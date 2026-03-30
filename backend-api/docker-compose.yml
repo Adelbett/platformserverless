@@ -1,0 +1,56 @@
+version: "3.9"
+
+services:
+
+  # ── PostgreSQL ────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: platform-postgres
+    environment:
+      POSTGRES_DB: platformdb
+      POSTGRES_USER: platform
+      POSTGRES_PASSWORD: platform123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U platform -d platformdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Spring Boot Backend API ───────────────────────────────────────
+  backend-api:
+    build: .
+    container_name: platform-backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/platformdb
+      SPRING_DATASOURCE_USERNAME: platform
+      SPRING_DATASOURCE_PASSWORD: platform123
+      APP_JWT_SECRET: "c2VjcmV0S2V5Rm9yUGxhdGZvcm1TZXJ2ZXJsZXNzUGxhdGZvcm1CYWNrZW5kQXBpMjAyNg=="
+      APP_JWT_EXPIRATION_MS: "86400000"
+      APP_KUBERNETES_ENABLED: "false"
+      APP_PROMETHEUS_URL: "http://prometheus:9090"
+      APP_CORS_ALLOWED_ORIGINS: "http://localhost:5173,http://localhost:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: on-failure
+
+  # ── Prometheus (optional, for metrics) ───────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.2
+    container_name: platform-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
