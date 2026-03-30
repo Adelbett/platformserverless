@@ -8,16 +8,15 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-# Start Control Plane
-echo "Starting Control Plane..."
-cd control-plane
-if [ ! -f go.mod ]; then
-    echo "Initializing Go module..."
-    go mod init control-plane
-    go mod tidy
+# Start Backend API
+echo "Starting Spring Boot Backend..."
+cd backend-api
+if [ -f mvnw ]; then
+    ./mvnw spring-boot:run &
+else
+    mvn spring-boot:run &
 fi
-go run main.go &
-CP_PID=$!
+BACKEND_PID=$!
 
 # Start Web Portal
 echo "Starting Web Portal..."
@@ -30,4 +29,4 @@ npm run dev -- --host &
 WP_PID=$!
 
 echo "Services started. Press Ctrl+C to stop."
-wait $CP_PID $WP_PID
+wait $BACKEND_PID $WP_PID
