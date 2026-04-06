@@ -101,6 +101,13 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
+
+        <dependency>
+    <groupId>io.fabric8</groupId>
+    <artifactId>kubernetes-client</artifactId>
+    <version>6.10.0</version>
+</dependency>
+
         <!-- ── Kubernetes Java Client ───────────────────────────── -->
         <dependency>
             <groupId>io.kubernetes</groupId>

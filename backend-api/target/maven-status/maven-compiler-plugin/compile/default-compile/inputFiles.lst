@@ -24,6 +24,7 @@ C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\m
 C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\auth\dto\LoginRequest.java
 C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\eventing\EventingService.java
 C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\kafka\dto\CreateTopicRequest.java
+C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\config\WebSocketConfig.java
 C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\kafka\KafkaTopicRepository.java
 C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\logs\DeploymentLogRepository.java
 C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\security\UserDetailsServiceImpl.java
@@ -34,6 +35,7 @@ C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\m
 C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\eventing\Trigger.java
 C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\metrics\MetricsService.java
 C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\logs\LogService.java
+C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\app\KnativeServiceHelper.java
 C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\exception\GlobalExceptionHandler.java
 C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\eventing\KafkaSourceRepository.java
 C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\app\dto\AppResponse.java
@@ -52,6 +54,7 @@ C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\m
 C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\logs\DeploymentLog.java
 C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\user\dto\UpdateUserRequest.java
 C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\auth\dto\RegisterRequest.java
+C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\config\KubernetesConfig.java
 C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\eventing\dto\KafkaSourceDto.java
 C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\logs\dto\LogDto.java
 C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\app\AppRepository.java
