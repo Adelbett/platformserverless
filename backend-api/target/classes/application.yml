@@ -19,7 +19,7 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/platformserverless
     username: postgres
-    password: secret123
+    password: postgres
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -32,7 +32,10 @@ spring:
         format_sql: true
 
   security:
-    ignored: /api/auth/**
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8081/realms/platform}
 
 server:
   port: 8080
@@ -51,7 +54,15 @@ app:
 
   # CORS Configuration
   cors:
-    allowed-origins: "http://localhost:5173,http://localhost:3000,http://localhost:8080"
+    allowed-origins: "http://localhost:5173,http://localhost:5174,http://localhost:3000,http://localhost:8080"
+
+  # Keycloak Admin API
+  keycloak:
+    url: ${KEYCLOAK_URL:http://localhost:8081}
+    realm: ${KEYCLOAK_REALM:platform}
+    admin-username: ${KEYCLOAK_ADMIN_USER:admin}
+    admin-password: ${KEYCLOAK_ADMIN_PASSWORD:admin}
+    client-id: ${KEYCLOAK_CLIENT_ID:platform-web}
 
   # Prometheus
   prometheus:

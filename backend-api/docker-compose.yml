@@ -30,6 +30,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/platformdb
       SPRING_DATASOURCE_USERNAME: platform
       SPRING_DATASOURCE_PASSWORD: platform123
+      KEYCLOAK_ISSUER_URI: "http://keycloak:8080/realms/platform"
       APP_JWT_SECRET: "c2VjcmV0S2V5Rm9yUGxhdGZvcm1TZXJ2ZXJsZXNzUGxhdGZvcm1CYWNrZW5kQXBpMjAyNg=="
       APP_JWT_EXPIRATION_MS: "86400000"
       APP_KUBERNETES_ENABLED: "false"
@@ -38,7 +39,21 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      keycloak:
+        condition: service_started
     restart: on-failure
+
+  # ── Keycloak (SSO / OIDC) ────────────────────────────────────────
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.1
+    container_name: platform-keycloak
+    command: ["start-dev"]
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8081:8080"
+    restart: unless-stopped
 
   # ── Prometheus (optional, for metrics) ───────────────────────────
   prometheus:

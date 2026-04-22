@@ -34,6 +34,7 @@ C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\m
 C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\app\App.java
 C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\eventing\Trigger.java
 C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\metrics\MetricsService.java
+C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\security\KeycloakJwtAuthConverter.java
 C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\logs\LogService.java
 C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\app\KnativeServiceHelper.java
 C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\backend-api\src\main\java\com\platform\api\exception\GlobalExceptionHandler.java
