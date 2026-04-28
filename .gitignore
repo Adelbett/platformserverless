@@ -18,7 +18,6 @@ build/
 # Go
 bin/
 pkg/
-src/
 *.exe
 *.test
 *.prof

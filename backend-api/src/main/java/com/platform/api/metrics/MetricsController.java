@@ -1,0 +1,32 @@
+package com.platform.api.metrics;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/metrics")
+@RequiredArgsConstructor
+@Tag(name = "Metrics", description = "Prometheus metrics for apps and the cluster")
+@SecurityRequirement(name = "bearerAuth")
+public class MetricsController {
+
+    private final MetricsService metricsService;
+
+    @GetMapping("/apps/{id}")
+    @Operation(summary = "Get metrics for a specific app (CPU, memory, requests, latency, error rate)")
+    public ResponseEntity<Map<String, Object>> getAppMetrics(@PathVariable String id) {
+        return ResponseEntity.ok(metricsService.getAppMetrics(id));
+    }
+
+    @GetMapping("/cluster")
+    @Operation(summary = "Get cluster-wide metrics overview")
+    public ResponseEntity<Map<String, Object>> getClusterMetrics() {
+        return ResponseEntity.ok(metricsService.getClusterMetrics());
+    }
+}

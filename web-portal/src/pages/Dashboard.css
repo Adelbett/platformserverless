@@ -1,0 +1,342 @@
+/* Dashboard.css - NextStep Design */
+
+.ns-dashboard {
+    padding: 32px;
+    background-color: #07090E;
+    min-height: 100vh;
+    color: #FFFFFF;
+    font-family: 'Inter', 'Syne', sans-serif;
+}
+
+.ns-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+}
+
+.ns-title {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0;
+    color: #FFFFFF;
+}
+
+.ns-btn-primary {
+    background-color: #29ABE2;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.ns-btn-primary:hover {
+    background-color: #218dbf;
+}
+
+.ns-card {
+    background-color: #0D1117;
+    border: 0.5px solid #1F2B3A;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: none;
+}
+
+.ns-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    margin-bottom: 32px;
+}
+
+.ns-metric-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: relative;
+    overflow: hidden;
+}
+
+.ns-metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: #1F2B3A;
+    transition: background 0.3s ease;
+}
+
+.ns-metric-card:hover::before {
+    background: #29ABE2;
+}
+
+.ns-metric-label {
+    color: #A8BDD0;
+    font-size: 13px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.ns-metric-value {
+    font-size: 42px;
+    font-weight: 700;
+    color: #FFFFFF;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+}
+
+.ns-metric-trend {
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.ns-text-green { color: #3FB950; }
+.ns-text-red { color: #F85149; }
+
+.ns-section {
+    margin-bottom: 32px;
+}
+
+.ns-section-title, .ns-panel-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 20px 0;
+    color: #FFFFFF;
+}
+
+.ns-apps-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+
+.ns-app-card {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 20px;
+    transition: border-color 0.2s ease;
+}
+
+.ns-app-card:hover {
+    border-color: #29ABE2;
+}
+
+.ns-app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.ns-app-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #FFFFFF;
+}
+
+.ns-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.ns-badge-green { background: rgba(63, 185, 80, 0.1); color: #3FB950; }
+.ns-badge-red { background: rgba(248, 81, 73, 0.1); color: #F85149; }
+.ns-badge-blue { background: rgba(41, 171, 226, 0.1); color: #29ABE2; }
+.ns-badge-gray { background: rgba(61, 79, 96, 0.15); color: #A8BDD0; }
+
+.ns-app-image {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: #A8BDD0;
+    background: #151a23;
+    padding: 6px 10px;
+    border-radius: 6px;
+    width: fit-content;
+}
+
+.ns-app-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: auto;
+}
+
+.ns-app-url {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: #29ABE2;
+    text-decoration: none;
+    max-width: 60%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ns-app-url:hover {
+    text-decoration: underline;
+}
+
+.ns-app-url.ns-muted {
+    color: #3D4F60;
+}
+
+.ns-app-date {
+    font-size: 12px;
+    color: #3D4F60;
+}
+
+.ns-bottom-panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.ns-panel {
+    display: flex;
+    flex-direction: column;
+    height: 400px;
+}
+
+.ns-topic-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.ns-topic-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 0.5px solid #1F2B3A;
+}
+
+.ns-topic-row:last-child {
+    border-bottom: none;
+}
+
+.ns-topic-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: #FFFFFF;
+}
+
+.ns-topic-meta {
+    font-size: 12px;
+    color: #A8BDD0;
+    margin-top: 4px;
+}
+
+.ns-topic-lag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: #A8BDD0;
+}
+
+.ns-terminal-panel {
+    background-color: #060809;
+}
+
+.ns-terminal {
+    flex: 1;
+    overflow-y: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #A8BDD0;
+    display: flex;
+    flex-direction: column;
+    padding-right: 10px;
+}
+
+.ns-terminal::-webkit-scrollbar,
+.ns-topic-list::-webkit-scrollbar {
+    width: 6px;
+}
+.ns-terminal::-webkit-scrollbar-thumb,
+.ns-topic-list::-webkit-scrollbar-thumb {
+    background: #1F2B3A;
+    border-radius: 4px;
+}
+
+.ns-log-line {
+    display: flex;
+    gap: 12px;
+}
+
+.ns-log-time {
+    color: #3D4F60;
+    flex-shrink: 0;
+}
+
+.ns-log-level {
+    font-weight: 600;
+    flex-shrink: 0;
+    width: 80px;
+}
+
+.ns-log-msg {
+    word-break: break-all;
+}
+
+.ns-empty-state {
+    color: #3D4F60;
+    font-size: 14px;
+    padding: 20px 0;
+}
+
+.ns-empty-action {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 40px 0;
+    grid-column: 1 / -1;
+}
+
+.ns-btn-secondary {
+    background-color: transparent;
+    color: #29ABE2;
+    border: 1px dashed #29ABE2;
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.ns-btn-secondary:hover {
+    background-color: rgba(41, 171, 226, 0.1);
+}
+
+@media (max-width: 1024px) {
+    .ns-metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .ns-apps-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .ns-bottom-panels {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .ns-metrics-grid {
+        grid-template-columns: 1fr;
+    }
+    .ns-apps-grid {
+        grid-template-columns: 1fr;
+    }
+}
