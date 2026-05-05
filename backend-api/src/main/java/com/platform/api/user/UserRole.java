@@ -2,6 +2,6 @@ package com.platform.api.user;
 
 public enum UserRole {
     ADMIN,
-    USER,
-    DEVELOPER
+    DEVELOPER,
+    VIEWER
 }

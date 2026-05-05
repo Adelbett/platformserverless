@@ -25,6 +25,9 @@ spring:
 app:
   kubernetes:
     enabled: false
+  kafka:
+    enabled: true
+    bootstrap-servers: 10.9.21.233:9093
   prometheus:
     url: http://10.9.21.232:9090
   cors:

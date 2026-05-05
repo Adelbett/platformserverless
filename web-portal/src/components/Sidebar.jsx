@@ -73,9 +73,15 @@ const Sidebar = ({ collapsed, onToggle }) => {
     const navigate = useNavigate();
 
     const email    = user?.email || user?.username || 'user@nextstep.io';
-    const username = email.split('@')[0];
+    const username = user?.username || email.split('@')[0];
     const initials = username.slice(0, 2).toUpperCase();
-    const role     = user?.role || 'DEVELOPER';
+    const role     = user?.role || 'VIEWER';
+
+    const roleStyle = {
+        ADMIN:     { color: '#EF4444', bg: 'rgba(239,68,68,0.12)'    },
+        DEVELOPER: { color: '#00D4FF', bg: 'rgba(0,212,255,0.10)'    },
+        VIEWER:    { color: '#9CA3AF', bg: 'rgba(156,163,175,0.10)'  },
+    }[role] || { color: '#9CA3AF', bg: 'rgba(156,163,175,0.10)' };
 
     const handleLogout = () => { logout(); navigate('/login'); };
 
@@ -176,9 +182,15 @@ const Sidebar = ({ collapsed, onToggle }) => {
                                 <p style={{ fontSize: 12, fontWeight: 700, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} className="text-primary">
                                     {username}
                                 </p>
-                                <p style={{ fontSize: 10, margin: '1px 0 0', fontFamily: "'JetBrains Mono', monospace", color: '#9CA3AF' }}>
+                                <span style={{
+                                    display: 'inline-block', marginTop: 3,
+                                    fontSize: 9, fontWeight: 700, letterSpacing: '0.1em',
+                                    textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace",
+                                    padding: '2px 6px', borderRadius: 4,
+                                    color: roleStyle.color, background: roleStyle.bg,
+                                }}>
                                     {role}
-                                </p>
+                                </span>
                             </div>
                         </motion.div>
                     )}

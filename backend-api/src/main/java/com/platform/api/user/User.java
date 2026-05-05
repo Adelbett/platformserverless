@@ -28,7 +28,7 @@ public class User {
 
     @Column(length = 20)
     @Builder.Default
-    private String role = "USER";
+    private String role = "VIEWER";
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

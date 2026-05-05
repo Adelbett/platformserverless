@@ -186,8 +186,9 @@ const DeployApp = () => {
             });
             toast.success('Deployment initiated', `${form.appName} is being deployed to the cluster.`);
                 setTimeout(() => navigate(`/apps/${response.data?.id || form.appName}`), 1000);
-        } catch {
-            toast.error('Deployment failed', 'Unable to deploy the application from the backend.');
+        } catch (err) {
+            const msg = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Unknown error';
+            toast.error('Deployment failed', msg);
         } finally {
             setDeploying(false);
         }

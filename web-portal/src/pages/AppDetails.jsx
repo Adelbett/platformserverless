@@ -8,7 +8,7 @@ import {
     Minus, Plus, Sliders, Terminal, GitBranch,
     Shield, AlertTriangle
 } from 'lucide-react';
-import { appsApi, logsApi } from '../api';
+import { appsApi, logsApi, metricsApi } from '../api';
 import { useTheme } from '../context/ThemeContext';
 
 // ── Mock data ──────────────────────────────────────────────────────────────────
@@ -61,6 +61,13 @@ const genSeries = (n, base, v) =>
         t: `${String(Math.floor((60 - n + i) / 60)).padStart(2,'0')}:${String((60 - n + i) % 60).padStart(2,'0')}`,
         v: Math.max(0, base + (Math.random() - 0.5) * v),
     }));
+
+// ── Metric formatters ──────────────────────────────────────────────────────────
+
+const fmtReq  = v => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v.toFixed(1);
+const fmtPct  = v => `${(v * 100).toFixed(2)}%`;
+const fmtMs   = v => v < 1 ? `${(v * 1000).toFixed(0)}µs` : `${v.toFixed(1)}ms`;
+const fmtMiB  = v => v >= 1024 ? `${(v / 1024).toFixed(1)}GiB` : `${v.toFixed(0)}MiB`;
 
 // ── Status badge ───────────────────────────────────────────────────────────────
 
@@ -258,6 +265,7 @@ const AppDetails = () => {
 
     const [app,        setApp]        = useState(null);
     const [logs,       setLogs]       = useState([]);
+    const [metrics,    setMetrics]    = useState(null);
     const [loading,    setLoading]    = useState(true);
     const [replicas,   setReplicas]   = useState(3);
     const [envOpen,    setEnvOpen]    = useState(true);
@@ -273,15 +281,17 @@ const AppDetails = () => {
         const load = async () => {
             setLoading(true);
             try {
-                const [appRes, logsRes] = await Promise.all([
+                const [appRes, logsRes, metricsRes] = await Promise.all([
                     appsApi.get(id).catch(() => ({ data: null })),
                     logsApi.getByApp(id).catch(() => ({ data: [] })),
+                    metricsApi.getApp(id).catch(() => ({ data: null })),
                 ]);
                 if (!active) return;
                 const a = appRes.data || MOCK_APP;
                 setApp(a);
                 setReplicas(a.replicas ?? a.minReplicas ?? 1);
                 setLogs(Array.isArray(logsRes.data) && logsRes.data.length > 0 ? logsRes.data : MOCK_LOGS);
+                setMetrics(metricsRes.data);
             } catch { if (active) { setApp(MOCK_APP); setLogs(MOCK_LOGS); } }
             finally   { if (active) setLoading(false); }
         };
@@ -355,14 +365,14 @@ const AppDetails = () => {
                 </div>
             </div>
 
-            {/* Metrics row */}
+            {/* Metrics row — real Prometheus data, falls back to "—" when cluster is unreachable */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
-                <MetricMini label="Req / sec"   value="4.2k"  color="#00D4FF" />
-                <MetricMini label="Error Rate"  value="0.3%"  color="#10B981" />
-                <MetricMini label="P50 Latency" value="18ms"  color={dark ? '#F9FAFB' : '#0F172A'} />
-                <MetricMini label="P95 Latency" value="52ms"  color="#F59E0B" />
-                <MetricMini label="P99 Latency" value="87ms"  color="#F97316" />
-                <MetricMini label="Uptime"      value="99.9%" color="#10B981" />
+                <MetricMini label="Req / sec"   value={metrics ? fmtReq(metrics.reqPerSec)        : '—'} color="#00D4FF" />
+                <MetricMini label="Error Rate"  value={metrics ? fmtPct(metrics.errorRate)        : '—'} color={metrics && metrics.errorRate > 0.05 ? '#EF4444' : '#10B981'} />
+                <MetricMini label="P50 Latency" value={metrics ? fmtMs(metrics.p50LatencyMs)      : '—'} color={dark ? '#F9FAFB' : '#0F172A'} />
+                <MetricMini label="P95 Latency" value={metrics ? fmtMs(metrics.p95LatencyMs)      : '—'} color="#F59E0B" />
+                <MetricMini label="P99 Latency" value={metrics ? fmtMs(metrics.p99LatencyMs)      : '—'} color="#F97316" />
+                <MetricMini label="Memory"      value={metrics ? fmtMiB(metrics.memoryMiB)        : '—'} color="#10B981" />
             </div>
 
             {/* Charts */}
@@ -491,7 +501,16 @@ const AppDetails = () => {
                 {deleteOpen && (
                     <DeleteModal
                         appName={appData.name || appData.serviceName || id}
-                        onConfirm={() => { setDeleteOpen(false); navigate('/apps'); }}
+                        onConfirm={async () => {
+                            try {
+                                await appsApi.delete(id);
+                                setDeleteOpen(false);
+                                navigate('/apps');
+                            } catch (err) {
+                                console.error('Delete failed:', err);
+                                setDeleteOpen(false);
+                            }
+                        }}
                         onClose={() => setDeleteOpen(false)}
                     />
                 )}

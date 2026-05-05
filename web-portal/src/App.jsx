@@ -12,6 +12,7 @@ import KafkaTopics from './pages/KafkaTopics';
 import Eventing from './pages/Eventing';
 import LogsView from './pages/LogsView';
 import Monitoring from './pages/Monitoring';
+import Users from './pages/Users';
 
 const ProtectedRoute = ({ children }) => {
     const { user, loading } = useAuth();
@@ -51,7 +52,7 @@ const AppRoutes = () => {
                 <Route path="/monitoring" element={<Monitoring />} />
                 <Route path="/billing" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/settings" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/users" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/users" element={<Users />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

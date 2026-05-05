@@ -19,13 +19,13 @@ public class MetricsController {
     private final MetricsService metricsService;
 
     @GetMapping("/apps/{id}")
-    @Operation(summary = "Get metrics for a specific app (CPU, memory, requests, latency, error rate)")
+    @Operation(summary = "Per-app metrics: req/sec, error rate, latency P50/P95/P99, CPU, memory")
     public ResponseEntity<Map<String, Object>> getAppMetrics(@PathVariable String id) {
         return ResponseEntity.ok(metricsService.getAppMetrics(id));
     }
 
     @GetMapping("/cluster")
-    @Operation(summary = "Get cluster-wide metrics overview")
+    @Operation(summary = "Cluster-wide aggregated metrics for dashboard overview")
     public ResponseEntity<Map<String, Object>> getClusterMetrics() {
         return ResponseEntity.ok(metricsService.getClusterMetrics());
     }

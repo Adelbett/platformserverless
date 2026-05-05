@@ -7,7 +7,7 @@ app.use(express.json());
 
 const kafka = new Kafka({
     clientId: 'order-service',
-    brokers: [(process.env.KAFKA_BOOTSTRAP || 'kafka.kafka.svc.cluster.local:9092')],
+    brokers: [(process.env.KAFKA_BROKERCONNECT || process.env.KAFKA_BOOTSTRAP || 'my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092')],
     retry: { initialRetryTime: 3000, retries: 10 },
 });
 const producer = kafka.producer();

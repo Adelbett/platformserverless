@@ -19,6 +19,10 @@ const C = {
 
 const BAR_HEIGHTS = [40, 45, 55, 70, 85, 60, 50, 40, 45, 65, 75, 60, 80, 90, 55, 45, 35, 65, 70, 80];
 
+const fmtReq = v => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v.toFixed(1);
+const fmtPct = v => `${(v * 100).toFixed(2)}%`;
+const fmtMBs = v => v >= 1024 ? `${(v / 1024).toFixed(1)} GB/s` : `${v.toFixed(1)} MB/s`;
+
 const statusColor = (s) => {
     if (s === 'RUNNING') return C.blue;
     if (s === 'SCALING') return C.yellow;
@@ -169,16 +173,16 @@ const Monitoring = () => {
                 />
                 <KpiCard
                     icon="conversion_path"
-                    label="Kafka Pipelines"
-                    value="12"
-                    sub="1 in maintenance"
-                    subColor={C.yellow}
+                    label="Req / sec"
+                    value={loading ? '…' : clusterMetrics ? fmtReq(clusterMetrics.totalReqPerSec) : '—'}
+                    sub={clusterMetrics ? `Error rate: ${fmtPct(clusterMetrics.clusterErrorRate)}` : 'No data'}
+                    subColor={clusterMetrics && clusterMetrics.clusterErrorRate > 0.05 ? C.red : C.green}
                 />
                 <KpiCard
                     icon="speed"
-                    label="Throughput"
-                    value="1.2 GB/s"
-                    sub="Optimal"
+                    label="Net Throughput"
+                    value={loading ? '…' : clusterMetrics ? fmtMBs(clusterMetrics.netSendMBs + clusterMetrics.netRecvMBs) : '—'}
+                    sub={clusterMetrics ? `↑ ${fmtMBs(clusterMetrics.netSendMBs)}  ↓ ${fmtMBs(clusterMetrics.netRecvMBs)}` : 'No data'}
                     subColor={C.cyan}
                 />
             </div>
@@ -196,7 +200,9 @@ const Monitoring = () => {
                         </span>
                     </div>
                     <span style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: C.textDim }}>
-                        Status: <span style={{ color: C.yellow }}>Awaiting Prometheus</span>
+                        Status: <span style={{ color: clusterMetrics ? C.green : C.yellow }}>
+                            {clusterMetrics ? 'Connected' : 'Awaiting Prometheus'}
+                        </span>
                     </span>
                 </div>
 

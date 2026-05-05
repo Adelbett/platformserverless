@@ -31,7 +31,7 @@ const LogsView = () => {
         const loadLogs = async () => {
             try {
                 setLoading(true);
-                const userId = user?.id || user?.username || 'admin';
+                const userId = user?.username || user?.id || 'admin';
                 const response = await logsApi.getByUser(userId);
                 if (!active) return;
                 setLogs(Array.isArray(response.data) ? response.data : []);

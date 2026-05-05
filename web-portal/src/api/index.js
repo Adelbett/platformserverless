@@ -19,6 +19,12 @@ export const metricsApi = {
     getCluster: () => api.get('/metrics/cluster'),
 }
 
+export const usersApi = {
+    me:         ()           => api.get('/users/me'),
+    list:       ()           => api.get('/users'),
+    updateRole: (id, role)   => api.patch(`/users/${id}/role`, { role }),
+}
+
 export const logsApi = {
     getByApp: (id) => api.get(`/logs/apps/${id}`),
     getByUser: (id) => api.get(`/logs/users/${id}`),

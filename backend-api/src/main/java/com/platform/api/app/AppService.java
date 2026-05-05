@@ -103,10 +103,10 @@ public class AppService {
 
 
     private String generateNamespace(String userId) {
-    return ("user-" + userId.substring(0, Math.min(6, userId.length())))
-            .toLowerCase()
-            .replaceAll("[^a-z0-9-]", "");
-}
+        String cleaned = userId.toLowerCase().replaceAll("[^a-z0-9]", "-");
+        if (cleaned.length() > 30) cleaned = cleaned.substring(0, 30);
+        return "user-" + cleaned;
+    }
 
     public AppResponse getApp(String appId, String userId) {
         App app = requireOwned(appId, userId);
@@ -150,8 +150,12 @@ public class AppService {
     }
 
     private void addLog(String appId, String userId, String message, String type) {
+        String name = appRepository.findById(appId)
+                .map(App::getName)
+                .orElse(appId);
         DeploymentLog log = DeploymentLog.builder()
                 .appId(appId)
+                .appName(name)
                 .userId(userId)
                 .message(message)
                 .type(type)

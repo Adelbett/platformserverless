@@ -1,3 +1,184 @@
+/* ── Auth page layout ─────────────────────────────────────── */
+.auth-page {
+    display: flex;
+    min-height: 100vh;
+    background-color: #0A0E1A;
+    position: relative;
+    overflow: hidden;
+}
+
+.auth-left {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 48px;
+    background: linear-gradient(135deg, #0A0E1A 0%, #0f1729 100%);
+    border-right: 1px solid rgba(255,255,255,0.06);
+}
+
+.auth-right {
+    width: 480px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px;
+    background-color: #0D1117;
+}
+
+@media (max-width: 900px) {
+    .auth-left { display: none; }
+    .auth-right { width: 100%; }
+}
+
+/* ── Glow spheres ─────────────────────────────────────────── */
+.glow-sphere {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    pointer-events: none;
+    z-index: 0;
+}
+.glow-1 {
+    width: 400px; height: 400px;
+    background: rgba(0, 212, 255, 0.08);
+    top: -100px; left: -100px;
+}
+.glow-2 {
+    width: 300px; height: 300px;
+    background: rgba(99, 102, 241, 0.08);
+    bottom: -80px; right: 200px;
+}
+
+/* ── Branding ─────────────────────────────────────────────── */
+.branding-top {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.brand-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.brand-name {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 800;
+    color: #F9FAFB;
+    letter-spacing: -0.02em;
+}
+
+.brand-tagline {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    color: #00D4FF;
+    text-transform: uppercase;
+}
+
+/* ── Hero text ────────────────────────────────────────────── */
+.auth-hero-text h1 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 3rem;
+    font-weight: 800;
+    color: #F9FAFB;
+    line-height: 1.15;
+    letter-spacing: -0.03em;
+    margin-bottom: 2rem;
+}
+
+.text-cyan { color: #00D4FF; }
+
+.feature-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.feature-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.95rem;
+    color: #9CA3AF;
+}
+
+.feature-icon {
+    color: #00D4FF;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+/* ── Auth card ────────────────────────────────────────────── */
+.auth-card {
+    width: 100%;
+    max-width: 400px;
+    background: #111827;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 40px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+    position: relative;
+    z-index: 1;
+}
+
+.auth-header {
+    margin-bottom: 2rem;
+}
+
+.auth-header h2 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #F9FAFB;
+    margin: 0 0 6px;
+}
+
+.auth-header p {
+    font-size: 0.875rem;
+    color: #6B7280;
+    margin: 0;
+}
+
+/* ── Form elements ────────────────────────────────────────── */
+.form-group {
+    margin-bottom: 1.25rem;
+}
+
+.form-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #9CA3AF;
+    margin-bottom: 6px;
+}
+
+.form-input {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    background-color: #1F2937;
+    color: #F9FAFB;
+    border: 1px solid rgba(255,255,255,0.08);
+    outline: none;
+    transition: border-color 200ms ease, box-shadow 200ms ease;
+    box-sizing: border-box;
+}
+
+.form-input::placeholder { color: #4B5563; }
+.form-input:focus {
+    border-color: rgba(0, 212, 255, 0.5);
+    box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.12);
+}
+.form-input:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Legacy ───────────────────────────────────────────────── */
 .auth-container {
     display: flex;
     align-items: center;
@@ -6,12 +187,6 @@
     padding: 20px;
     background: radial-gradient(circle at top right, rgba(99, 102, 241, 0.15), transparent 40%),
         radial-gradient(circle at bottom left, rgba(16, 185, 129, 0.1), transparent 40%);
-}
-
-.auth-card {
-    width: 100%;
-    max-width: 440px;
-    padding: 40px;
 }
 
 .auth-title {
@@ -42,6 +217,4 @@
     color: var(--text-secondary);
 }
 
-.alert {
-    margin-bottom: 24px;
-}
+.alert { margin-bottom: 24px; }

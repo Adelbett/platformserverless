@@ -131,6 +131,14 @@ public class KnativeService {
                                 "ports", List.of(Map.of(
                                     "containerPort", req.getPort() != null ? req.getPort() : 8080
                                 )),
+                                "env", List.of(
+                                    // Injectés automatiquement — le client n'a pas besoin de les configurer
+                                    Map.of("name", "KAFKA_BROKERCONNECT",         "value", "my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"),
+                                    Map.of("name", "KAFKA_BOOTSTRAP",             "value", "my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"),
+                                    Map.of("name", "KAFKA_BOOTSTRAP_SERVERS",     "value", "my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"),
+                                    Map.of("name", "SPRING_KAFKA_BOOTSTRAP_SERVERS", "value", "my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"),
+                                    Map.of("name", "KAFKA_BROKERS",               "value", "my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092")
+                                ),
                                 "resources", Map.of(
                                     "requests", Map.of(
                                         "cpu",    req.getCpuRequest()    != null ? req.getCpuRequest()    : "100m",
@@ -145,6 +153,24 @@ public class KnativeService {
     }
 
     private String buildServiceUrl(String name, String namespace) {
+        for (int i = 0; i < 20; i++) {
+            try {
+                GenericKubernetesResource ksvc = kubernetesClient
+                        .genericKubernetesResources("serving.knative.dev/v1", "Service")
+                        .inNamespace(namespace)
+                        .withName(name)
+                        .get();
+                if (ksvc != null) {
+                    Map<?, ?> status = (Map<?, ?>) ksvc.getAdditionalProperties().get("status");
+                    if (status != null && status.get("url") != null) {
+                        return status.get("url").toString();
+                    }
+                }
+                Thread.sleep(3000);
+            } catch (Exception e) {
+                log.warn("Waiting for Knative service URL '{}' attempt {}: {}", name, i + 1, e.getMessage());
+            }
+        }
         return String.format("http://%s.%s.svc.cluster.local", name, namespace);
     }
 

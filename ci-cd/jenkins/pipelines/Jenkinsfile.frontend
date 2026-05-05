@@ -1,0 +1,79 @@
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_NAME = 'adelbettaieb/platform-web'
+        IMAGE_TAG  = "v${BUILD_NUMBER}"
+        NAMESPACE  = 'platform'
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/Adelbett/platformserverless.git'
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                dir('web-portal') {
+                    sh 'npm install'
+                }
+            }
+        }
+
+        stage('Build') {
+            steps {
+                dir('web-portal') {
+                    sh 'npm run build'
+                }
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                dir('web-portal') {
+                    sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -t ${IMAGE_NAME}:latest -f ../ci-cd/docker/frontend.Dockerfile ."
+                }
+            }
+        }
+
+        stage('Docker Push') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-credentials',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh """
+                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                        docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                        docker push ${IMAGE_NAME}:latest
+                    """
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                sh """
+                    kubectl set image deployment/platform-web \
+                        platform-web=${IMAGE_NAME}:${IMAGE_TAG} \
+                        -n ${NAMESPACE}
+                    kubectl rollout status deployment/platform-web -n ${NAMESPACE}
+                """
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Frontend déployé avec succès — ${IMAGE_NAME}:${IMAGE_TAG}"
+        }
+        failure {
+            echo "❌ Pipeline échoué — vérifier les logs"
+        }
+    }
+}

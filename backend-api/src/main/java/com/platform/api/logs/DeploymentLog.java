@@ -20,6 +20,9 @@ public class DeploymentLog {
     @Column(name = "app_id")
     private String appId;
 
+    @Column(name = "app_name")
+    private String appName;
+
     @Column(name = "user_id")
     private String userId;
 

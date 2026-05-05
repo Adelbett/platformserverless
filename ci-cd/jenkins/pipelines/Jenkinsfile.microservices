@@ -1,0 +1,65 @@
+pipeline {
+    agent any
+
+    environment {
+        ORDER_IMAGE  = 'adelbettaieb/order-service'
+        NOTIF_IMAGE  = 'adelbettaieb/notification-service'
+        IMAGE_TAG    = "v${BUILD_NUMBER}"
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/Adelbett/platformserverless.git'
+            }
+        }
+
+        stage('Docker Build') {
+            parallel {
+                stage('order-service') {
+                    steps {
+                        dir('microservices/order-service') {
+                            sh "docker build -t ${ORDER_IMAGE}:${IMAGE_TAG} -t ${ORDER_IMAGE}:latest ."
+                        }
+                    }
+                }
+                stage('notification-service') {
+                    steps {
+                        dir('microservices/notification-service') {
+                            sh "docker build -t ${NOTIF_IMAGE}:${IMAGE_TAG} -t ${NOTIF_IMAGE}:latest ."
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Docker Push') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-credentials',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh """
+                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                        docker push ${ORDER_IMAGE}:${IMAGE_TAG}
+                        docker push ${ORDER_IMAGE}:latest
+                        docker push ${NOTIF_IMAGE}:${IMAGE_TAG}
+                        docker push ${NOTIF_IMAGE}:latest
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Microservices buildés et pushés — tag: ${IMAGE_TAG}"
+        }
+        failure {
+            echo "❌ Pipeline échoué — vérifier les logs"
+        }
+    }
+}

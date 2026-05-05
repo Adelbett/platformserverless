@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { authApi } from '../api';
+import './Auth.css';
 const VisibilityIcon    = () => <span>👁</span>;
 const VisibilityOffIcon = () => <span>🙈</span>;
 

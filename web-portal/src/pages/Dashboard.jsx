@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -8,9 +9,10 @@ import {
 import {
     Box, Cpu, Zap, Clock, TrendingUp, TrendingDown, Minus,
     Rocket, ArrowRight, RefreshCw, ChevronUp, ChevronDown,
-    ChevronsUpDown, X, ExternalLink, CheckCircle2
+    ChevronsUpDown, X, ExternalLink, CheckCircle2,
+    Users, Activity, Globe, KeyRound
 } from 'lucide-react';
-import { appsApi } from '../api';
+import { appsApi, logsApi, metricsApi } from '../api';
 import { useTheme } from '../context/ThemeContext';
 
 // ── Mock data ──────────────────────────────────────────────────────────────────
@@ -23,23 +25,9 @@ const genData = (pts, base, v) =>
 
 const TIME_RANGES = ['1h', '6h', '24h', '7d'];
 
-const MOCK_APPS = [
-    { id: 'api-gateway',   name: 'api-gateway',   status: 'RUNNING', replicas: 3, lastDeploy: '3m ago',  traffic: '4.2k rps', version: 'v2.1.4' },
-    { id: 'auth-service',  name: 'auth-service',  status: 'RUNNING', replicas: 2, lastDeploy: '1h ago',  traffic: '890 rps',  version: 'v1.8.2' },
-    { id: 'worker-jobs',   name: 'worker-jobs',   status: 'IDLE',    replicas: 1, lastDeploy: '2h ago',  traffic: '12 rps',   version: 'v3.0.1' },
-    { id: 'frontend-app',  name: 'frontend-app',  status: 'RUNNING', replicas: 4, lastDeploy: '30m ago', traffic: '2.1k rps', version: 'v5.2.0' },
-    { id: 'ml-inference',  name: 'ml-inference',  status: 'ERROR',   replicas: 0, lastDeploy: '4h ago',  traffic: '0 rps',    version: 'v0.9.1' },
-    { id: 'data-pipeline', name: 'data-pipeline', status: 'RUNNING', replicas: 2, lastDeploy: '6h ago',  traffic: '340 rps',  version: 'v1.2.0' },
-];
+const fmtReq = v => v == null ? '—' : v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v.toFixed(1);
+const fmtMs  = v => v == null ? '—' : v < 1 ? `${(v * 1000).toFixed(0)}µs` : `${v.toFixed(0)}ms`;
 
-const MOCK_ACTIVITY = [
-    { id: 1, color: '#10B981', app: 'api-gateway',   msg: 'Deployed v2.1.4 successfully',         time: '3m ago'  },
-    { id: 2, color: '#00D4FF', app: 'frontend-app',  msg: 'Scaled up to 4 replicas',              time: '28m ago' },
-    { id: 3, color: '#EF4444', app: 'ml-inference',  msg: 'Health check failed — pod restarting', time: '45m ago' },
-    { id: 4, color: '#10B981', app: 'auth-service',  msg: 'Deployed v1.8.2 successfully',         time: '1h ago'  },
-    { id: 5, color: '#F59E0B', app: 'worker-jobs',   msg: 'Scaled down to 1 replica (idle)',      time: '2h ago'  },
-    { id: 6, color: '#10B981', app: 'data-pipeline', msg: 'Pipeline v1.2.0 deployed',             time: '6h ago'  },
-];
 
 // ── Status badge ───────────────────────────────────────────────────────────────
 
@@ -268,14 +256,105 @@ const QuickDeployPanel = ({ onClose }) => {
     );
 };
 
+// ── Role ideas card ────────────────────────────────────────────────────────────
+
+const ROLE_IDEAS = {
+    ADMIN: {
+        color: '#EF4444',
+        bg: 'rgba(239,68,68,0.08)',
+        border: 'rgba(239,68,68,0.2)',
+        title: 'Admin — Full Control',
+        subtitle: 'You manage the platform. Here are your key actions:',
+        ideas: [
+            { icon: Users,       label: 'Manage team',         desc: 'View all users, assign DEVELOPER or VIEWER roles',  path: '/users'     },
+            { icon: Activity,    label: 'Global monitoring',   desc: 'Watch all running services across all namespaces',   path: '/monitoring'},
+            { icon: Box,         label: 'All applications',    desc: 'Browse every deployed app on the platform',         path: '/apps'      },
+            { icon: Zap,         label: 'Kafka clusters',      desc: 'Manage topics, partitions and eventing pipelines',  path: '/kafka'     },
+        ],
+    },
+    DEVELOPER: {
+        color: '#00D4FF',
+        bg: 'rgba(0,212,255,0.06)',
+        border: 'rgba(0,212,255,0.18)',
+        title: 'Developer — Build & Ship',
+        subtitle: 'You deploy and operate services. Suggested next steps:',
+        ideas: [
+            { icon: Rocket,      label: 'Deploy a new service', desc: 'Push a Docker image and get a live URL instantly',  path: '/apps/new'  },
+            { icon: Zap,         label: 'Create a Kafka topic', desc: 'Set up event streaming between your microservices', path: '/kafka'     },
+            { icon: Globe,       label: 'Configure eventing',   desc: 'Wire KafkaSources and Triggers for event routing',  path: '/eventing'  },
+            { icon: Activity,    label: 'Monitor your apps',    desc: 'Live metrics: req/sec, latency, error rate, CPU',   path: '/monitoring'},
+        ],
+    },
+    VIEWER: {
+        color: '#9CA3AF',
+        bg: 'rgba(156,163,175,0.06)',
+        border: 'rgba(156,163,175,0.18)',
+        title: 'Viewer — Read Only',
+        subtitle: 'You have read access. Explore the platform:',
+        ideas: [
+            { icon: Box,         label: 'Browse applications', desc: 'See all running services and their live URLs',       path: '/apps'      },
+            { icon: Activity,    label: 'Check metrics',       desc: 'View req/sec, latency and error rates per service',  path: '/monitoring'},
+            { icon: KeyRound,    label: 'Explore logs',        desc: 'Read deployment and runtime logs for any service',   path: '/logs'      },
+            { icon: Globe,       label: 'Event pipelines',     desc: 'Explore the Kafka eventing topology',                path: '/eventing'  },
+        ],
+    },
+};
+
+const RoleIdeasCard = ({ role, navigate }) => {
+    const cfg = ROLE_IDEAS[role] || ROLE_IDEAS.VIEWER;
+    return (
+        <div className="ns-card" style={{ padding: 24, border: `1px solid ${cfg.border}`, background: cfg.bg }}>
+            <div style={{ marginBottom: 16 }}>
+                <span style={{
+                    display: 'inline-block', fontSize: 9, fontWeight: 800, letterSpacing: '0.15em',
+                    textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace",
+                    padding: '3px 8px', borderRadius: 4, marginBottom: 8,
+                    color: cfg.color, background: `${cfg.color}18`,
+                }}>{role || 'VIEWER'}</span>
+                <h3 style={{ fontSize: 15, fontWeight: 900, fontFamily: "'Outfit', sans-serif", margin: '0 0 4px' }} className="text-primary">{cfg.title}</h3>
+                <p style={{ fontSize: 12, margin: 0, color: '#9CA3AF' }}>{cfg.subtitle}</p>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                {cfg.ideas.map(idea => {
+                    const Icon = idea.icon;
+                    return (
+                        <motion.button
+                            key={idea.path}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => navigate(idea.path)}
+                            style={{
+                                display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8,
+                                padding: 14, borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)',
+                                background: 'rgba(255,255,255,0.03)', cursor: 'pointer', textAlign: 'left',
+                            }}
+                        >
+                            <div style={{ width: 32, height: 32, borderRadius: 8, background: `${cfg.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <Icon size={16} style={{ color: cfg.color }} />
+                            </div>
+                            <div>
+                                <p style={{ fontSize: 12, fontWeight: 700, margin: '0 0 3px' }} className="text-primary">{idea.label}</p>
+                                <p style={{ fontSize: 11, margin: 0, lineHeight: 1.4, color: '#6B7280' }}>{idea.desc}</p>
+                            </div>
+                        </motion.button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
 // ── Main Dashboard ─────────────────────────────────────────────────────────────
 
 const Dashboard = () => {
     const navigate = useNavigate();
     const { dark } = useTheme();
+    const { user } = useAuth();
 
-    const [apps,       setApps]       = useState([]);
-    const [loading,    setLoading]    = useState(true);
+    const [apps,           setApps]       = useState([]);
+    const [logs,           setLogs]       = useState([]);
+    const [clusterMetrics, setCluster]    = useState(null);
+    const [loading,        setLoading]    = useState(true);
     const [timeRange,  setTimeRange]  = useState('24h');
     const [chartData,  setChartData]  = useState([]);
     const [deployOpen, setDeployOpen] = useState(false);
@@ -301,18 +380,26 @@ const Dashboard = () => {
         const load = async () => {
             setLoading(true);
             try {
-                const res = await appsApi.list().catch(() => ({ data: [] }));
+                const [res, metricsRes] = await Promise.all([
+                    appsApi.list().catch(() => ({ data: [] })),
+                    metricsApi.getCluster().catch(() => ({ data: null })),
+                ]);
                 if (!active) return;
-                const data = Array.isArray(res.data) && res.data.length > 0 ? res.data : MOCK_APPS;
+                const data = Array.isArray(res.data) ? res.data : [];
                 setApps(data);
-            } catch { if (active) setApps(MOCK_APPS); }
+                setCluster(metricsRes.data);
+                if (user?.username) {
+                    const logsRes = await logsApi.getByUser(user.username).catch(() => ({ data: [] }));
+                    if (active) setLogs(Array.isArray(logsRes.data) ? logsRes.data : []);
+                }
+            } catch { if (active) setApps([]); }
             finally   { if (active) setLoading(false); }
         };
         load();
         return () => { active = false; };
     }, []);
 
-    const displayApps  = apps.length > 0 ? apps : MOCK_APPS;
+    const displayApps  = apps;
     const running      = displayApps.filter(a => a.status === 'RUNNING').length;
     const totalReplicas = displayApps.reduce((s, a) => s + (a.replicas ?? a.minReplicas ?? 1), 0);
     const spark = (scale = 1) => Array.from({ length: 20 }, (_, i) => ({ value: (40 + Math.sin(i * 0.5) * 15 + Math.random() * 10) * scale }));
@@ -320,8 +407,8 @@ const Dashboard = () => {
     const kpiCards = [
         { label: 'Total Apps',         value: displayApps.length, sub: `${displayApps.filter(a=>a.status==='ERROR').length} errors`,    trend: 2,  icon: Box,   iconBg: 'rgba(0,212,255,0.1)',   iconColor: '#00D4FF', sparkColor: '#00D4FF', sparkData: spark(0.8) },
         { label: 'Running Instances',  value: totalReplicas,       sub: `${running}/${displayApps.length} apps healthy`,                 trend: 0,  icon: Cpu,   iconBg: 'rgba(168,85,247,0.1)',  iconColor: '#A855F7', sparkColor: '#A855F7', sparkData: spark(1)   },
-        { label: 'Requests / sec',     value: '4.2k',              sub: 'avg last 5 min',                                               trend: 8,  icon: Zap,   iconBg: 'rgba(16,185,129,0.1)',  iconColor: '#10B981', sparkColor: '#10B981', sparkData: spark(1.2) },
-        { label: 'Avg Latency',        value: '32ms',              sub: 'P95: 87ms',                                                    trend: -3, icon: Clock, iconBg: 'rgba(245,158,11,0.1)',  iconColor: '#F59E0B', sparkColor: '#F59E0B', sparkData: spark(0.4) },
+        { label: 'Requests / sec',     value: fmtReq(clusterMetrics?.totalReqPerSec),  sub: clusterMetrics ? `Error: ${(clusterMetrics.clusterErrorRate*100).toFixed(2)}%` : 'No data', trend: 8,  icon: Zap,   iconBg: 'rgba(16,185,129,0.1)',  iconColor: '#10B981', sparkColor: '#10B981', sparkData: spark(1.2) },
+        { label: 'CPU Cores',          value: clusterMetrics ? clusterMetrics.totalCpuCores.toFixed(2) : '—', sub: clusterMetrics ? `${clusterMetrics.totalMemoryGiB.toFixed(1)} GiB RAM` : 'No data', trend: -3, icon: Clock, iconBg: 'rgba(245,158,11,0.1)',  iconColor: '#F59E0B', sparkColor: '#F59E0B', sparkData: spark(0.4) },
     ];
 
     const toggleSort = (field) => {
@@ -522,7 +609,12 @@ const Dashboard = () => {
                         <p style={{ fontSize: 11, margin: '3px 0 0' }} className="text-secondary">Recent platform events</p>
                     </div>
                     <div>
-                        {MOCK_ACTIVITY.map((ev, i) => (
+                        {logs.length === 0 ? (
+                            <p style={{ padding: '20px', fontSize: 12, color: '#6B7280', textAlign: 'center' }}>No activity yet</p>
+                        ) : (logs || []).slice(0, 6).map((ev, i) => {
+                            const typeColors = { DEPLOYMENT_SUCCESS: '#10B981', DEPLOYMENT_FAIL: '#EF4444', DEPLOYMENT_START: '#00D4FF', DELETE: '#F59E0B' };
+                            const color = typeColors[ev.type] || '#6B7280';
+                            return (
                             <motion.div
                                 key={ev.id}
                                 initial={{ opacity: 0, x: 8 }}
@@ -532,17 +624,21 @@ const Dashboard = () => {
                                 onMouseEnter={e => e.currentTarget.style.background = dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'}
                                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                             >
-                                <div style={{ width: 3, minHeight: 40, borderRadius: 2, background: ev.color, flexShrink: 0, marginTop: 2 }} />
+                                <div style={{ width: 3, minHeight: 40, borderRadius: 2, background: color, flexShrink: 0, marginTop: 2 }} />
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                    <p style={{ fontSize: 11.5, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", margin: 0, color: '#00D4FF' }}>{ev.app}</p>
-                                    <p style={{ fontSize: 11, margin: '3px 0 0', lineHeight: 1.4 }} className="text-secondary">{ev.msg}</p>
-                                    <p style={{ fontSize: 10, margin: '4px 0 0', color: '#9CA3AF' }}>{ev.time}</p>
+                                    <p style={{ fontSize: 11.5, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", margin: 0, color: '#00D4FF' }}>{ev.appId?.slice(0, 8) || 'platform'}</p>
+                                    <p style={{ fontSize: 11, margin: '3px 0 0', lineHeight: 1.4 }} className="text-secondary">{ev.message}</p>
+                                    <p style={{ fontSize: 10, margin: '4px 0 0', color: '#9CA3AF' }}>{ev.createdAt ? new Date(ev.createdAt).toLocaleString() : ''}</p>
                                 </div>
                             </motion.div>
-                        ))}
+                        )})}
+
                     </div>
                 </div>
             </div>
+
+            {/* Role-based suggestions */}
+            <RoleIdeasCard role={user?.role} navigate={navigate} />
 
             {/* Quick Deploy panel */}
             <AnimatePresence>

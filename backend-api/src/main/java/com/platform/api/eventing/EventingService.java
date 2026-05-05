@@ -73,6 +73,7 @@ public class EventingService {
                 .userId(userId)
                 .name(name)
                 .namespace(namespace != null ? namespace : "default")
+                .bootstrapServers("my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092")
                 .config(config)
                 .updatedAt(LocalDateTime.now())
                 .build();

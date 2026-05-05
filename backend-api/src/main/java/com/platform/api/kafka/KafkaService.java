@@ -6,12 +6,17 @@ import com.platform.api.exception.UnauthorizedException;
 import com.platform.api.kafka.dto.CreateTopicRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -90,14 +95,26 @@ public class KafkaService {
     }
 
     private void createTopicInKafka(KafkaTopic topic) {
-        // TODO: Implement actual Kafka topic creation using Kafka admin client
-        log.info("Creating Kafka topic '{}' with {} partitions and {} replicas",
-                topic.getName(), topic.getPartitions(), topic.getReplicas());
+        try (AdminClient admin = AdminClient.create(Map.of(
+                AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers))) {
+            NewTopic newTopic = new NewTopic(topic.getName(), topic.getPartitions(), topic.getReplicas().shortValue());
+            admin.createTopics(List.of(newTopic)).all().get();
+            log.info("Kafka topic '{}' created with {} partitions", topic.getName(), topic.getPartitions());
+        } catch (Exception e) {
+            log.error("Failed to create Kafka topic '{}': {}", topic.getName(), e.getMessage());
+            throw new RuntimeException("Failed to create Kafka topic: " + e.getMessage(), e);
+        }
     }
 
     private void deleteTopicFromKafka(String topicName) {
-        // TODO: Implement actual Kafka topic deletion using Kafka admin client
-        log.info("Deleting Kafka topic '{}'", topicName);
+        try (AdminClient admin = AdminClient.create(Map.of(
+                AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers))) {
+            admin.deleteTopics(Set.of(topicName)).all().get();
+            log.info("Kafka topic '{}' deleted", topicName);
+        } catch (Exception e) {
+            log.error("Failed to delete Kafka topic '{}': {}", topicName, e.getMessage());
+            throw new RuntimeException("Failed to delete Kafka topic: " + e.getMessage(), e);
+        }
     }
 
     private KafkaTopicDto toDto(KafkaTopic topic) {
