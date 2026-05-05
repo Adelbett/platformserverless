@@ -34,14 +34,52 @@ pipeline {
             }
         }
 
-        // Docker + Deploy activés après installation kaniko
-        // stage('Docker Build & Push') { ... }
-        // stage('Deploy to Kubernetes') { ... }
+        stage('Docker Build & Push') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-credentials',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh '''
+                        # Créer le fichier config.json pour Kaniko
+                        mkdir -p /kaniko/.docker
+                        AUTH=$(echo -n "$DOCKER_USER:$DOCKER_PASS" | base64 -w 0)
+                        cat > /kaniko/.docker/config.json <<EOF
+{
+    "auths": {
+        "https://index.docker.io/v1/": {
+            "auth": "$AUTH"
+        }
+    }
+}
+EOF
+                        # Build et push avec Kaniko
+                        /kaniko/executor \
+                            --context=dir://$(pwd)/backend-api \
+                            --dockerfile=$(pwd)/ci-cd/docker/backend.Dockerfile \
+                            --destination=${IMAGE_NAME}:${IMAGE_TAG} \
+                            --destination=${IMAGE_NAME}:latest
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                sh """
+                    kubectl set image deployment/platform-api \
+                        platform-api=${IMAGE_NAME}:${IMAGE_TAG} \
+                        -n ${NAMESPACE}
+                    kubectl rollout status deployment/platform-api -n ${NAMESPACE}
+                """
+            }
+        }
     }
 
     post {
         success {
-            echo "✅ Build backend réussi — prêt pour Docker push"
+            echo "✅ Backend déployé avec succès — ${IMAGE_NAME}:${IMAGE_TAG}"
         }
         failure {
             echo "❌ Pipeline échoué — vérifier les logs"
