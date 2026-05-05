@@ -42,10 +42,10 @@ pipeline {
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
                     sh '''
-                        mkdir -p /kaniko/.docker
+                        mkdir -p /root/.docker
                         printf '{"auths":{"https://index.docker.io/v1/":{"auth":"%s"}}}' \
                             $(printf '%s:%s' "$DOCKER_USER" "$DOCKER_PASS" | base64 -w0) \
-                            > /kaniko/.docker/config.json
+                            > /root/.docker/config.json
 
                         /kaniko/executor \
                             --context=dir://$(pwd)/backend-api \
