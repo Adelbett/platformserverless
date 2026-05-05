@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    tools {
+        maven 'maven-3'
+    }
+
     environment {
         IMAGE_NAME = 'adelbettaieb/platform-api'
         IMAGE_TAG  = "v${BUILD_NUMBER}"
@@ -12,6 +16,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 git branch: 'main',
+                    credentialsId: 'github-credentials',
                     url: 'https://github.com/Adelbett/platformserverless.git'
             }
         }
@@ -24,45 +29,14 @@ pipeline {
             }
         }
 
-        stage('Docker Build') {
-            steps {
-                dir('backend-api') {
-                    sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -t ${IMAGE_NAME}:latest ."
-                }
-            }
-        }
-
-        stage('Docker Push') {
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-credentials',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh """
-                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-                        docker push ${IMAGE_NAME}:${IMAGE_TAG}
-                        docker push ${IMAGE_NAME}:latest
-                    """
-                }
-            }
-        }
-
-        stage('Deploy to Kubernetes') {
-            steps {
-                sh """
-                    kubectl set image deployment/platform-api \
-                        platform-api=${IMAGE_NAME}:${IMAGE_TAG} \
-                        -n ${NAMESPACE}
-                    kubectl rollout status deployment/platform-api -n ${NAMESPACE}
-                """
-            }
-        }
+        // Docker + Deploy activés après installation kaniko
+        // stage('Docker Build & Push') { ... }
+        // stage('Deploy to Kubernetes') { ... }
     }
 
     post {
         success {
-            echo "✅ Backend déployé avec succès — ${IMAGE_NAME}:${IMAGE_TAG}"
+            echo "✅ Build backend réussi — prêt pour Docker push"
         }
         failure {
             echo "❌ Pipeline échoué — vérifier les logs"
