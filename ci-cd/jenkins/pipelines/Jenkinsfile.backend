@@ -25,7 +25,11 @@ pipeline {
         stage('Build JAR') {
             steps {
                 dir('backend-api') {
-                    sh 'mvn clean package -DskipTests'
+                    sh '''
+                        export JAVA_HOME=$( dirname $(dirname $(readlink -f $(which java))) )
+                        java -version
+                        mvn clean package -DskipTests
+                    '''
                 }
             }
         }
