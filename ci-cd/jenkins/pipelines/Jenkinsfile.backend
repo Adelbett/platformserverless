@@ -26,7 +26,8 @@ pipeline {
             steps {
                 dir('backend-api') {
                     sh '''
-                        export JAVA_HOME=$( dirname $(dirname $(readlink -f $(which java))) )
+                        export JAVA_HOME=/opt/java21
+                        export PATH=$JAVA_HOME/bin:$PATH
                         java -version
                         mvn clean package -DskipTests
                     '''
@@ -42,12 +43,12 @@ pipeline {
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
                     sh '''
-                        mkdir -p /root/.docker
+                        mkdir -p /kaniko/.docker
                         printf '{"auths":{"https://index.docker.io/v1/":{"auth":"%s"}}}' \
                             $(printf '%s:%s' "$DOCKER_USER" "$DOCKER_PASS" | base64 -w0) \
-                            > /root/.docker/config.json
+                            > /kaniko/.docker/config.json
 
-                        /kaniko/executor \
+                        DOCKER_CONFIG=/kaniko/.docker /kaniko/executor \
                             --context=dir://$(pwd)/backend-api \
                             --dockerfile=$(pwd)/ci-cd/docker/backend.Dockerfile \
                             --destination=${IMAGE_NAME}:${IMAGE_TAG} \
