@@ -1,0 +1,69 @@
+server:
+  port: 8082
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres.platform.svc.cluster.local:5432/platformserverless}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak.platform.svc.cluster.local:8080/realms/platform}
+
+app:
+  kubernetes:
+    enabled: true
+    namespace: default
+    knative-api-version: serving.knative.dev/v1
+
+  keycloak:
+    url: ${KEYCLOAK_URL:http://keycloak.platform.svc.cluster.local:8080}
+    realm: platform
+    admin-username: admin
+    admin-password: admin
+    client-id: platform-web
+
+  kafka:
+    enabled: true
+    bootstrap-servers: ${APP_KAFKA_BOOTSTRAP_SERVERS:my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092}
+
+  prometheus:
+    url: ${APP_PROMETHEUS_URL:http://prometheus.monitoring.svc.cluster.local:9090}
+
+  cors:
+    allowed-origins: "*"
+
+management:
+  health:
+    redis:
+      enabled: false
+    elasticsearch:
+      enabled: false
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.platform: INFO
+    org.springframework.security: INFO

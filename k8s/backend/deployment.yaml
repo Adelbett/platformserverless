@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: platform-api
+  namespace: platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: platform-api
+  template:
+    metadata:
+      labels:
+        app: platform-api
+    spec:
+      containers:
+      - name: platform-api
+        image: adelbettaieb/platform-api:latest
+        ports:
+        - containerPort: 8082
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "k8s"
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:postgresql://postgres.platform.svc.cluster.local:5432/platformserverless"
+        - name: SPRING_DATASOURCE_USERNAME
+          value: "postgres"
+        - name: SPRING_DATASOURCE_PASSWORD
+          value: "postgres"
+        - name: KEYCLOAK_ISSUER_URI
+          value: "http://keycloak.platform.svc.cluster.local:8080/realms/platform"
+        - name: KEYCLOAK_URL
+          value: "http://keycloak.platform.svc.cluster.local:8080"
+        - name: APP_PROMETHEUS_URL
+          value: "http://prometheus.monitoring.svc.cluster.local:9090"
+        - name: APP_KAFKA_BOOTSTRAP_SERVERS
+          value: "my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
+        - name: APP_KAFKA_ENABLED
+          value: "true"
+        - name: APP_KUBERNETES_ENABLED
+          value: "true"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: platform-api
+  namespace: platform
+spec:
+  type: LoadBalancer
+  selector:
+    app: platform-api
+  ports:
+  - port: 8082
+    targetPort: 8082
