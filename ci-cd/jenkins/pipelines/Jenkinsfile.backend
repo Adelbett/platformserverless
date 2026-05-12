@@ -39,7 +39,7 @@ pipeline {
             }
         }
 
-        stage('Docker Build & Push') {
+        stage('Docker Build & Push + Deploy') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-credentials',
@@ -57,21 +57,9 @@ pipeline {
                             --dockerfile=$(pwd)/ci-cd/docker/backend.Dockerfile \
                             --destination=${IMAGE_NAME}:${IMAGE_TAG} \
                             --destination=${IMAGE_NAME}:latest
-                    '''
-                }
-            }
-        }
 
-        stage('Deploy to Kubernetes') {
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-credentials',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh '''
                         kubectl set image deployment/platform-api \
-                            platform-api=adelbettaieb/platform-api:latest \
+                            platform-api=${IMAGE_NAME}:latest \
                             -n platform
                         kubectl rollout status deployment/platform-api -n platform
                     '''
