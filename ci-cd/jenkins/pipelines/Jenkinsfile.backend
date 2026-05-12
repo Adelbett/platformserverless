@@ -59,7 +59,7 @@ pipeline {
                             --destination=${IMAGE_NAME}:latest
 
                         kubectl set image deployment/platform-api \
-                            platform-api=${IMAGE_NAME}:latest \
+                            platform-api=$IMAGE_NAME:$IMAGE_TAG \
                             -n platform
                         kubectl rollout status deployment/platform-api -n platform
                     '''

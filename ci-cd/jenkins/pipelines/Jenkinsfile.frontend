@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    options {
+        durabilityHint('PERFORMANCE_OPTIMIZED')
+    }
+
     environment {
         IMAGE_NAME = 'adelbettaieb/platform-web'
         IMAGE_TAG  = "v${BUILD_NUMBER}"
@@ -28,7 +32,7 @@ pipeline {
             }
         }
 
-        stage('Docker Build & Push') {
+        stage('Docker Build & Push + Deploy') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-credentials',
@@ -36,29 +40,23 @@ pipeline {
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
                     sh '''
-                        mkdir -p /root/.docker
+                        mkdir -p /kaniko/.docker
                         printf '{"auths":{"https://index.docker.io/v1/":{"auth":"%s"}}}' \
                             $(printf '%s:%s' "$DOCKER_USER" "$DOCKER_PASS" | base64 -w0) \
-                            > /root/.docker/config.json
+                            > /kaniko/.docker/config.json
 
-                        /kaniko/executor \
+                        DOCKER_CONFIG=/kaniko/.docker /kaniko/executor \
                             --context=dir://$(pwd)/web-portal \
-                            --dockerfile=$(pwd)/ci-cd/docker/frontend.Dockerfile \
-                            --destination=${IMAGE_NAME}:${IMAGE_TAG} \
-                            --destination=${IMAGE_NAME}:latest
+                            --dockerfile=$(pwd)/ci-cd/docker/frontend-kaniko.Dockerfile \
+                            --destination=$IMAGE_NAME:$IMAGE_TAG \
+                            --destination=$IMAGE_NAME:latest
+
+                        kubectl set image deployment/platform-web \
+                            platform-web=$IMAGE_NAME:$IMAGE_TAG \
+                            -n platform
+                        kubectl rollout status deployment/platform-web -n platform
                     '''
                 }
-            }
-        }
-
-        stage('Deploy to Kubernetes') {
-            steps {
-                sh """
-                    kubectl set image deployment/platform-web \
-                        platform-web=${IMAGE_NAME}:${IMAGE_TAG} \
-                        -n ${NAMESPACE}
-                    kubectl rollout status deployment/platform-web -n ${NAMESPACE}
-                """
             }
         }
     }
