@@ -64,12 +64,18 @@ pipeline {
 
         stage('Deploy to Kubernetes') {
             steps {
-                sh """
-                    kubectl set image deployment/platform-api \
-                        platform-api=${IMAGE_NAME}:${IMAGE_TAG} \
-                        -n ${NAMESPACE}
-                    kubectl rollout status deployment/platform-api -n ${NAMESPACE}
-                """
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-credentials',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh '''
+                        kubectl set image deployment/platform-api \
+                            platform-api=adelbettaieb/platform-api:latest \
+                            -n platform
+                        kubectl rollout status deployment/platform-api -n platform
+                    '''
+                }
             }
         }
     }
