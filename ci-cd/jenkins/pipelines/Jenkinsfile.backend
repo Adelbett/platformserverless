@@ -56,7 +56,13 @@ pipeline {
                             --context=dir://$(pwd)/backend-api \
                             --dockerfile=$(pwd)/ci-cd/docker/backend.Dockerfile \
                             --destination=${IMAGE_NAME}:${IMAGE_TAG} \
-                            --destination=${IMAGE_NAME}:latest
+                            --destination=${IMAGE_NAME}:latest \
+                            --ignore-path=/tmp \
+                            --ignore-path=/var/jenkins_home \
+                            --ignore-path=/kaniko \
+                            --ignore-path=/proc \
+                            --ignore-path=/sys \
+                            --ignore-path=/dev
 
                         kubectl set image deployment/platform-api \
                             platform-api=${IMAGE_NAME}:latest \
