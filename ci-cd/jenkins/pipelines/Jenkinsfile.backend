@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    options {
+        durabilityHint('PERFORMANCE_OPTIMIZED')
+    }
+
     tools {
         maven 'maven-3'
         jdk   'jdk-21'
