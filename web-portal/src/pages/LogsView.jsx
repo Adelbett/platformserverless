@@ -27,8 +27,9 @@ const LogsView = () => {
 
     useEffect(() => {
         let active = true;
+        let eventSource = null;
 
-        const loadLogs = async () => {
+        const loadHistory = async () => {
             try {
                 setLoading(true);
                 const userId = user?.username || user?.id || 'admin';
@@ -43,9 +44,31 @@ const LogsView = () => {
             }
         };
 
-        loadLogs();
+        const connectSse = () => {
+            const token = localStorage.getItem('token');
+            if (!token) return;
+            // SSE with Authorization via URL param (EventSource doesn't support headers)
+            eventSource = new EventSource(`/api/logs/stream?token=${token}`);
+            eventSource.addEventListener('log', (e) => {
+                if (!active) return;
+                try {
+                    const newLog = JSON.parse(e.data);
+                    setLogs((prev) => [newLog, ...prev]);
+                } catch {}
+            });
+            eventSource.onerror = () => {
+                eventSource?.close();
+                // Reconnect after 5s
+                if (active) setTimeout(connectSse, 5000);
+            };
+        };
+
+        loadHistory();
+        connectSse();
+
         return () => {
             active = false;
+            eventSource?.close();
         };
     }, [user]);
 
@@ -53,15 +76,23 @@ const LogsView = () => {
         if (autoScroll) logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [logs, autoScroll]);
 
+    const typeToLevel = (type) => {
+        if (!type) return 'INFO';
+        if (type.includes('FAIL') || type.includes('ERROR')) return 'ERROR';
+        if (type.includes('WARN')) return 'WARN';
+        return 'INFO';
+    };
+
     const apps = useMemo(() => {
-        const uniqueApps = [...new Set(logs.map((log) => log.appId || log.appName || 'unknown'))];
+        const uniqueApps = [...new Set(logs.map((log) => log.appName || log.appId || 'unknown'))];
         return ['all', ...uniqueApps];
     }, [logs]);
 
     const filtered = logs.filter((log) => {
-        const appName = log.appId || log.appName || 'unknown';
+        const appName = log.appName || log.appId || 'unknown';
         if (appFilter !== 'all' && appName !== appFilter) return false;
-        if (!levelFilters[log.type || 'INFO']) return false;
+        const level = typeToLevel(log.type);
+        if (!levelFilters[level]) return false;
         if (search) {
             const haystack = `${appName} ${log.message || ''} ${log.type || ''}`.toLowerCase();
             if (!haystack.includes(search.toLowerCase())) return false;
@@ -224,7 +255,7 @@ const LogsView = () => {
                         filtered.map((log, index) => (
                             <div key={log.id || index} style={{ display: 'flex', gap: '14px', flexWrap: wordWrap ? 'wrap' : 'nowrap' }}>
                                 <span style={{ color: '#2D3D52', flexShrink: 0 }}>{log.createdAt || ''}</span>
-                                <span style={{ color: levelColor(log.type), fontWeight: 600, width: '60px', flexShrink: 0 }}>{log.type || 'INFO'}</span>
+                                <span style={{ color: levelColor(typeToLevel(log.type)), fontWeight: 600, width: '90px', flexShrink: 0 }}>{log.type || 'INFO'}</span>
                                 <span style={{ color: '#A8B8C8' }}>{log.message}</span>
                             </div>
                         ))

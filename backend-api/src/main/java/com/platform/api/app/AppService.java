@@ -6,6 +6,7 @@ import com.platform.api.eventing.EventingService;
 import com.platform.api.exception.NotFoundException;
 import com.platform.api.logs.DeploymentLog;
 import com.platform.api.logs.DeploymentLogRepository;
+import com.platform.api.logs.LogSseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -25,6 +26,7 @@ public class AppService {
     private final DeploymentLogRepository logRepository;
     private final KnativeService knativeService;
     private final EventingService eventingService;
+    private final LogSseService logSseService;
 
     // ── Create & Deploy ──────────────────────────────────────────────
 
@@ -161,6 +163,7 @@ public class AppService {
                 .type(type)
                 .build();
         logRepository.save(log);
+        logSseService.push(log);
     }
 
     private String generateServiceName(String imageName, String userId) {

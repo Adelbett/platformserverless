@@ -4,8 +4,11 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
@@ -17,6 +20,7 @@ import java.util.List;
 public class LogController {
 
     private final LogService logService;
+    private final LogSseService logSseService;
 
     @GetMapping("/apps/{id}")
     @Operation(summary = "Get deployment logs for a specific app")
@@ -28,5 +32,11 @@ public class LogController {
     @Operation(summary = "Get all deployment logs for a user")
     public ResponseEntity<List<DeploymentLog>> getUserLogs(@PathVariable String id) {
         return ResponseEntity.ok(logService.getLogsByUser(id));
+    }
+
+    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "SSE stream of live deployment logs for the authenticated user")
+    public SseEmitter streamLogs(Authentication auth) {
+        return logSseService.subscribe(auth.getName());
     }
 }
