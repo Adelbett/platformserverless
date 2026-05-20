@@ -32,9 +32,10 @@ const NAV_SECTIONS = [
         label: 'Admin',
         adminSection: true,
         items: [
-            { path: '/admin/dashboard', label: 'Overview',  icon: BarChart2, adminOnly: true },
-            { path: '/admin/users',     label: 'Users',     icon: Users,     adminOnly: true },
-            { path: '/admin/cluster',   label: 'Cluster',   icon: Server,    adminOnly: true },
+            { path: '/admin/dashboard', label: 'Overview',   icon: BarChart2, adminOnly: true },
+            { path: '/monitoring',      label: 'Monitoring', icon: Activity,  adminOnly: true },
+            { path: '/admin/users',     label: 'Users',      icon: Users,     adminOnly: true },
+            { path: '/admin/cluster',   label: 'Cluster',    icon: Server,    adminOnly: true },
         ],
     },
 ];
