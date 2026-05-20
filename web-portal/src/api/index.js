@@ -49,12 +49,18 @@ export const eventingApi = {
 }
 
 export const adminApi = {
-    getStats:      ()     => api.get('/admin/stats'),
-    getAllApps:     ()     => api.get('/admin/apps'),
-    forceDelete:   (id)   => api.delete(`/admin/apps/${id}`),
-    getAllTopics:   ()     => api.get('/admin/kafka/topics'),
-    deleteTopic:   (id)   => api.delete(`/admin/kafka/topics/${id}`),
-    getAllLogs:     ()     => api.get('/admin/logs'),
-    getNodes:      ()     => api.get('/admin/cluster/nodes'),
-    getNamespaces: ()     => api.get('/admin/cluster/namespaces'),
+    getStats:          ()   => api.get('/admin/stats'),
+    getAllApps:         ()   => api.get('/admin/apps'),
+    forceDelete:       (id) => api.delete(`/admin/apps/${id}`),
+    getAllTopics:       ()   => api.get('/admin/kafka/topics'),
+    deleteTopic:       (id) => api.delete(`/admin/kafka/topics/${id}`),
+    getAllLogs:         ()   => api.get('/admin/logs'),
+    getNodes:          ()   => api.get('/admin/cluster/nodes'),
+    getNamespaces:     ()   => api.get('/admin/cluster/namespaces'),
+    getPods:           ()   => api.get('/admin/cluster/pods'),
+    getKnativeServices:()   => api.get('/admin/cluster/knative/services'),
+    getKafkaBrokers:   ()   => api.get('/admin/cluster/kafka/brokers'),
+    getAllSources:      ()   => api.get('/admin/eventing/sources'),
+    getAllTriggers:     ()   => api.get('/admin/eventing/triggers'),
+    getClusterOverview:()   => api.get('/admin/cluster/overview'),
 }

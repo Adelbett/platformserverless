@@ -4,6 +4,8 @@ import com.platform.api.app.App;
 import com.platform.api.app.AppRepository;
 import com.platform.api.app.KnativeService;
 import com.platform.api.app.dto.AppResponse;
+import com.platform.api.eventing.KafkaSourceRepository;
+import com.platform.api.eventing.TriggerRepository;
 import com.platform.api.kafka.KafkaTopic;
 import com.platform.api.kafka.KafkaTopicRepository;
 import com.platform.api.logs.DeploymentLog;
@@ -11,6 +13,7 @@ import com.platform.api.logs.DeploymentLogRepository;
 import com.platform.api.user.UserRepository;
 import io.fabric8.kubernetes.api.model.Node;
 import io.fabric8.kubernetes.api.model.Namespace;
+import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -33,12 +36,14 @@ import java.util.stream.Collectors;
 @SecurityRequirement(name = "bearerAuth")
 public class AdminController {
 
-    private final AppRepository       appRepository;
-    private final KafkaTopicRepository kafkaTopicRepository;
+    private final AppRepository           appRepository;
+    private final KafkaTopicRepository    kafkaTopicRepository;
     private final DeploymentLogRepository logRepository;
-    private final UserRepository      userRepository;
-    private final KubernetesClient    kubernetesClient;
-    private final KnativeService      knativeService;
+    private final UserRepository          userRepository;
+    private final KubernetesClient        kubernetesClient;
+    private final KnativeService          knativeService;
+    private final KafkaSourceRepository   kafkaSourceRepository;
+    private final TriggerRepository       triggerRepository;
 
     // ── Platform stats ────────────────────────────────────────────────
 
@@ -145,7 +150,165 @@ public class AdminController {
         }
     }
 
+    // ── Pods ──────────────────────────────────────────────────────────
+
+    @GetMapping("/cluster/pods")
+    @Operation(summary = "All pods across all namespaces")
+    public ResponseEntity<List<Map<String, Object>>> getPods() {
+        try {
+            List<Map<String, Object>> pods = kubernetesClient.pods().inAnyNamespace().list().getItems()
+                    .stream().map(this::podInfo).collect(Collectors.toList());
+            return ResponseEntity.ok(pods);
+        } catch (Exception e) {
+            log.warn("Could not fetch pods: {}", e.getMessage());
+            return ResponseEntity.ok(List.of());
+        }
+    }
+
+    // ── Knative services ──────────────────────────────────────────────
+
+    @GetMapping("/cluster/knative/services")
+    @Operation(summary = "All Knative services across all tenant namespaces")
+    public ResponseEntity<List<Map<String, Object>>> getKnativeServices() {
+        try {
+            List<Map<String, Object>> services = kubernetesClient.namespaces().list().getItems()
+                    .stream()
+                    .filter(n -> n.getMetadata().getName().startsWith("user-"))
+                    .flatMap(n -> {
+                        String ns = n.getMetadata().getName();
+                        try {
+                            return kubernetesClient.genericKubernetesResources(
+                                            "serving.knative.dev/v1", "Service")
+                                    .inNamespace(ns).list().getItems()
+                                    .stream()
+                                    .map(ksvc -> {
+                                        Map<String, Object> info = new LinkedHashMap<>();
+                                        info.put("name",      ksvc.getMetadata().getName());
+                                        info.put("namespace", ns);
+                                        info.put("tenant",    ns.replaceFirst("^user-", ""));
+                                        var cond = ksvc.get("status") instanceof Map
+                                                ? ((Map<?, ?>) ksvc.get("status")).get("conditions") : null;
+                                        info.put("ready", cond != null ? "True" : "Unknown");
+                                        info.put("url", ksvc.get("status") instanceof Map
+                                                ? ((Map<?, ?>) ((Map<?, ?>) ksvc.get("status")).getOrDefault("url", "")).toString() : "");
+                                        return info;
+                                    });
+                        } catch (Exception ex) {
+                            return java.util.stream.Stream.empty();
+                        }
+                    })
+                    .collect(Collectors.toList());
+            return ResponseEntity.ok(services);
+        } catch (Exception e) {
+            log.warn("Could not fetch Knative services: {}", e.getMessage());
+            return ResponseEntity.ok(List.of());
+        }
+    }
+
+    // ── Kafka brokers ─────────────────────────────────────────────────
+
+    @GetMapping("/cluster/kafka/brokers")
+    @Operation(summary = "Kafka broker pods status")
+    public ResponseEntity<List<Map<String, Object>>> getKafkaBrokers() {
+        try {
+            List<Map<String, Object>> brokers = kubernetesClient.pods().inAnyNamespace()
+                    .withLabelSelector("app.kubernetes.io/name=kafka,app.kubernetes.io/component=kafka")
+                    .list().getItems()
+                    .stream().map(this::podInfo).collect(Collectors.toList());
+            // fallback: search by label strimzi.io/kind=Kafka
+            if (brokers.isEmpty()) {
+                brokers = kubernetesClient.pods().inAnyNamespace()
+                        .withLabelSelector("strimzi.io/kind=Kafka")
+                        .list().getItems()
+                        .stream().map(this::podInfo).collect(Collectors.toList());
+            }
+            return ResponseEntity.ok(brokers);
+        } catch (Exception e) {
+            log.warn("Could not fetch Kafka brokers: {}", e.getMessage());
+            return ResponseEntity.ok(List.of());
+        }
+    }
+
+    // ── Eventing — all sources & triggers ────────────────────────────
+
+    @GetMapping("/eventing/sources")
+    @Operation(summary = "All KafkaSources across all tenants")
+    public ResponseEntity<?> getAllSources() {
+        return ResponseEntity.ok(kafkaSourceRepository.findAll());
+    }
+
+    @GetMapping("/eventing/triggers")
+    @Operation(summary = "All Triggers across all tenants")
+    public ResponseEntity<?> getAllTriggers() {
+        return ResponseEntity.ok(triggerRepository.findAll());
+    }
+
+    // ── Full cluster overview ─────────────────────────────────────────
+
+    @GetMapping("/cluster/overview")
+    @Operation(summary = "Full cluster state: nodes, pods, namespaces, Kafka, Knative, apps, eventing")
+    public ResponseEntity<Map<String, Object>> getClusterOverview() {
+        Map<String, Object> overview = new LinkedHashMap<>();
+
+        // Nodes
+        try {
+            var nodes = kubernetesClient.nodes().list().getItems();
+            overview.put("totalNodes",  nodes.size());
+            overview.put("readyNodes",  nodes.stream().filter(n -> n.getStatus().getConditions().stream()
+                    .anyMatch(c -> "Ready".equals(c.getType()) && "True".equals(c.getStatus()))).count());
+        } catch (Exception e) { overview.put("totalNodes", 0); overview.put("readyNodes", 0); }
+
+        // Pods
+        try {
+            var pods = kubernetesClient.pods().inAnyNamespace().list().getItems();
+            overview.put("totalPods",   pods.size());
+            overview.put("runningPods", pods.stream().filter(p -> "Running".equals(p.getStatus().getPhase())).count());
+            overview.put("pendingPods", pods.stream().filter(p -> "Pending".equals(p.getStatus().getPhase())).count());
+            overview.put("failedPods",  pods.stream().filter(p -> "Failed".equals(p.getStatus().getPhase())).count());
+        } catch (Exception e) { overview.put("totalPods", 0); }
+
+        // Namespaces
+        try {
+            var tenantNs = kubernetesClient.namespaces().list().getItems().stream()
+                    .filter(n -> n.getMetadata().getName().startsWith("user-")).count();
+            overview.put("tenantNamespaces", tenantNs);
+        } catch (Exception e) { overview.put("tenantNamespaces", 0); }
+
+        // Platform data
+        overview.put("totalUsers",    userRepository.count());
+        overview.put("totalApps",     appRepository.count());
+        overview.put("runningApps",   appRepository.findAll().stream().filter(a -> "RUNNING".equals(a.getStatus())).count());
+        overview.put("failedApps",    appRepository.findAll().stream().filter(a -> "FAILED".equals(a.getStatus())).count());
+        overview.put("totalTopics",   kafkaTopicRepository.count());
+        overview.put("totalSources",  kafkaSourceRepository.count());
+        overview.put("totalTriggers", triggerRepository.count());
+
+        return ResponseEntity.ok(overview);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────
+
+    private Map<String, Object> podInfo(Pod pod) {
+        Map<String, Object> info = new LinkedHashMap<>();
+        info.put("name",      pod.getMetadata().getName());
+        info.put("namespace", pod.getMetadata().getNamespace());
+        info.put("phase",     pod.getStatus().getPhase() != null ? pod.getStatus().getPhase() : "Unknown");
+        info.put("nodeName",  pod.getSpec().getNodeName() != null ? pod.getSpec().getNodeName() : "");
+        var conditions = pod.getStatus().getConditions();
+        boolean ready = conditions != null && conditions.stream()
+                .anyMatch(c -> "Ready".equals(c.getType()) && "True".equals(c.getStatus()));
+        info.put("ready", ready);
+        int restarts = pod.getStatus().getContainerStatuses() != null
+                ? pod.getStatus().getContainerStatuses().stream()
+                    .mapToInt(cs -> cs.getRestartCount() != null ? cs.getRestartCount() : 0).sum()
+                : 0;
+        info.put("restarts", restarts);
+        info.put("age", pod.getMetadata().getCreationTimestamp());
+        var labels = pod.getMetadata().getLabels();
+        info.put("app", labels != null ? labels.getOrDefault("app",
+                labels.getOrDefault("app.kubernetes.io/name", "")) : "");
+        return info;
+    }
 
     private Map<String, Object> nodeInfo(Node node) {
         Map<String, Object> info = new LinkedHashMap<>();
