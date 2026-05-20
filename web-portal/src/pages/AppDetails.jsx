@@ -290,7 +290,15 @@ const AppDetails = () => {
                 const a = appRes.data || MOCK_APP;
                 setApp(a);
                 setReplicas(a.replicas ?? a.minReplicas ?? 1);
-                setLogs(Array.isArray(logsRes.data) && logsRes.data.length > 0 ? logsRes.data : MOCK_LOGS);
+                const rawLogs = Array.isArray(logsRes.data) ? logsRes.data : [];
+                const mappedLogs = rawLogs.map(l => ({
+                    id: l.id,
+                    level: l.type?.includes('FAIL') || l.type?.includes('ERROR') ? 'ERROR'
+                         : l.type?.includes('WARN') ? 'WARN' : 'INFO',
+                    time: l.createdAt ? new Date(l.createdAt).toLocaleTimeString() : '',
+                    msg: l.message || '',
+                }));
+                setLogs(mappedLogs.length > 0 ? mappedLogs : MOCK_LOGS);
                 setMetrics(metricsRes.data);
             } catch { if (active) { setApp(MOCK_APP); setLogs(MOCK_LOGS); } }
             finally   { if (active) setLoading(false); }

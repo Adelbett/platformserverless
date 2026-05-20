@@ -13,18 +13,34 @@ import Eventing from './pages/Eventing';
 import LogsView from './pages/LogsView';
 import Monitoring from './pages/Monitoring';
 import Users from './pages/Users';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import ClusterManagement from './pages/admin/ClusterManagement';
 
 const ProtectedRoute = ({ children }) => {
     const { user, loading } = useAuth();
     if (loading) return null;
     if (!user) return <Navigate to="/login" replace />;
-    return children;    
+    return children;
 };
 
 const PublicRoute = ({ children }) => {
     const { user, loading } = useAuth();
     if (loading) return null;
-    if (user) return <Navigate to="/dashboard" replace />;
+    if (user) return <Navigate to={user.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard'} replace />;
+    return children;
+};
+
+const DashboardRedirect = () => {
+    const { user } = useAuth();
+    if (user?.role === 'ADMIN') return <Navigate to="/admin/dashboard" replace />;
+    return <Dashboard />;
+};
+
+const AdminRoute = ({ children }) => {
+    const { user, loading } = useAuth();
+    if (loading) return null;
+    if (!user) return <Navigate to="/login" replace />;
+    if (user.role !== 'ADMIN') return <Navigate to="/dashboard" replace />;
     return children;
 };
 
@@ -42,7 +58,7 @@ const AppRoutes = () => {
             } />
 
             <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/dashboard" element={<DashboardRedirect />} />
                 <Route path="/apps" element={<AppsList />} />
                 <Route path="/apps/new" element={<DeployApp />} />
                 <Route path="/apps/:name" element={<AppDetails />} />
@@ -53,6 +69,16 @@ const AppRoutes = () => {
                 <Route path="/billing" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/settings" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/users" element={<Users />} />
+                {/* Admin-only routes */}
+                <Route path="/admin/dashboard" element={
+                    <AdminRoute><AdminDashboard /></AdminRoute>
+                } />
+                <Route path="/admin/cluster" element={
+                    <AdminRoute><ClusterManagement /></AdminRoute>
+                } />
+                <Route path="/admin/users" element={
+                    <AdminRoute><Users /></AdminRoute>
+                } />
             </Route>
 
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

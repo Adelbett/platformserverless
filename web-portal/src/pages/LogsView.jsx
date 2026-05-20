@@ -58,8 +58,7 @@ const LogsView = () => {
             });
             eventSource.onerror = () => {
                 eventSource?.close();
-                // Reconnect after 5s
-                if (active) setTimeout(connectSse, 5000);
+                // Don't reconnect on auth errors — backend SSE not yet deployed
             };
         };
 

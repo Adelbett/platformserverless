@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     LayoutDashboard, Box, Rocket, Activity, Zap,
     Globe, KeyRound, Users, CreditCard, Settings,
-    LogOut, ChevronLeft, ChevronRight, Hexagon
+    LogOut, ChevronLeft, ChevronRight, Hexagon,
+    Server, Shield, BarChart2, Terminal
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -12,32 +13,35 @@ const NAV_SECTIONS = [
     {
         label: 'Platform',
         items: [
-            { path: '/dashboard',  label: 'Dashboard',         icon: LayoutDashboard },
+            { path: '/dashboard',  label: 'Dashboard',         icon: LayoutDashboard, clientOnly: true },
             { path: '/apps',       label: 'Applications',      icon: Box             },
-            { path: '/apps/new',   label: 'Deploy',            icon: Rocket          },
+            { path: '/apps/new',   label: 'Deploy',            icon: Rocket,  clientOnly: true },
             { path: '/monitoring', label: 'Monitoring',        icon: Activity        },
+            { path: '/logs',       label: 'Logs',              icon: Terminal        },
         ],
     },
     {
         label: 'Configure',
         items: [
-            { path: '/kafka',      label: 'Scaling',           icon: Zap             },
-            { path: '/eventing',   label: 'Domains & Routing', icon: Globe           },
-            { path: '/logs',       label: 'Secrets & Config',  icon: KeyRound        },
+            { path: '/kafka',      label: 'Kafka Topics',      icon: Zap             },
+            { path: '/eventing',   label: 'Eventing',          icon: Globe           },
+            { path: '/settings',   label: 'Settings',          icon: Settings        },
         ],
     },
     {
-        label: 'Management',
+        label: 'Admin',
+        adminSection: true,
         items: [
-            { path: '/users',      label: 'Team & Access',     icon: Users,     adminOnly: true },
-            { path: '/billing',    label: 'Billing',           icon: CreditCard },
-            { path: '/settings',   label: 'Settings',          icon: Settings  },
+            { path: '/admin/dashboard', label: 'Overview',  icon: BarChart2, adminOnly: true },
+            { path: '/admin/users',     label: 'Users',     icon: Users,     adminOnly: true },
+            { path: '/admin/cluster',   label: 'Cluster',   icon: Server,    adminOnly: true },
         ],
     },
 ];
 
 const NavItem = ({ item, collapsed, user }) => {
     if (item.adminOnly && user?.role !== 'ADMIN') return null;
+    if (item.clientOnly && user?.role === 'ADMIN') return null;
     const Icon = item.icon;
 
     return (
@@ -131,7 +135,11 @@ const Sidebar = ({ collapsed, onToggle }) => {
             {/* Navigation */}
             <nav style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '8px 10px' }}>
                 {NAV_SECTIONS.map(section => {
-                    const visible = section.items.filter(i => !i.adminOnly || user?.role === 'ADMIN');
+                    if (section.adminSection && user?.role !== 'ADMIN') return null;
+                    const visible = section.items.filter(i =>
+                        (!i.adminOnly || user?.role === 'ADMIN') &&
+                        (!i.clientOnly || user?.role !== 'ADMIN')
+                    );
                     if (visible.length === 0) return null;
                     return (
                         <div key={section.label}>

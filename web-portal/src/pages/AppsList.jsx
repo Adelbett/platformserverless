@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { appsApi } from '../api';
+import { appsApi, adminApi } from '../api';
+import { useAuth } from '../context/AuthContext';
 
 /* ── Color tokens (matching the HTML reference design) ── */
 const C = {
@@ -65,27 +66,28 @@ const inputStyle = {
 
 const AppsList = () => {
     const navigate = useNavigate();
+    const { user } = useAuth();
+    const isAdmin = user?.role === 'ADMIN';
     const [apps, setApps] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All Status');
 
+    const load = async () => {
+        try {
+            setLoading(true);
+            const res = isAdmin ? await adminApi.getAllApps() : await appsApi.list();
+            setApps(Array.isArray(res.data) ? res.data : []);
+        } catch {
+            setApps([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        let active = true;
-        const load = async () => {
-            try {
-                setLoading(true);
-                const res = await appsApi.list();
-                if (active) setApps(Array.isArray(res.data) ? res.data : []);
-            } catch {
-                if (active) setApps([]);
-            } finally {
-                if (active) setLoading(false);
-            }
-        };
         load();
-        return () => { active = false; };
-    }, []);
+    }, [isAdmin]);
 
     const filtered = useMemo(() => {
         const lc = searchTerm.toLowerCase();
@@ -114,11 +116,12 @@ const AppsList = () => {
                     fontSize: '36px', fontWeight: 300, letterSpacing: '-0.02em',
                     color: C.textWhite, marginBottom: '12px', lineHeight: 1.1,
                 }}>
-                    Active Services
+                    {isAdmin ? 'All Services' : 'Active Services'}
                 </h2>
                 <p style={{ color: C.textSub, maxWidth: '640px', lineHeight: 1.6, fontSize: '14px', fontWeight: 300 }}>
-                    Manage and monitor your containerized workloads across global nodes.
-                    Real-time telemetry is synced with Cloud Core v2.6 protocols.
+                    {isAdmin
+                        ? 'Global view of all tenant workloads across the platform.'
+                        : 'Manage and monitor your containerized workloads across global nodes.'}
                 </p>
             </header>
 
@@ -173,22 +176,24 @@ const AppsList = () => {
                 {/* Divider */}
                 <div style={{ width: '1px', height: '32px', background: C.border }} />
 
-                {/* Deploy */}
-                <button
-                    onClick={() => navigate('/apps/new')}
-                    style={{
-                        display: 'flex', alignItems: 'center', gap: '8px',
-                        padding: '11px 24px', borderRadius: '8px', border: 'none',
-                        background: C.primary, color: '#fff', cursor: 'pointer',
-                        fontSize: '13px', fontWeight: 600, fontFamily: "'Inter', sans-serif",
-                        whiteSpace: 'nowrap', transition: 'filter 0.15s',
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.filter = 'brightness(1.15)'}
-                    onMouseLeave={e => e.currentTarget.style.filter = 'brightness(1)'}
-                >
-                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add</span>
-                    Deploy Service
-                </button>
+                {/* Deploy — clients only */}
+                {!isAdmin && (
+                    <button
+                        onClick={() => navigate('/apps/new')}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            padding: '11px 24px', borderRadius: '8px', border: 'none',
+                            background: C.primary, color: '#fff', cursor: 'pointer',
+                            fontSize: '13px', fontWeight: 600, fontFamily: "'Inter', sans-serif",
+                            whiteSpace: 'nowrap', transition: 'filter 0.15s',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.filter = 'brightness(1.15)'}
+                        onMouseLeave={e => e.currentTarget.style.filter = 'brightness(1)'}
+                    >
+                        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add</span>
+                        Deploy Service
+                    </button>
+                )}
             </div>
 
             {/* ── Table ── */}
@@ -200,13 +205,16 @@ const AppsList = () => {
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                     <thead>
                         <tr style={{ borderBottom: `1px solid ${C.border}`, background: C.cardMid }}>
-                            {['Service Name', 'Replicas', 'Resources', 'Status', 'Actions'].map((col, i) => (
+                            {(isAdmin
+                                ? ['Service Name', 'Tenant', 'Replicas', 'Resources', 'Status', 'Actions']
+                                : ['Service Name', 'Replicas', 'Resources', 'Status', 'Actions']
+                            ).map((col, i, arr) => (
                                 <th key={col} style={{
                                     padding: '16px 28px',
                                     fontSize: '10px', fontFamily: "'Space Grotesk', sans-serif",
                                     fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.18em',
                                     color: C.textMuted,
-                                    textAlign: i === 2 ? 'center' : i === 4 ? 'right' : 'left',
+                                    textAlign: i === arr.length - 1 ? 'right' : 'left',
                                 }}>{col}</th>
                             ))}
                         </tr>
@@ -248,6 +256,11 @@ const AppsList = () => {
                                         total={total}
                                         pct={pct}
                                         barColor={s.bar}
+                                        isAdmin={isAdmin}
+                                        onForceDelete={async (id) => {
+                                            await adminApi.forceDelete(id);
+                                            load();
+                                        }}
                                     />
                                 );
                             })
@@ -311,9 +324,11 @@ const AppsList = () => {
 };
 
 /* ── Row with hover state ── */
-const ServiceRow = ({ app, appName, location, current, total, pct, barColor }) => {
+const ServiceRow = ({ app, appName, location, current, total, pct, barColor, isAdmin, onForceDelete }) => {
     const navigate = useNavigate();
     const [hovered, setHovered] = useState(false);
+
+    const tenant = app.namespace ? app.namespace.replace(/^user-/, '') : app.userId || '—';
 
     return (
         <tr
@@ -351,6 +366,16 @@ const ServiceRow = ({ app, appName, location, current, total, pct, barColor }) =
                 </div>
             </td>
 
+            {/* Tenant (admin only) */}
+            {isAdmin && (
+                <td style={{ padding: '22px 28px' }}>
+                    <span style={{
+                        fontSize: '12px', color: '#A371F7',
+                        fontFamily: "'JetBrains Mono', monospace",
+                    }}>{tenant}</span>
+                </td>
+            )}
+
             {/* Replicas */}
             <td style={{ padding: '22px 28px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -372,7 +397,7 @@ const ServiceRow = ({ app, appName, location, current, total, pct, barColor }) =
             </td>
 
             {/* Resources */}
-            <td style={{ padding: '22px 28px', textAlign: 'center' }}>
+            <td style={{ padding: '22px 28px', textAlign: 'left' }}>
                 <div style={{ fontSize: '12px', color: '#d4d4d8', marginBottom: '2px' }}>
                     {app.cpuRequest || '—'} vCPU
                 </div>
@@ -395,7 +420,12 @@ const ServiceRow = ({ app, appName, location, current, total, pct, barColor }) =
                     display: 'flex', justifyContent: 'flex-end', gap: '8px',
                     opacity: hovered ? 1 : 0, transition: 'opacity 0.2s',
                 }}>
-                    {[
+                    {isAdmin ? [
+                        { icon: 'visibility', label: 'View', hoverColor: C.primary, hoverBg: C.primaryBg, action: () => navigate(`/apps/${app.id}`) },
+                        { icon: 'delete_forever', label: 'Force Delete', hoverColor: C.red, hoverBg: C.redBg, action: () => onForceDelete(app.id) },
+                    ].map(btn => (
+                        <ActionBtn key={btn.icon} {...btn} />
+                    )) : [
                         { icon: 'terminal', label: 'Logs', hoverColor: C.primary, hoverBg: C.primaryBg, action: () => navigate(`/apps/${app.id}`) },
                         { icon: 'edit',     label: 'Edit', hoverColor: C.textWhite, hoverBg: 'rgba(255,255,255,0.08)', action: () => navigate(`/apps/${app.id}`) },
                         { icon: 'stop_circle', label: 'Stop', hoverColor: C.red, hoverBg: C.redBg, action: () => {} },

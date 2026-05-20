@@ -47,3 +47,14 @@ export const eventingApi = {
     listTriggers:  ()     => api.get('/eventing/triggers'),
     createTrigger: (data) => api.post('/eventing/triggers', data),
 }
+
+export const adminApi = {
+    getStats:      ()     => api.get('/admin/stats'),
+    getAllApps:     ()     => api.get('/admin/apps'),
+    forceDelete:   (id)   => api.delete(`/admin/apps/${id}`),
+    getAllTopics:   ()     => api.get('/admin/kafka/topics'),
+    deleteTopic:   (id)   => api.delete(`/admin/kafka/topics/${id}`),
+    getAllLogs:     ()     => api.get('/admin/logs'),
+    getNodes:      ()     => api.get('/admin/cluster/nodes'),
+    getNamespaces: ()     => api.get('/admin/cluster/namespaces'),
+}
