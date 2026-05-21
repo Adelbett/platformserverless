@@ -186,11 +186,16 @@ public class AdminController {
                                         info.put("name",      ksvc.getMetadata().getName());
                                         info.put("namespace", ns);
                                         info.put("tenant",    ns.replaceFirst("^user-", ""));
-                                        var cond = ksvc.get("status") instanceof Map
-                                                ? ((Map<?, ?>) ksvc.get("status")).get("conditions") : null;
-                                        info.put("ready", cond != null ? "True" : "Unknown");
-                                        info.put("url", ksvc.get("status") instanceof Map
-                                                ? ((Map<?, ?>) ((Map<?, ?>) ksvc.get("status")).getOrDefault("url", "")).toString() : "");
+                                        Object statusObj = ksvc.get("status");
+                                        String ready = "Unknown";
+                                        String url   = "";
+                                        if (statusObj instanceof Map<?, ?> statusMap) {
+                                            ready = statusMap.get("conditions") != null ? "True" : "Unknown";
+                                            Object urlObj = statusMap.get("url");
+                                            url = urlObj != null ? urlObj.toString() : "";
+                                        }
+                                        info.put("ready", ready);
+                                        info.put("url",   url);
                                         return info;
                                     });
                         } catch (Exception ex) {
