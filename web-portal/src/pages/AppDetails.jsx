@@ -360,7 +360,7 @@ const AppDetails = () => {
                                 {appUrl && (
                                     <a href={appUrl.startsWith('http') ? appUrl : `https://${appUrl}`} target="_blank" rel="noreferrer"
                                         style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#00D4FF', textDecoration: 'none' }}>
-                                        <ExternalLink size={11} /> {appUrl}
+                                        <ExternalLink size={11} /> {appData.name}.nextstep.app
                                     </a>
                                 )}
                             </div>
