@@ -3,6 +3,10 @@ package com.platform.api.eventing;
 import com.platform.api.eventing.dto.KafkaSourceDto;
 import com.platform.api.exception.NotFoundException;
 import com.platform.api.exception.UnauthorizedException;
+import io.fabric8.kubernetes.api.model.GenericKubernetesResource;
+import io.fabric8.kubernetes.api.model.GenericKubernetesResourceBuilder;
+import io.fabric8.kubernetes.client.KubernetesClient;
+import io.fabric8.kubernetes.client.KubernetesClientException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,6 +27,7 @@ public class EventingService {
     private final WebClient.Builder webClientBuilder;
     private final KafkaSourceRepository kafkaSourceRepository;
     private final TriggerRepository triggerRepository;
+    private final KubernetesClient kubernetesClient;
 
     /**
      * Broker URL — set via environment variable or application.yml.
@@ -118,6 +123,57 @@ public class EventingService {
                 .build();
 
         triggerRepository.save(trigger);
+
+        // Create the real Knative Trigger resource on the cluster
+        if (kubernetesEnabled) {
+            createKnativeTrigger(triggerName, filter, action, source.getNamespace());
+        }
+    }
+
+    private void createKnativeTrigger(String triggerName, String eventType, String subscriberUrl, String appNamespace) {
+        try {
+            GenericKubernetesResource knativeTrigger = new GenericKubernetesResourceBuilder()
+                    .withApiVersion("eventing.knative.dev/v1")
+                    .withKind("Trigger")
+                    .withNewMetadata()
+                        .withName(triggerName)
+                        .withNamespace("default")  // broker lives in default namespace
+                    .endMetadata()
+                    .addToAdditionalProperties("spec", Map.of(
+                        "broker", "default",
+                        "filter", Map.of(
+                            "attributes", Map.of("type", eventType)
+                        ),
+                        "subscriber", Map.of(
+                            "uri", subscriberUrl
+                        )
+                    ))
+                    .build();
+
+            try {
+                kubernetesClient.genericKubernetesResources("eventing.knative.dev/v1", "Trigger")
+                        .inNamespace("default")
+                        .resource(knativeTrigger)
+                        .create();
+                log.info("Knative Trigger '{}' created in default namespace → {}", triggerName, subscriberUrl);
+            } catch (KubernetesClientException e) {
+                if (e.getCode() == 409) {
+                    kubernetesClient.genericKubernetesResources("eventing.knative.dev/v1", "Trigger")
+                            .inNamespace("default")
+                            .withName(triggerName)
+                            .delete();
+                    kubernetesClient.genericKubernetesResources("eventing.knative.dev/v1", "Trigger")
+                            .inNamespace("default")
+                            .resource(knativeTrigger)
+                            .create();
+                    log.info("Knative Trigger '{}' recreated", triggerName);
+                } else {
+                    throw e;
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to create Knative Trigger '{}': {}", triggerName, e.getMessage());
+        }
     }
 
     public List<Trigger> listTriggers(String kafkaSourceId, String userId) {
