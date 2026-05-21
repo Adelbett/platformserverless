@@ -68,12 +68,14 @@ public class EventingService {
     // ── KafkaSource Management ────────────────────────────────────────
 
     public KafkaSourceDto createKafkaSource(String userId, String kafkaTopicId, String name, String namespace, String config) {
+        String consumerGroup = name + "-group";
         KafkaSource source = KafkaSource.builder()
                 .kafkaTopicId(kafkaTopicId)
                 .userId(userId)
                 .name(name)
                 .namespace(namespace != null ? namespace : "default")
                 .bootstrapServers("my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092")
+                .consumerGroup(consumerGroup)
                 .config(config)
                 .updatedAt(LocalDateTime.now())
                 .build();
@@ -96,12 +98,20 @@ public class EventingService {
     // ── Trigger Management ───────────────────────────────────────────
 
     public void createTrigger(String userId, String kafkaSourceId, String filter, String action) {
-        requireOwnedSource(kafkaSourceId, userId); // Verify user owns the source
+        KafkaSource source = requireOwnedSource(kafkaSourceId, userId);
+
+        String triggerName = source.getName() + "-trigger";
+        String subscriberName = action != null
+                ? action.replaceAll("https?://", "").replaceAll("[^a-zA-Z0-9-]", "-")
+                : "subscriber-" + kafkaSourceId.substring(0, Math.min(8, kafkaSourceId.length()));
 
         Trigger trigger = Trigger.builder()
+                .name(triggerName)
+                .subscriberName(subscriberName)
                 .kafkaSourceId(kafkaSourceId)
                 .userId(userId)
                 .filter(filter)
+                .filterType("exact")
                 .action(action)
                 .active(true)
                 .updatedAt(LocalDateTime.now())
