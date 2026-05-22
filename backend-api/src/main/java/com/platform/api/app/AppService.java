@@ -136,6 +136,7 @@ public class AppService {
     public void deleteApp(String appId, String userId) {
         App app = requireOwned(appId, userId);
         knativeService.delete(app.getServiceName(), app.getNamespace());
+        eventingService.deleteByServiceName(app.getServiceName(), userId);
         addLog(appId, userId, "App deleted", "DELETE");
         appRepository.delete(app);
     }

@@ -130,6 +130,32 @@ public class EventingService {
         }
     }
 
+    public void deleteByServiceName(String serviceName, String userId) {
+        String sourceName = serviceName + "-source";
+        kafkaSourceRepository.findByUserId(userId).stream()
+                .filter(s -> s.getName().equals(sourceName))
+                .forEach(source -> {
+                    String triggerName = source.getName() + "-trigger";
+                    triggerRepository.findByKafkaSourceId(source.getId())
+                            .forEach(t -> {
+                                if (kubernetesEnabled) {
+                                    try {
+                                        kubernetesClient.genericKubernetesResources("eventing.knative.dev/v1", "Trigger")
+                                                .inNamespace("default")
+                                                .withName(triggerName)
+                                                .delete();
+                                        log.info("Knative Trigger '{}' deleted", triggerName);
+                                    } catch (Exception e) {
+                                        log.warn("Could not delete Knative Trigger '{}': {}", triggerName, e.getMessage());
+                                    }
+                                }
+                                triggerRepository.delete(t);
+                            });
+                    kafkaSourceRepository.delete(source);
+                    log.info("KafkaSource '{}' and its triggers deleted", sourceName);
+                });
+    }
+
     private void createKnativeTrigger(String triggerName, String eventType, String subscriberUrl, String appNamespace) {
         try {
             GenericKubernetesResource knativeTrigger = new GenericKubernetesResourceBuilder()

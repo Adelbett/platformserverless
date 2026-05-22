@@ -25,10 +25,12 @@ const C = {
 };
 
 const STATUS = {
-    RUNNING: { color: C.primary,  bg: C.primaryBg, border: C.primaryBd,  glow: '0 0 8px rgba(0,112,243,0.6)',  bar: C.primary  },
-    SCALING: { color: C.amber,    bg: C.amberBg,   border: C.amberBd,    glow: '0 0 8px rgba(245,158,11,0.5)', bar: C.amber    },
-    FAILED:  { color: C.red,      bg: C.redBg,     border: C.redBd,      glow: '0 0 8px rgba(239,68,68,0.5)',  bar: 'rgba(239,68,68,0.3)' },
-    default: { color: C.textMuted,bg:'rgba(255,255,255,0.04)', border: C.border, glow: 'none', bar: 'rgba(255,255,255,0.1)' },
+    RUNNING:         { color: C.primary,  bg: C.primaryBg, border: C.primaryBd,  glow: '0 0 8px rgba(0,112,243,0.6)',  bar: C.primary  },
+    SCALING:         { color: C.amber,    bg: C.amberBg,   border: C.amberBd,    glow: '0 0 8px rgba(245,158,11,0.5)', bar: C.amber    },
+    FAILED:          { color: C.red,      bg: C.redBg,     border: C.redBd,      glow: '0 0 8px rgba(239,68,68,0.5)',  bar: 'rgba(239,68,68,0.3)' },
+    'SCALED TO ZERO':{ color: '#6B7280',  bg: 'rgba(107,114,128,0.10)', border: 'rgba(107,114,128,0.22)', glow: 'none', bar: 'rgba(107,114,128,0.3)' },
+    DEPLOYING:       { color: C.amber,    bg: C.amberBg,   border: C.amberBd,    glow: '0 0 8px rgba(245,158,11,0.5)', bar: C.amber    },
+    default:         { color: C.textMuted,bg:'rgba(255,255,255,0.04)', border: C.border, glow: 'none', bar: 'rgba(255,255,255,0.1)' },
 };
 
 const StatusBadge = ({ status }) => {
@@ -238,8 +240,10 @@ const AppsList = () => {
                             </tr>
                         ) : (
                             filtered.map((app, idx) => {
-                                const s = STATUS[app.status] || STATUS.default;
-                                const current = app.replicas ?? app.minReplicas ?? 1;
+                                const displayStatus = (app.status === 'RUNNING' && (app.replicas === 0 || (app.minReplicas === 0 && app.replicas == null)))
+                                    ? 'SCALED TO ZERO' : app.status;
+                                const s = STATUS[displayStatus] || STATUS.default;
+                                const current = app.replicas ?? 0;
                                 const total = app.maxReplicas ?? 5;
                                 const pct = Math.min(100, Math.round((current / Math.max(total, 1)) * 100));
                                 const appName = app.serviceName || app.name || 'Unnamed';
@@ -256,6 +260,7 @@ const AppsList = () => {
                                         total={total}
                                         pct={pct}
                                         barColor={s.bar}
+                                        displayStatus={displayStatus}
                                         isAdmin={isAdmin}
                                         onForceDelete={async (id) => {
                                             await adminApi.forceDelete(id);
@@ -324,7 +329,7 @@ const AppsList = () => {
 };
 
 /* ── Row with hover state ── */
-const ServiceRow = ({ app, appName, location, current, total, pct, barColor, isAdmin, onForceDelete }) => {
+const ServiceRow = ({ app, appName, location, current, total, pct, barColor, displayStatus, isAdmin, onForceDelete }) => {
     const navigate = useNavigate();
     const [hovered, setHovered] = useState(false);
 
@@ -411,7 +416,7 @@ const ServiceRow = ({ app, appName, location, current, total, pct, barColor, isA
 
             {/* Status */}
             <td style={{ padding: '22px 28px' }}>
-                <StatusBadge status={app.status} />
+                <StatusBadge status={displayStatus || app.status} />
             </td>
 
             {/* Actions */}
