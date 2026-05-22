@@ -64,12 +64,22 @@ public class KnativeService {
             log.info("Knative service '{}' created in namespace '{}'", serviceName, ns);
         } catch (KubernetesClientException e) {
             if (e.getCode() == 409) {
-                // Déjà existant → remplacer
+                // Service already exists — delete then recreate to avoid immutable annotation conflict
+                log.info("Knative service '{}' already exists, recreating...", serviceName);
+                try {
+                    kubernetesClient.genericKubernetesResources("serving.knative.dev/v1", "Service")
+                            .inNamespace(ns)
+                            .withName(serviceName)
+                            .delete();
+                    Thread.sleep(2000);
+                } catch (Exception deleteEx) {
+                    log.warn("Could not delete existing Knative service '{}': {}", serviceName, deleteEx.getMessage());
+                }
                 kubernetesClient.genericKubernetesResources("serving.knative.dev/v1", "Service")
                         .inNamespace(ns)
                         .resource(manifest)
-                        .update();
-                log.info("Knative service '{}' updated in namespace '{}'", serviceName, ns);
+                        .create();
+                log.info("Knative service '{}' recreated in namespace '{}'", serviceName, ns);
             } else {
                 log.error("Failed to deploy Knative service '{}': {}", serviceName, e.getMessage());
                 throw new RuntimeException("Kubernetes API error: " + e.getMessage(), e);

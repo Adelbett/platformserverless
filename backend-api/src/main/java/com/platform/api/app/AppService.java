@@ -115,6 +115,25 @@ public class AppService {
         return toResponse(app);
     }
 
+    // ── Update & Redeploy ─────────────────────────────────────────────
+
+    @Transactional
+    public AppResponse updateApp(String appId, String userId, AppRequest req) {
+        App app = requireOwned(appId, userId);
+        if (req.getImageTag()      != null) app.setImageTag(req.getImageTag());
+        if (req.getDescription()   != null) app.setDescription(req.getDescription());
+        if (req.getMinReplicas()   != null) app.setMinReplicas(req.getMinReplicas());
+        if (req.getMaxReplicas()   != null) app.setMaxReplicas(req.getMaxReplicas());
+        if (req.getCpuRequest()    != null) app.setCpuRequest(req.getCpuRequest());
+        if (req.getMemoryRequest() != null) app.setMemoryRequest(req.getMemoryRequest());
+        app.setStatus("DEPLOYING");
+        app.setUpdatedAt(LocalDateTime.now());
+        appRepository.save(app);
+        addLog(appId, userId, "App updated — redeploying", "UPDATE");
+        triggerDeployAsync(app, buildRequestFromApp(app));
+        return toResponse(app);
+    }
+
     // ── Re-deploy ─────────────────────────────────────────────────────
 
     @Transactional

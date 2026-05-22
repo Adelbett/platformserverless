@@ -49,6 +49,14 @@ public class AppController {
         return ResponseEntity.ok(appService.redeploy(id, auth.getName()));
     }
 
+    @PutMapping("/{id}")
+    @Operation(summary = "Update application settings and redeploy")
+    public ResponseEntity<AppResponse> updateApp(@PathVariable String id,
+                                                  @RequestBody AppRequest req,
+                                                  Authentication auth) {
+        return ResponseEntity.ok(appService.updateApp(id, auth.getName(), req));
+    }
+
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete an application and its Knative service")
     public ResponseEntity<Void> deleteApp(@PathVariable String id, Authentication auth) {

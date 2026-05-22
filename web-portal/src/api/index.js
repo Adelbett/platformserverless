@@ -11,6 +11,7 @@ export const appsApi = {
     list: () => api.get('/apps'),
     get: (id) => api.get(`/apps/${id}`),
     deploy: (id) => api.post(`/apps/${id}/deploy`),
+    update: (id, data) => api.put(`/apps/${id}`, data),
     delete: (id) => api.delete(`/apps/${id}`),
 }
 

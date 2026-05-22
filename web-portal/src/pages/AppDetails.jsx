@@ -8,7 +8,8 @@ import {
     Minus, Plus, Sliders, Terminal, GitBranch,
     Shield, AlertTriangle
 } from 'lucide-react';
-import { appsApi, logsApi, metricsApi } from '../api';
+import { appsApi, logsApi, metricsApi, adminApi } from '../api';
+import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
 // ── Mock data ──────────────────────────────────────────────────────────────────
@@ -263,6 +264,7 @@ const AppDetails = () => {
     const navigate     = useNavigate();
     const { dark }     = useTheme();
 
+    const { user } = useAuth();
     const [app,        setApp]        = useState(null);
     const [logs,       setLogs]       = useState([]);
     const [metrics,    setMetrics]    = useState(null);
@@ -270,6 +272,9 @@ const AppDetails = () => {
     const [replicas,   setReplicas]   = useState(3);
     const [envOpen,    setEnvOpen]    = useState(true);
     const [deleteOpen, setDeleteOpen] = useState(false);
+    const [editOpen,   setEditOpen]   = useState(false);
+    const [editForm,   setEditForm]   = useState({});
+    const [editSaving, setEditSaving] = useState(false);
     const [latencyData] = useState(() => genSeries(48, 32, 20));
     const [errRateData] = useState(() => genSeries(48, 0.3, 0.4));
 
@@ -306,6 +311,33 @@ const AppDetails = () => {
         load();
         return () => { active = false; };
     }, [id]);
+
+    const openEdit = () => {
+        const a = app || MOCK_APP;
+        setEditForm({
+            imageTag:      a.imageTag      || 'latest',
+            description:   a.description   || '',
+            minReplicas:   a.minReplicas    ?? 0,
+            maxReplicas:   a.maxReplicas    ?? 10,
+            cpuRequest:    a.cpuRequest     || '100m',
+            memoryRequest: a.memoryRequest  || '128Mi',
+        });
+        setEditOpen(true);
+    };
+
+    const saveEdit = async () => {
+        setEditSaving(true);
+        try {
+            await appsApi.update(id, editForm);
+            const res = await appsApi.get(id);
+            setApp(res.data);
+            setEditOpen(false);
+        } catch (e) {
+            alert('Update failed: ' + (e?.response?.data?.message || e.message));
+        } finally {
+            setEditSaving(false);
+        }
+    };
 
     const appData    = app || MOCK_APP;
     const appImage   = `${appData.imageName || 'nextstep/app'}${appData.imageTag ? `:${appData.imageTag}` : ''}`;
@@ -367,7 +399,7 @@ const AppDetails = () => {
                         </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <button className="btn-secondary" style={{ fontSize: 12.5 }}><Edit3 size={13} /> Edit</button>
+                        <button className="btn-secondary" style={{ fontSize: 12.5 }} onClick={openEdit}><Edit3 size={13} /> Edit</button>
                         <button className="btn-danger"    style={{ fontSize: 12.5 }} onClick={() => setDeleteOpen(true)}><Trash2 size={13} /> Delete</button>
                     </div>
                 </div>
@@ -521,6 +553,72 @@ const AppDetails = () => {
                         }}
                         onClose={() => setDeleteOpen(false)}
                     />
+                )}
+            </AnimatePresence>
+
+            {/* Edit Modal */}
+            <AnimatePresence>
+                {editOpen && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+                        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+                            className="ns-card" style={{ width: '100%', maxWidth: 500, padding: 28, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }} className="text-primary">Edit Application</h2>
+                                <button className="btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setEditOpen(false)}>✕</button>
+                            </div>
+
+                            {/* Image Tag */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                <label style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Image Tag</label>
+                                <input className="ns-input" value={editForm.imageTag} onChange={e => setEditForm(f => ({ ...f, imageTag: e.target.value }))}
+                                    placeholder="e.g. v2.0, latest" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13 }} />
+                            </div>
+
+                            {/* Description */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                <label style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Description</label>
+                                <input className="ns-input" value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                                    placeholder="App description" style={{ fontSize: 13 }} />
+                            </div>
+
+                            {/* Replicas */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                    <label style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Min Replicas</label>
+                                    <input className="ns-input" type="number" min="0" max="10" value={editForm.minReplicas}
+                                        onChange={e => setEditForm(f => ({ ...f, minReplicas: parseInt(e.target.value) || 0 }))} />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                    <label style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Max Replicas</label>
+                                    <input className="ns-input" type="number" min="1" max="50" value={editForm.maxReplicas}
+                                        onChange={e => setEditForm(f => ({ ...f, maxReplicas: parseInt(e.target.value) || 1 }))} />
+                                </div>
+                            </div>
+
+                            {/* Resources */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                    <label style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.1em' }}>CPU Request</label>
+                                    <input className="ns-input" value={editForm.cpuRequest} onChange={e => setEditForm(f => ({ ...f, cpuRequest: e.target.value }))}
+                                        placeholder="e.g. 100m, 500m" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13 }} />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                    <label style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Memory Request</label>
+                                    <input className="ns-input" value={editForm.memoryRequest} onChange={e => setEditForm(f => ({ ...f, memoryRequest: e.target.value }))}
+                                        placeholder="e.g. 128Mi, 512Mi" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13 }} />
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
+                                <button className="btn-secondary" onClick={() => setEditOpen(false)}>Cancel</button>
+                                <button className="btn-primary" onClick={saveEdit} disabled={editSaving}
+                                    style={{ opacity: editSaving ? 0.6 : 1 }}>
+                                    {editSaving ? 'Saving...' : 'Save & Redeploy'}
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
                 )}
             </AnimatePresence>
         </div>
