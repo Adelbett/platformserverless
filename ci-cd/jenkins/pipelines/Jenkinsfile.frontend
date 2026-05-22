@@ -13,6 +13,12 @@ pipeline {
 
     stages {
 
+        stage('Fix JNA tmp') {
+            steps {
+                sh 'find /tmp -maxdepth 1 -name "jna-*" -type d -exec rm -rf {} + 2>/dev/null || true'
+            }
+        }
+
         stage('Checkout') {
             steps {
                 git branch: 'main',
