@@ -45,25 +45,24 @@ public class MetricsService {
 
         // Request rate: counter → per-second rate over 5-minute window
         double reqPerSec = scalarOr0(
-            "sum(rate(revision_request_count{service_name=\"" + svc + "\",namespace_name=\"" + ns + "\"}[5m]))"
+            "sum(rate(activator_request_count{service_name=\"" + svc + "\",namespace_name=\"" + ns + "\"}[5m]))"
         );
 
         // Error rate: 5xx responses / total requests (returns 0 if no traffic)
         double errTotal = scalarOr0(
-            "sum(rate(revision_request_count{service_name=\"" + svc + "\",namespace_name=\"" + ns + "\",response_code_class=\"5xx\"}[5m]))"
+            "sum(rate(activator_request_count{service_name=\"" + svc + "\",namespace_name=\"" + ns + "\",response_code_class=\"5xx\"}[5m]))"
         );
         double errorRate = (reqPerSec > 0) ? errTotal / reqPerSec : 0.0;
 
         // Latency percentiles from Knative's histogram (milliseconds)
-        // histogram_quantile computes percentile from histogram buckets collected over 5m
         double p50ms = scalarOr0(
-            "histogram_quantile(0.50, sum by(le) (rate(revision_response_latencies_bucket{service_name=\"" + svc + "\",namespace_name=\"" + ns + "\"}[5m])))"
+            "histogram_quantile(0.50, sum by(le) (rate(activator_request_latencies_bucket{service_name=\"" + svc + "\",namespace_name=\"" + ns + "\"}[5m])))"
         );
         double p95ms = scalarOr0(
-            "histogram_quantile(0.95, sum by(le) (rate(revision_response_latencies_bucket{service_name=\"" + svc + "\",namespace_name=\"" + ns + "\"}[5m])))"
+            "histogram_quantile(0.95, sum by(le) (rate(activator_request_latencies_bucket{service_name=\"" + svc + "\",namespace_name=\"" + ns + "\"}[5m])))"
         );
         double p99ms = scalarOr0(
-            "histogram_quantile(0.99, sum by(le) (rate(revision_response_latencies_bucket{service_name=\"" + svc + "\",namespace_name=\"" + ns + "\"}[5m])))"
+            "histogram_quantile(0.99, sum by(le) (rate(activator_request_latencies_bucket{service_name=\"" + svc + "\",namespace_name=\"" + ns + "\"}[5m])))"
         );
 
         // CPU cores in use (sum across all pods in namespace)
@@ -95,10 +94,10 @@ public class MetricsService {
      */
     public Map<String, Object> getClusterMetrics() {
         // Total request rate across all Knative services
-        double totalReqPerSec = scalarOr0("sum(rate(revision_request_count[5m]))");
+        double totalReqPerSec = scalarOr0("sum(rate(activator_request_count[5m]))");
 
         // Total 5xx error rate
-        double totalErrors = scalarOr0("sum(rate(revision_request_count{response_code_class=\"5xx\"}[5m]))");
+        double totalErrors = scalarOr0("sum(rate(activator_request_count{response_code_class=\"5xx\"}[5m]))");
         double clusterErrorRate = (totalReqPerSec > 0) ? totalErrors / totalReqPerSec : 0.0;
 
         // Total CPU cores used by all containers (excluding infra)

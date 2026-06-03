@@ -27,7 +27,7 @@ public class AuthService {
     private String realm;
 
     @Value("${app.keycloak.admin-username}")
-    private String adminUsername;
+    private String adminUsername; 
 
     @Value("${app.keycloak.admin-password}")
     private String adminPassword;

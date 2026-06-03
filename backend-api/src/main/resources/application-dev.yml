@@ -18,7 +18,7 @@ app:
   kubernetes:
     enabled: false
   prometheus:
-    url: http://localhost:9090
+    url: http://10.9.21.232:9090
   cors:
     allowed-origins:
       - "http://localhost:5173"
