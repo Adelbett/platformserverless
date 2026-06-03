@@ -46,12 +46,12 @@ public class MetricsService {
 
         // Request rate: counter → per-second rate over 5-minute window
         double reqPerSec = scalarOr0(
-            "sum(rate(activator_request_count{service_name=\"" + svc + "\",namespace_name=\"" + ns + "\"}[5m]))"
+            "sum(increase(activator_request_count{service_name=\"" + svc + "\",namespace_name=\"" + ns + "\"}[5m]))"
         );
 
         // Error rate: 5xx responses / total requests (returns 0 if no traffic)
         double errTotal = scalarOr0(
-            "sum(rate(activator_request_count{service_name=\"" + svc + "\",namespace_name=\"" + ns + "\",response_code_class=\"5xx\"}[5m]))"
+            "sum(increase(activator_request_count{service_name=\"" + svc + "\",namespace_name=\"" + ns + "\",response_code_class=\"5xx\"}[5m]))"
         );
         double errorRate = (reqPerSec > 0) ? errTotal / reqPerSec : 0.0;
 
@@ -95,10 +95,10 @@ public class MetricsService {
      */
     public Map<String, Object> getClusterMetrics() {
         // Total request rate across all Knative services
-        double totalReqPerSec = scalarOr0("sum(rate(activator_request_count[5m]))");
+        double totalReqPerSec = scalarOr0("sum(increase(activator_request_count[5m]))");
 
         // Total 5xx error rate
-        double totalErrors = scalarOr0("sum(rate(activator_request_count{response_code_class=\"5xx\"}[5m]))");
+        double totalErrors = scalarOr0("sum(increase(activator_request_count{response_code_class=\"5xx\"}[5m]))");
         double clusterErrorRate = (totalReqPerSec > 0) ? totalErrors / totalReqPerSec : 0.0;
 
         // Total CPU cores used by all containers (excluding infra)
