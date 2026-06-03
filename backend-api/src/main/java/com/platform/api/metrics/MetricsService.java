@@ -16,6 +16,7 @@ import java.util.Map;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+// Metrics service - uses Knative activator metrics
 public class MetricsService {
 
     private final AppRepository appRepository;
