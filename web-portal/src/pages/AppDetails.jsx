@@ -281,15 +281,15 @@ const AppDetails = () => {
     const gridColor = dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)';
     const axisColor = dark ? '#4B5563' : '#94A3B8';
 
+    // Fetch app info and logs once
     useEffect(() => {
         let active = true;
         const load = async () => {
             setLoading(true);
             try {
-                const [appRes, logsRes, metricsRes] = await Promise.all([
+                const [appRes, logsRes] = await Promise.all([
                     appsApi.get(id).catch(() => ({ data: null })),
                     logsApi.getByApp(id).catch(() => ({ data: [] })),
-                    metricsApi.getApp(id).catch(() => ({ data: null })),
                 ]);
                 if (!active) return;
                 const a = appRes.data || MOCK_APP;
@@ -304,12 +304,22 @@ const AppDetails = () => {
                     msg: l.message || '',
                 }));
                 setLogs(mappedLogs.length > 0 ? mappedLogs : MOCK_LOGS);
-                setMetrics(metricsRes.data);
             } catch { if (active) { setApp(MOCK_APP); setLogs(MOCK_LOGS); } }
             finally   { if (active) setLoading(false); }
         };
         load();
         return () => { active = false; };
+    }, [id]);
+
+    // SSE — métriques temps réel toutes les 10 secondes
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        const es = new EventSource(`/api/metrics/apps/${id}/stream?token=${token}`);
+        es.onmessage = (e) => {
+            try { setMetrics(JSON.parse(e.data)); } catch {}
+        };
+        es.onerror = () => es.close();
+        return () => es.close();
     }, [id]);
 
     const openEdit = () => {

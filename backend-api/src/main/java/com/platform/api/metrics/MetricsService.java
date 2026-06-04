@@ -68,24 +68,30 @@ public class MetricsService {
 
         // CPU cores in use (sum across all pods in namespace)
         double cpuCores = scalarOr0(
-            "sum(rate(container_cpu_usage_seconds_total{namespace=\"" + ns + "\",container!=\"POD\",container!=\"\"}[5m]))"
+            "sum(rate(container_cpu_usage_seconds_total{namespace=\"" + ns + "\"}[5m]))"
         );
 
         // Memory in bytes → convert to MiB
         double memBytes = scalarOr0(
-            "sum(container_memory_working_set_bytes{namespace=\"" + ns + "\",container!=\"POD\",container!=\"\"})"
+            "sum(container_memory_working_set_bytes{namespace=\"" + ns + "\"})"
+        );
+
+        // Running pods for this app
+        double runningPods = scalarOr0(
+            "count(kube_pod_info{namespace=\"" + ns + "\"})"
         );
 
         return Map.of(
-            "appId",       appId,
-            "timestamp",   Instant.now().toString(),
-            "reqPerSec",   reqPerSec,
-            "errorRate",   errorRate,
+            "appId",        appId,
+            "timestamp",    Instant.now().toString(),
+            "reqPerSec",    reqPerSec,
+            "errorRate",    errorRate,
             "p50LatencyMs", p50ms,
             "p95LatencyMs", p95ms,
             "p99LatencyMs", p99ms,
-            "cpuCores",    cpuCores,
-            "memoryMiB",   memBytes / (1024.0 * 1024.0)
+            "cpuCores",     cpuCores,
+            "memoryMiB",    memBytes / (1024.0 * 1024.0),
+            "runningPods",  runningPods
         );
     }
 
@@ -103,15 +109,20 @@ public class MetricsService {
 
         // Total CPU cores used by all containers (excluding infra)
         double totalCpuCores = scalarOr0(
-            "sum(rate(container_cpu_usage_seconds_total{container!=\"POD\",container!=\"\"}[5m]))"
+            "sum(rate(container_cpu_usage_seconds_total[5m]))"
         );
 
         // Total memory in GiB
         double totalMemBytes = scalarOr0(
-            "sum(container_memory_working_set_bytes{container!=\"POD\",container!=\"\"})"
+            "sum(container_memory_working_set_bytes)"
         );
 
-        // Network throughput: send + receive in MB/s
+        // Running instances — pods actifs dans les namespaces utilisateurs
+        double runningInstances = scalarOr0(
+            "count(kube_pod_info{namespace=~\"user-.*\"})"
+        );
+
+        // Network throughput
         double netSendMBs = scalarOr0(
             "sum(rate(container_network_transmit_bytes_total[5m])) / 1048576"
         );
@@ -125,6 +136,7 @@ public class MetricsService {
             "clusterErrorRate", clusterErrorRate,
             "totalCpuCores",    totalCpuCores,
             "totalMemoryGiB",   totalMemBytes / (1024.0 * 1024.0 * 1024.0),
+            "runningInstances", runningInstances,
             "netSendMBs",       netSendMBs,
             "netRecvMBs",       netRecvMBs
         );

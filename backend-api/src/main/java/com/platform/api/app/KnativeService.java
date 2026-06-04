@@ -188,3 +188,4 @@ public class KnativeService {
         return String.format("http://%s.%s.example.com (mock)", name, namespace);
     }
 }
+//
