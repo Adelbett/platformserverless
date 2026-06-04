@@ -122,6 +122,14 @@ public class MetricsService {
             "count(kube_pod_info{namespace=~\"user-.*\"})"
         );
 
+        // CPU usage percentage
+        double cpuTotal = scalarOr0("sum(kube_node_status_allocatable{resource=\"cpu\"})");
+        double cpuUsagePct = cpuTotal > 0 ? Math.min(100.0, (totalCpuCores / cpuTotal) * 100.0) : 0.0;
+
+        // Memory usage percentage
+        double memTotal = scalarOr0("sum(kube_node_status_allocatable{resource=\"memory\"})");
+        double memUsagePct = memTotal > 0 ? Math.min(100.0, (totalMemBytes / memTotal) * 100.0) : 0.0;
+
         // Network throughput
         double netSendMBs = scalarOr0(
             "sum(rate(container_network_transmit_bytes_total[5m])) / 1048576"
@@ -135,7 +143,9 @@ public class MetricsService {
             "totalReqPerSec",   totalReqPerSec,
             "clusterErrorRate", clusterErrorRate,
             "totalCpuCores",    totalCpuCores,
+            "cpuUsagePct",      Math.round(cpuUsagePct),
             "totalMemoryGiB",   totalMemBytes / (1024.0 * 1024.0 * 1024.0),
+            "memUsagePct",      Math.round(memUsagePct),
             "runningInstances", runningInstances,
             "netSendMBs",       netSendMBs,
             "netRecvMBs",       netRecvMBs

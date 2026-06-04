@@ -269,7 +269,8 @@ const AppDetails = () => {
     const [logs,       setLogs]       = useState([]);
     const [metrics,    setMetrics]    = useState(null);
     const [loading,    setLoading]    = useState(true);
-    const [replicas,   setReplicas]   = useState(3);
+    const [replicas,      setReplicas]      = useState(0);
+    const [applyingReplicas, setApplyingReplicas] = useState(false);
     const [envOpen,    setEnvOpen]    = useState(true);
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [editOpen,   setEditOpen]   = useState(false);
@@ -294,7 +295,7 @@ const AppDetails = () => {
                 if (!active) return;
                 const a = appRes.data || MOCK_APP;
                 setApp(a);
-                setReplicas(a.replicas ?? a.minReplicas ?? 1);
+                setReplicas(a.minReplicas ?? 0);
                 const rawLogs = Array.isArray(logsRes.data) ? logsRes.data : [];
                 const mappedLogs = rawLogs.map(l => ({
                     id: l.id,
@@ -490,7 +491,25 @@ const AppDetails = () => {
                     <span>20</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
-                    <button className="btn-primary" style={{ fontSize: 12.5 }}><RefreshCw size={13} /> Apply</button>
+                    <button
+                        className="btn-primary"
+                        style={{ fontSize: 12.5, opacity: applyingReplicas ? 0.6 : 1 }}
+                        disabled={applyingReplicas}
+                        onClick={async () => {
+                            setApplyingReplicas(true);
+                            try {
+                                await appsApi.update(id, { minReplicas: replicas });
+                                const res = await appsApi.get(id);
+                                setApp(res.data);
+                            } catch (e) {
+                                alert('Failed to update replicas: ' + (e?.response?.data?.message || e.message));
+                            } finally {
+                                setApplyingReplicas(false);
+                            }
+                        }}
+                    >
+                        <RefreshCw size={13} /> {applyingReplicas ? 'Applying...' : 'Apply'}
+                    </button>
                 </div>
             </div>
 

@@ -246,6 +246,17 @@ const Monitoring = () => {
 
     useEffect(() => { loadData(); }, [isAdmin]);
 
+    // SSE — cluster metrics temps réel toutes les 10s
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        const es = new EventSource(`/api/metrics/cluster/stream?token=${token}`);
+        es.onmessage = (e) => {
+            try { setCluster(JSON.parse(e.data)); } catch {}
+        };
+        es.onerror = () => es.close();
+        return () => es.close();
+    }, []);
+
     const refresh = () => { setRefreshing(true); loadData(); };
 
     const running = apps.filter(a => a.status === 'RUNNING').length;
@@ -360,6 +371,7 @@ const Monitoring = () => {
                     </ResponsiveContainer>
                 </div>
 
+                {isAdmin ? (
                 <div className="ns-card" style={{ padding: 20 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
                         <div>
@@ -372,11 +384,20 @@ const Monitoring = () => {
                         </span>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, alignItems: 'center' }}>
-                        <GaugeRing value={cluster?.cpuUsagePct ?? 68} color="#00D4FF" label="CPU"    sublabel={cluster ? `${cluster.totalCpuCores?.toFixed(1)} cores` : '6.8 / 10 cores'} />
-                        <GaugeRing value={cluster?.memUsagePct ?? 45}  color="#A855F7" label="Memory" sublabel={cluster ? `${cluster.totalMemoryGiB?.toFixed(1)} GiB` : '18 / 40 GB'} />
-                        <GaugeRing value={cluster?.netUsagePct ?? 32}  color="#10B981" label="Network" sublabel={cluster ? `${cluster.netSendMBs?.toFixed(1)} MB/s` : '4.1 / 5 Gbps'} />
+                        <GaugeRing value={cluster?.cpuUsagePct ?? 0} color="#00D4FF" label="CPU"     sublabel={cluster ? `${cluster.totalCpuCores?.toFixed(1)} cores` : '—'} />
+                        <GaugeRing value={cluster?.memUsagePct ?? 0} color="#A855F7" label="Memory"  sublabel={cluster ? `${cluster.totalMemoryGiB?.toFixed(1)} GiB`  : '—'} />
+                        <GaugeRing value={Math.min(100, Math.round((cluster?.netSendMBs ?? 0) / 10))} color="#10B981" label="Network" sublabel={cluster ? `${cluster.netSendMBs?.toFixed(1)} MB/s` : '—'} />
                     </div>
                 </div>
+                ) : (
+                <div className="ns-card" style={{ padding: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+                    <div style={{ textAlign: 'center' }}>
+                        <p style={{ fontSize: 13, color: '#64748B', margin: 0 }}>Your applications</p>
+                        <p style={{ fontSize: 28, fontWeight: 900, fontFamily: "'Outfit', sans-serif", color: '#00D4FF', margin: '8px 0' }}>{apps.length}</p>
+                        <p style={{ fontSize: 12, color: '#64748B', margin: 0 }}>{running} running · {apps.length - running} idle</p>
+                    </div>
+                </div>
+                )}
             </div>
 
             {/* ── ADMIN ONLY: detailed tabs ─────────────────────────── */}
