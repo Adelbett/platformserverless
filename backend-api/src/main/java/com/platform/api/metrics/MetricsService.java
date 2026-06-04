@@ -146,7 +146,7 @@ public class MetricsService {
                     .uri(uriBuilder -> uriBuilder
                             .path("/api/v1/query")
                             .queryParam("query", query)
-                            .build())
+                            .build(new Object[0]))
                     .retrieve()
                     .bodyToMono(Map.class)
                     .block();

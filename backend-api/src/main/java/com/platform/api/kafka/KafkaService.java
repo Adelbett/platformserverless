@@ -97,7 +97,9 @@ public class KafkaService {
     private void createTopicInKafka(KafkaTopic topic) {
         try (AdminClient admin = AdminClient.create(Map.of(
                 AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers))) {
-            NewTopic newTopic = new NewTopic(topic.getName(), topic.getPartitions(), topic.getReplicas().shortValue());
+            int availableBrokers = admin.describeCluster().nodes().get().size();
+            short replicas = (short) Math.min(topic.getReplicas(), availableBrokers);
+            NewTopic newTopic = new NewTopic(topic.getName(), topic.getPartitions(), replicas);
             admin.createTopics(List.of(newTopic)).all().get();
             log.info("Kafka topic '{}' created with {} partitions", topic.getName(), topic.getPartitions());
         } catch (Exception e) {
