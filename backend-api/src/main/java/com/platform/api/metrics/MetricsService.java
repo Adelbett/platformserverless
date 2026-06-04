@@ -8,6 +8,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import java.net.URI;
 
 import java.time.Instant;
 import java.util.List;
@@ -161,14 +164,17 @@ public class MetricsService {
     @SuppressWarnings("unchecked")
     private double scalarOr0(String query) {
         try {
+            String url = UriComponentsBuilder
+                    .fromHttpUrl(prometheusUrl + "/api/v1/query")
+                    .queryParam("query", query)
+                    .build(true)
+                    .toUriString();
+
             Map<String, Object> result = webClientBuilder
                     .baseUrl(prometheusUrl)
                     .build()
                     .get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/api/v1/query")
-                            .queryParam("query", query)
-                            .build(new Object[0]))
+                    .uri(URI.create(url))
                     .retrieve()
                     .bodyToMono(Map.class)
                     .block();
