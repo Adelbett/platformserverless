@@ -43,7 +43,7 @@ public class MetricsController {
                 while (true) {
                     Map<String, Object> metrics = metricsService.getAppMetrics(id);
                     emitter.send(SseEmitter.event().data(metrics));
-                    Thread.sleep(10_000);
+                    Thread.sleep(5_000);
                 }
             } catch (IOException e) {
                 emitter.complete();
@@ -66,7 +66,7 @@ public class MetricsController {
                 while (true) {
                     Map<String, Object> metrics = metricsService.getClusterMetrics();
                     emitter.send(SseEmitter.event().data(metrics));
-                    Thread.sleep(10_000);
+                    Thread.sleep(5_000);
                 }
             } catch (IOException e) {
                 emitter.complete();

@@ -8,9 +8,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.util.UriComponentsBuilder;
-
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 import java.time.Instant;
 import java.util.List;
@@ -164,17 +164,14 @@ public class MetricsService {
     @SuppressWarnings("unchecked")
     private double scalarOr0(String query) {
         try {
-            String url = UriComponentsBuilder
-                    .fromHttpUrl(prometheusUrl + "/api/v1/query")
-                    .queryParam("query", query)
-                    .build(true)
-                    .toUriString();
+            String encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8);
+            URI uri = URI.create(prometheusUrl + "/api/v1/query?query=" + encodedQuery);
 
             Map<String, Object> result = webClientBuilder
                     .baseUrl(prometheusUrl)
                     .build()
                     .get()
-                    .uri(URI.create(url))
+                    .uri(uri)
                     .retrieve()
                     .bodyToMono(Map.class)
                     .block();
