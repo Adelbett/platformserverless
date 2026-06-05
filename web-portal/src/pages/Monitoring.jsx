@@ -260,7 +260,7 @@ const Monitoring = () => {
     const refresh = () => { setRefreshing(true); loadData(); };
 
     const running = apps.filter(a => a.status === 'RUNNING').length;
-    const totalReplicas = apps.reduce((s, a) => s + (a.replicas ?? a.minReplicas ?? 1), 0);
+    const totalReplicas = pods.filter(p => p.phase === 'Running').length || apps.filter(a => a.status === 'RUNNING').length;
 
     // ── KPI data ───────────────────────────────────────────────────────
     const kpiCards = isAdmin ? [

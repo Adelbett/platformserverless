@@ -339,10 +339,12 @@ const ServiceRow = ({ app, appName, location, current, total, pct, barColor, dis
         <tr
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
+            onClick={() => navigate(`/apps/${app.id}`)}
             style={{
                 borderBottom: `1px solid ${C.border}`,
-                background: hovered ? 'rgba(255,255,255,0.012)' : 'transparent',
+                background: hovered ? 'rgba(255,255,255,0.025)' : 'transparent',
                 transition: 'background 0.15s',
+                cursor: 'pointer',
             }}
         >
             {/* Service Name */}
@@ -383,22 +385,28 @@ const ServiceRow = ({ app, appName, location, current, total, pct, barColor, dis
 
             {/* Replicas */}
             <td style={{ padding: '22px 28px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{
-                        fontSize: '13px', color: C.textSub,
-                        fontFamily: "'Space Grotesk', sans-serif",
-                    }}>{current} / {total}</span>
-                    <div style={{
-                        width: '88px', height: '4px',
-                        background: 'rgba(255,255,255,0.05)', borderRadius: '99px', overflow: 'hidden',
-                    }}>
+                {current === 0 ? (
+                    <span style={{ fontSize: '11px', color: '#6B7280', fontFamily: "'Space Grotesk', sans-serif", fontStyle: 'italic' }}>
+                        Scale to zero
+                    </span>
+                ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{
+                            fontSize: '13px', color: C.textSub,
+                            fontFamily: "'Space Grotesk', sans-serif",
+                        }}>{current} pod{current !== 1 ? 's' : ''} / {total} max</span>
                         <div style={{
-                            height: '100%', borderRadius: '99px',
-                            background: barColor, width: `${pct}%`,
-                            transition: 'width 0.7s ease',
-                        }} />
+                            width: '88px', height: '4px',
+                            background: 'rgba(255,255,255,0.05)', borderRadius: '99px', overflow: 'hidden',
+                        }}>
+                            <div style={{
+                                height: '100%', borderRadius: '99px',
+                                background: barColor, width: `${pct}%`,
+                                transition: 'width 0.7s ease',
+                            }} />
+                        </div>
                     </div>
-                </div>
+                )}
             </td>
 
             {/* Resources */}

@@ -255,7 +255,7 @@ kind create cluster --name platform
 9. **[LONG TERME]** Mettre en place CI/CD (GitHub Actions ou GitLab CI)
 
 ---
-
+C:\Users\Hassen\.gemini\antigravity\scratch\platformserverless\RAPPORT_ETAT_PROJET.md
 ## 7. COMMANDES UTILES
 
 ```bash

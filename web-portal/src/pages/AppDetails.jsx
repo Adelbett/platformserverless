@@ -197,7 +197,7 @@ const LogViewer = ({ logs, dark }) => {
                     </div>
                 </div>
             </div>
-            <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+            <div style={{ maxHeight: 480, overflowY: 'auto' }}>
                 {filtered.map((log, i) => (
                     <div key={log.id || i} style={{
                         display: 'flex', alignItems: 'flex-start', gap: 12, padding: '7px 20px',
@@ -403,7 +403,7 @@ const AppDetails = () => {
                                 {appUrl && (
                                     <a href={appUrl.startsWith('http') ? appUrl : `https://${appUrl}`} target="_blank" rel="noreferrer"
                                         style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#00D4FF', textDecoration: 'none' }}>
-                                        <ExternalLink size={11} /> {appData.name}.nextstep.app
+                                        <ExternalLink size={11} /> {appUrl}
                                     </a>
                                 )}
                             </div>
@@ -475,7 +475,7 @@ const AppDetails = () => {
                         <h3 style={{ fontSize: 14, fontWeight: 800, fontFamily: "'Outfit', sans-serif", margin: 0, display: 'flex', alignItems: 'center', gap: 8 }} className="text-primary">
                             <Sliders size={15} style={{ color: '#9CA3AF' }} /> Replica Control
                         </h3>
-                        <p style={{ fontSize: 11, margin: '3px 0 0' }} className="text-secondary">Adjust the number of running instances</p>
+                        <p style={{ fontSize: 11, margin: '3px 0 0' }} className="text-secondary">Adjust the number of running pods</p>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <button className="btn-secondary" style={{ width: 32, height: 32, padding: 0, justifyContent: 'center' }} onClick={() => setReplicas(r => Math.max(0, r - 1))}><Minus size={14} /></button>
@@ -513,7 +513,7 @@ const AppDetails = () => {
                 </div>
             </div>
 
-            {/* Environment Variables */}
+            {/* App Metadata & Environment Variables */}
             <div className="ns-card" style={{ overflow: 'hidden' }}>
                 <button onClick={() => setEnvOpen(o => !o)}
                     style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: envOpen ? '1px solid rgba(0,0,0,0.07)' : 'none', background: 'none', border: 'none', cursor: 'pointer', transition: 'background 150ms', textAlign: 'left' }}
@@ -522,15 +522,39 @@ const AppDetails = () => {
                 >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <Shield size={15} style={{ color: '#9CA3AF' }} />
-                        <span style={{ fontSize: 14, fontWeight: 800, fontFamily: "'Outfit', sans-serif" }} className="text-primary">Environment Variables</span>
-                        <span style={{ fontSize: 11, color: '#9CA3AF' }}>({MOCK_ENV.length})</span>
+                        <span style={{ fontSize: 14, fontWeight: 800, fontFamily: "'Outfit', sans-serif" }} className="text-primary">App Configuration</span>
                     </div>
                     <ChevronDown size={16} style={{ color: '#9CA3AF', transform: envOpen ? 'rotate(180deg)' : 'none', transition: 'transform 200ms' }} />
                 </button>
                 <AnimatePresence initial={false}>
                     {envOpen && (
                         <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} transition={{ duration: 0.2 }} style={{ overflow: 'hidden' }}>
-                            {MOCK_ENV.map(item => <EnvRow key={item.key} item={item} dark={dark} />)}
+                            {/* Section header: App Info */}
+                            <div style={{ padding: '8px 20px', background: dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                                <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B' }}>Application Info</span>
+                            </div>
+                            {[
+                                { key: 'APP_NAME',      value: appData.name || appData.serviceName || id,                      secret: false },
+                                { key: 'IMAGE',         value: appImage,                                                        secret: false },
+                                { key: 'PORT',          value: String(appData.port || '—'),                                     secret: false },
+                                { key: 'NAMESPACE',     value: appData.namespace || '—',                                        secret: false },
+                                { key: 'STATUS',        value: appData.status || '—',                                           secret: false },
+                                { key: 'MIN_REPLICAS',  value: String(appData.minReplicas ?? '—'),                              secret: false },
+                                { key: 'MAX_REPLICAS',  value: String(appData.maxReplicas ?? '—'),                              secret: false },
+                                { key: 'CPU_REQUEST',   value: appData.cpuRequest || '—',                                       secret: false },
+                                { key: 'MEMORY_REQUEST',value: appData.memoryRequest || '—',                                    secret: false },
+                                { key: 'URL',           value: appData.url || '—',                                              secret: false },
+                            ].map(item => <EnvRow key={item.key} item={item} dark={dark} />)}
+                            {/* Section header: Kafka */}
+                            <div style={{ padding: '8px 20px', background: dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', borderBottom: '1px solid rgba(0,0,0,0.05)', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
+                                <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B' }}>Kafka / Eventing</span>
+                            </div>
+                            {[
+                                { key: 'KAFKA_TOPIC',          value: appData.kafkaTopic        || appData.kafkaTopicId  || '—', secret: false },
+                                { key: 'KAFKA_CONSUMER_GROUP', value: appData.kafkaConsumerGroup || appData.serviceName  || '—', secret: false },
+                                { key: 'KAFKA_SOURCE',         value: appData.kafkaSourceName   || '—',                         secret: false },
+                                { key: 'TRIGGER_FILTER',       value: appData.triggerFilter     || '—',                         secret: false },
+                            ].map(item => <EnvRow key={item.key} item={item} dark={dark} />)}
                         </motion.div>
                     )}
                 </AnimatePresence>

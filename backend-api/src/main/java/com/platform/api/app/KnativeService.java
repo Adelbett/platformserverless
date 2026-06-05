@@ -110,6 +110,26 @@ public class KnativeService {
         }
     }
 
+    // ── Ready pods count ─────────────────────────────────────────────
+
+    public int getReadyPods(String serviceName, String namespace) {
+        String ns = namespace != null ? namespace : defaultNamespace;
+        if (!kubernetesEnabled) return 0;
+        try {
+            var pods = kubernetesClient.pods().inNamespace(ns)
+                    .withLabel("serving.knative.dev/service", serviceName)
+                    .list().getItems();
+            return (int) pods.stream()
+                    .filter(p -> "Running".equals(p.getStatus().getPhase()))
+                    .filter(p -> p.getStatus().getContainerStatuses() != null &&
+                                 p.getStatus().getContainerStatuses().stream().allMatch(c -> Boolean.TRUE.equals(c.getReady())))
+                    .count();
+        } catch (Exception e) {
+            log.warn("Could not get pod count for '{}': {}", serviceName, e.getMessage());
+            return 0;
+        }
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────
 
     private GenericKubernetesResource buildKnativeManifest(String name, String namespace, AppRequest req) {

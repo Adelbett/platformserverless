@@ -497,7 +497,8 @@ const Dashboard = () => {
                     </ResponsiveContainer>
                 </div>
 
-                {/* Gauges */}
+                {/* Gauges — admin only */}
+                {user?.role === 'ADMIN' && (
                 <div className="ns-card" style={{ padding: 20 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
                         <div>
@@ -510,11 +511,12 @@ const Dashboard = () => {
                         </span>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, alignItems: 'center' }}>
-                        <GaugeRing value={68} color="#00D4FF" label="CPU"     sublabel="6.8 / 10 cores" />
-                        <GaugeRing value={45} color="#A855F7" label="Memory"  sublabel="18 / 40 GB"     />
-                        <GaugeRing value={82} color="#10B981" label="Network" sublabel="4.1 / 5 Gbps"   />
+                        <GaugeRing value={clusterMetrics?.cpuUsagePct ?? 0} color="#00D4FF" label="CPU"     sublabel={clusterMetrics ? `${clusterMetrics.totalCpuCores?.toFixed(1)} cores` : '—'} />
+                        <GaugeRing value={clusterMetrics?.memUsagePct ?? 0} color="#A855F7" label="Memory"  sublabel={clusterMetrics ? `${clusterMetrics.totalMemoryGiB?.toFixed(1)} GiB`  : '—'} />
+                        <GaugeRing value={Math.min(100, Math.round((clusterMetrics?.netSendMBs ?? 0) / 10))} color="#10B981" label="Network" sublabel={clusterMetrics ? `${clusterMetrics.netSendMBs?.toFixed(1)} MB/s` : '—'} />
                     </div>
                 </div>
+                )}
             </div>
 
             {/* Table + Activity Feed */}

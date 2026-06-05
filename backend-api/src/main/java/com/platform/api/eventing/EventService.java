@@ -33,25 +33,33 @@ public class EventService {
     public void publish(Map<String, Object> payload) {
         String eventType = payload.getOrDefault("type", "PLATFORM_EVENT").toString();
         String eventId   = UUID.randomUUID().toString();
+        String appId     = payload.getOrDefault("appId", "").toString();
 
         if (!kubernetesEnabled) {
-            log.info("[MOCK] Would publish CloudEvent id={} type={} payload={}", eventId, eventType, payload);
+            log.info("[MOCK] Would publish CloudEvent id={} type={} appId={} payload={}", eventId, eventType, appId, payload);
             return;
         }
 
         try {
-            webClientBuilder.baseUrl(brokerUrl).build()
+            var request = webClientBuilder.baseUrl(brokerUrl).build()
                     .post()
                     .header("Content-Type", "application/json")
                     .header("Ce-Specversion", "1.0")
                     .header("Ce-Type", eventType)
                     .header("Ce-Source", "platform-backend")
-                    .header("Ce-Id", eventId)
-                    .bodyValue(payload)
+                    .header("Ce-Id", eventId);
+
+            // Si appId fourni → ajouter comme attribut CloudEvent pour le routage par Trigger
+            if (!appId.isBlank()) {
+                request = request.header("Ce-Appid", appId);
+            }
+
+            request.bodyValue(payload)
                     .retrieve()
                     .toBodilessEntity()
                     .block();
-            log.info("CloudEvent published: id={} type={}", eventId, eventType);
+
+            log.info("CloudEvent published: id={} type={} appId={}", eventId, eventType, appId);
         } catch (Exception e) {
             log.error("Failed to publish CloudEvent: {}", e.getMessage());
         }

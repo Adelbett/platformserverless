@@ -219,6 +219,7 @@ public class AppService {
                 .port(app.getPort())
                 .minReplicas(app.getMinReplicas())
                 .maxReplicas(app.getMaxReplicas())
+                .replicas(knativeService.getReadyPods(app.getServiceName(), app.getNamespace()))
                 .cpuRequest(app.getCpuRequest())
                 .memoryRequest(app.getMemoryRequest())
                 .deployedAt(app.getDeployedAt())

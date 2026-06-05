@@ -24,6 +24,7 @@ public class AppResponse {
     private Integer port;
     private Integer minReplicas;
     private Integer maxReplicas;
+    private Integer replicas;
     private String cpuRequest;
     private String memoryRequest;
     private LocalDateTime deployedAt;
