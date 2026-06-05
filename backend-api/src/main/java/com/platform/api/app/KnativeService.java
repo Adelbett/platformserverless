@@ -133,9 +133,9 @@ public class KnativeService {
     // ── Helpers ───────────────────────────────────────────────────────
 
     private GenericKubernetesResource buildKnativeManifest(String name, String namespace, AppRequest req) {
-        String fullImage = req.getImageTag() != null
-                ? req.getImageName() + ":" + req.getImageTag()
-                : req.getImageName();
+        String imageName = req.getImageName() != null ? req.getImageName().trim() : "";
+        String imageTag  = req.getImageTag()  != null ? req.getImageTag().trim()  : "";
+        String fullImage = !imageTag.isEmpty() ? imageName + ":" + imageTag : imageName;
 
         return new GenericKubernetesResourceBuilder()
                 .withApiVersion("serving.knative.dev/v1")

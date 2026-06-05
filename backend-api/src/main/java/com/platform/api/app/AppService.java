@@ -187,9 +187,13 @@ public class AppService {
     }
 
     private String generateServiceName(String imageName, String userId) {
-        String base = imageName.replaceAll("[^a-zA-Z0-9]", "-").toLowerCase();
-        String suffix = userId.substring(0, Math.min(6, userId.length()));
+        String base = imageName.trim().replaceAll("[^a-zA-Z0-9]", "-").toLowerCase()
+                               .replaceAll("-{2,}", "-")   // collapse multiple dashes
+                               .replaceAll("^-+|-+$", ""); // strip leading/trailing dashes
+        String suffix = userId.toLowerCase().replaceAll("[^a-z0-9]", "")
+                               .substring(0, Math.min(6, userId.length()));
         String full = base + "-" + suffix;
+        full = full.replaceAll("^-+|-+$", ""); // final safety strip
         return full.substring(0, Math.min(50, full.length()));
     }
 
