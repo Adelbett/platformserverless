@@ -25,6 +25,10 @@ public class AppResponse {
     private Integer minReplicas;
     private Integer maxReplicas;
     private Integer replicas;
+    private String kafkaTopic;
+    private String kafkaConsumerGroup;
+    private String kafkaSourceName;
+    private String triggerFilter;
     private String cpuRequest;
     private String memoryRequest;
     private LocalDateTime deployedAt;

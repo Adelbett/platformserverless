@@ -3,6 +3,8 @@ package com.platform.api.app;
 import com.platform.api.app.dto.AppRequest;
 import com.platform.api.app.dto.AppResponse;
 import com.platform.api.eventing.EventingService;
+import com.platform.api.eventing.KafkaSourceRepository;
+import com.platform.api.eventing.TriggerRepository;
 import com.platform.api.exception.NotFoundException;
 import com.platform.api.logs.DeploymentLog;
 import com.platform.api.logs.DeploymentLogRepository;
@@ -27,6 +29,8 @@ public class AppService {
     private final KnativeService knativeService;
     private final EventingService eventingService;
     private final LogSseService logSseService;
+    private final KafkaSourceRepository kafkaSourceRepository;
+    private final TriggerRepository triggerRepository;
 
     // ── Create & Deploy ──────────────────────────────────────────────
 
@@ -228,6 +232,45 @@ public class AppService {
                 .memoryRequest(app.getMemoryRequest())
                 .deployedAt(app.getDeployedAt())
                 .updatedAt(app.getUpdatedAt())
+                .kafkaTopic(resolveKafkaTopic(app.getServiceName(), app.getUserId()))
+                .kafkaConsumerGroup(resolveConsumerGroup(app.getServiceName(), app.getUserId()))
+                .kafkaSourceName(resolveKafkaSourceName(app.getServiceName(), app.getUserId()))
+                .triggerFilter(resolveTriggerFilter(app.getServiceName(), app.getUserId()))
                 .build();
+    }
+
+    private String resolveKafkaTopic(String serviceName, String userId) {
+        return triggerRepository.findByUserId(userId).stream()
+                .filter(t -> serviceName.equals(t.getSubscriberName()))
+                .findFirst()
+                .flatMap(t -> kafkaSourceRepository.findById(t.getKafkaSourceId())
+                        .map(s -> s.getKafkaTopicId()))
+                .orElse(null);
+    }
+
+    private String resolveConsumerGroup(String serviceName, String userId) {
+        return triggerRepository.findByUserId(userId).stream()
+                .filter(t -> serviceName.equals(t.getSubscriberName()))
+                .findFirst()
+                .flatMap(t -> kafkaSourceRepository.findById(t.getKafkaSourceId())
+                        .map(s -> s.getConsumerGroup()))
+                .orElse(null);
+    }
+
+    private String resolveKafkaSourceName(String serviceName, String userId) {
+        return triggerRepository.findByUserId(userId).stream()
+                .filter(t -> serviceName.equals(t.getSubscriberName()))
+                .findFirst()
+                .flatMap(t -> kafkaSourceRepository.findById(t.getKafkaSourceId())
+                        .map(s -> s.getName()))
+                .orElse(null);
+    }
+
+    private String resolveTriggerFilter(String serviceName, String userId) {
+        return triggerRepository.findByUserId(userId).stream()
+                .filter(t -> serviceName.equals(t.getSubscriberName()))
+                .findFirst()
+                .map(t -> t.getFilter())
+                .orElse(null);
     }
 }

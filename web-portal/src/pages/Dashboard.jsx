@@ -401,7 +401,7 @@ const Dashboard = () => {
 
     const displayApps  = apps;
     const running      = displayApps.filter(a => a.status === 'RUNNING').length;
-    const totalReplicas = displayApps.reduce((s, a) => s + (a.replicas ?? a.minReplicas ?? 1), 0);
+    const totalReplicas = displayApps.reduce((s, a) => s + (a.replicas ?? 0), 0);
     const spark = (scale = 1) => Array.from({ length: 20 }, (_, i) => ({ value: (40 + Math.sin(i * 0.5) * 15 + Math.random() * 10) * scale }));
 
     const kpiCards = [
@@ -557,6 +557,14 @@ const Dashboard = () => {
                                 </tr>
                             </thead>
                             <tbody>
+                                {sortedApps.length === 0 && (
+                                    <tr>
+                                        <td colSpan={6} style={{ padding: '48px 16px', textAlign: 'center' }}>
+                                            <p style={{ fontSize: 13, color: '#6B7280', margin: 0 }}>No applications deployed yet</p>
+                                            <button className="btn-primary" style={{ marginTop: 12, fontSize: 12 }} onClick={() => navigate('/apps/new')}>Deploy your first app</button>
+                                        </td>
+                                    </tr>
+                                )}
                                 {sortedApps.map((app, i) => (
                                     <motion.tr
                                         key={app.id || i}
@@ -574,28 +582,38 @@ const Dashboard = () => {
                                                     {(app.name || app.serviceName || 'A').slice(0, 2).toUpperCase()}
                                                 </div>
                                                 <div>
-                                                    <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }} className="text-primary">{app.name || app.serviceName}</p>
-                                                    {app.version && <p style={{ fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: '#9CA3AF', margin: '1px 0 0' }}>{app.version}</p>}
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                        <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }} className="text-primary">{app.name || app.serviceName}</p>
+                                                        {app.deployedAt && (new Date() - new Date(app.deployedAt)) < 3600000 && (
+                                                            <span style={{ fontSize: 9, fontWeight: 700, background: 'rgba(16,185,129,0.15)', color: '#10B981', padding: '1px 6px', borderRadius: 999, letterSpacing: '0.05em' }}>NEW</span>
+                                                        )}
+                                                    </div>
+                                                    {app.imageName && <p style={{ fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: '#9CA3AF', margin: '1px 0 0' }}>{app.imageName}:{app.imageTag || 'latest'}</p>}
                                                 </div>
                                             </div>
                                         </td>
                                         <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
                                             <StatusBadge status={app.status || 'PENDING'} />
                                         </td>
-                                        <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.04)', fontFamily: "'JetBrains Mono', monospace", fontSize: 13, fontWeight: 700 }} className="text-primary">
-                                            {app.replicas ?? app.minReplicas ?? '—'}
+                                        <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.04)', fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }} className="text-primary">
+                                            {(app.replicas ?? 0) === 0
+                                                ? <span style={{ color: '#6B7280', fontStyle: 'italic', fontSize: 11 }}>scaled to zero</span>
+                                                : `${app.replicas} pod${app.replicas !== 1 ? 's' : ''}`}
                                         </td>
                                         <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.04)', fontSize: 12 }} className="text-secondary">
-                                            {app.lastDeploy || app.deployedAt || '—'}
-                                        </td>
-                                        <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.04)', fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }} className="text-secondary">
-                                            {app.traffic || '—'}
+                                            {app.deployedAt ? new Date(app.deployedAt).toLocaleString() : '—'}
                                         </td>
                                         <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
-                                            <button onClick={e => { e.stopPropagation(); navigate(`/apps/${app.id || app.serviceName}`); }}
-                                                className="btn-ghost" style={{ padding: '4px 8px', fontSize: 11 }}>
-                                                <ExternalLink size={12} />
-                                            </button>
+                                            <div style={{ display: 'flex', gap: 6 }}>
+                                                {app.url && (
+                                                    <a href={app.url.startsWith('http') ? app.url : `http://${app.url}`} target="_blank" rel="noreferrer"
+                                                        onClick={e => e.stopPropagation()}
+                                                        title="Open app URL"
+                                                        style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 8px', borderRadius: 6, background: 'rgba(0,212,255,0.08)', color: '#00D4FF', border: 'none', cursor: 'pointer', textDecoration: 'none' }}>
+                                                        <ExternalLink size={12} />
+                                                    </a>
+                                                )}
+                                            </div>
                                         </td>
                                     </motion.tr>
                                 ))}
@@ -628,7 +646,7 @@ const Dashboard = () => {
                             >
                                 <div style={{ width: 3, minHeight: 40, borderRadius: 2, background: color, flexShrink: 0, marginTop: 2 }} />
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                    <p style={{ fontSize: 11.5, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", margin: 0, color: '#00D4FF' }}>{ev.appId?.slice(0, 8) || 'platform'}</p>
+                                    <p style={{ fontSize: 11.5, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", margin: 0, color: '#00D4FF' }}>{ev.appName || ev.appId?.slice(0, 8) || 'platform'}</p>
                                     <p style={{ fontSize: 11, margin: '3px 0 0', lineHeight: 1.4 }} className="text-secondary">{ev.message}</p>
                                     <p style={{ fontSize: 10, margin: '4px 0 0', color: '#9CA3AF' }}>{ev.createdAt ? new Date(ev.createdAt).toLocaleString() : ''}</p>
                                 </div>
