@@ -206,8 +206,10 @@ const Eventing = () => {
     useEffect(() => { load(); }, []);
 
     const TABS = [
-        { key: 'pipelines', label: 'Pipelines' },
-        { key: 'publish',   label: 'Publish Event' },
+        { key: 'pipelines',   label: 'Pipelines'      },
+        { key: 'sources',     label: 'KafkaSources'   },
+        { key: 'triggers',    label: 'Triggers'        },
+        { key: 'publish',     label: 'Publish Event'   },
     ];
 
     return (
@@ -276,6 +278,83 @@ const Eventing = () => {
                             ))}
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* KafkaSources tab */}
+            {tab === 'sources' && (
+                <div className="ns-card" style={{ overflow: 'hidden' }}>
+                    <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(0,0,0,0.07)' }}>
+                        <span style={{ fontSize: 13, fontWeight: 700 }} className="text-primary">KafkaSources ({sources.length})</span>
+                    </div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                            <tr style={{ borderBottom: '1px solid rgba(0,0,0,0.07)' }}>
+                                {['NAME', 'TOPIC', 'CONSUMER GROUP', 'NAMESPACE', 'STATUS'].map(h => (
+                                    <th key={h} style={{ padding: '10px 20px', textAlign: 'left', fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#64748B' }}>{h}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {loading ? (
+                                <tr><td colSpan={5} style={{ padding: 40, textAlign: 'center', color: '#64748B' }}>Loading...</td></tr>
+                            ) : sources.length === 0 ? (
+                                <tr><td colSpan={5} style={{ padding: 40, textAlign: 'center', color: '#64748B' }}>No KafkaSources — deploy an app with Kafka Trigger enabled</td></tr>
+                            ) : sources.map(s => {
+                                const topic = topics.find(t => t.id === s.kafkaTopicId);
+                                return (
+                                    <tr key={s.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
+                                        <td style={{ padding: '12px 20px', fontFamily: "'JetBrains Mono', monospace", fontSize: 13, fontWeight: 700 }} className="text-primary">{s.name}</td>
+                                        <td style={{ padding: '12px 20px', fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: '#F59E0B' }}>{topic?.name || s.kafkaTopicId}</td>
+                                        <td style={{ padding: '12px 20px', fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }} className="text-secondary">{s.consumerGroup || '—'}</td>
+                                        <td style={{ padding: '12px 20px', fontSize: 12 }} className="text-secondary">{s.namespace || '—'}</td>
+                                        <td style={{ padding: '12px 20px' }}>
+                                            <span style={{ fontSize: 11, fontWeight: 700, color: s.ready ? '#10B981' : '#F59E0B', background: s.ready ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', padding: '3px 10px', borderRadius: 999 }}>
+                                                ● {s.ready ? 'READY' : 'PENDING'}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {/* Triggers tab */}
+            {tab === 'triggers' && (
+                <div className="ns-card" style={{ overflow: 'hidden' }}>
+                    <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(0,0,0,0.07)' }}>
+                        <span style={{ fontSize: 13, fontWeight: 700 }} className="text-primary">Triggers ({triggers.length})</span>
+                    </div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                            <tr style={{ borderBottom: '1px solid rgba(0,0,0,0.07)' }}>
+                                {['NAME', 'BROKER', 'FILTER', 'SUBSCRIBER', 'STATUS'].map(h => (
+                                    <th key={h} style={{ padding: '10px 20px', textAlign: 'left', fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#64748B' }}>{h}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {loading ? (
+                                <tr><td colSpan={5} style={{ padding: 40, textAlign: 'center', color: '#64748B' }}>Loading...</td></tr>
+                            ) : triggers.length === 0 ? (
+                                <tr><td colSpan={5} style={{ padding: 40, textAlign: 'center', color: '#64748B' }}>No triggers configured</td></tr>
+                            ) : triggers.map(t => (
+                                <tr key={t.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
+                                    <td style={{ padding: '12px 20px', fontFamily: "'JetBrains Mono', monospace", fontSize: 13, fontWeight: 700 }} className="text-primary">{t.name}</td>
+                                    <td style={{ padding: '12px 20px', fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: '#00D4FF' }}>{t.brokerName || 'default'}</td>
+                                    <td style={{ padding: '12px 20px', fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: '#A8B8C8' }}>{t.filter || '—'}</td>
+                                    <td style={{ padding: '12px 20px', fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: '#10B981' }}>{t.subscriberName || t.action || '—'}</td>
+                                    <td style={{ padding: '12px 20px' }}>
+                                        <span style={{ fontSize: 11, fontWeight: 700, color: t.ready ? '#10B981' : '#F59E0B', background: t.ready ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', padding: '3px 10px', borderRadius: 999 }}>
+                                            ● {t.ready ? 'READY' : 'PENDING'}
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             )}
 

@@ -276,8 +276,8 @@ const AppDetails = () => {
     const [editOpen,   setEditOpen]   = useState(false);
     const [editForm,   setEditForm]   = useState({});
     const [editSaving, setEditSaving] = useState(false);
-    const [latencyData] = useState(() => genSeries(48, 32, 20));
-    const [errRateData] = useState(() => genSeries(48, 0.3, 0.4));
+    const [latencyHistory, setLatencyHistory] = useState([]);
+    const [errHistory,     setErrHistory]     = useState([]);
 
     const gridColor = dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)';
     const axisColor = dark ? '#4B5563' : '#94A3B8';
@@ -317,7 +317,13 @@ const AppDetails = () => {
         const token = localStorage.getItem('token');
         const es = new EventSource(`/api/metrics/apps/${id}/stream?token=${token}`);
         es.onmessage = (e) => {
-            try { setMetrics(JSON.parse(e.data)); } catch {}
+            try {
+                const m = JSON.parse(e.data);
+                setMetrics(m);
+                const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                setLatencyHistory(h => [...h.slice(-47), { t, v: m.p50LatencyMs ?? 0 }]);
+                setErrHistory(h =>     [...h.slice(-47), { t, v: (m.errorRate ?? 0) * 100 }]);
+            } catch {}
         };
         es.onerror = () => es.close();
         return () => es.close();
@@ -326,10 +332,11 @@ const AppDetails = () => {
     const openEdit = () => {
         const a = app || MOCK_APP;
         setEditForm({
+            imageName:     a.imageName     || '',
             imageTag:      a.imageTag      || 'latest',
             description:   a.description   || '',
             minReplicas:   a.minReplicas    ?? 0,
-            maxReplicas:   a.maxReplicas    ?? 10,
+            maxReplicas:   a.maxReplicas    ?? 5,
             cpuRequest:    a.cpuRequest     || '100m',
             memoryRequest: a.memoryRequest  || '128Mi',
         });
@@ -417,54 +424,69 @@ const AppDetails = () => {
             </div>
 
             {/* Metrics row — real Prometheus data, falls back to "—" when cluster is unreachable */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
                 <MetricMini label="Req / sec"   value={metrics ? fmtReq(metrics.reqPerSec)        : '—'} color="#00D4FF" />
                 <MetricMini label="Error Rate"  value={metrics ? fmtPct(metrics.errorRate)        : '—'} color={metrics && metrics.errorRate > 0.05 ? '#EF4444' : '#10B981'} />
                 <MetricMini label="P50 Latency" value={metrics ? fmtMs(metrics.p50LatencyMs)      : '—'} color={dark ? '#F9FAFB' : '#0F172A'} />
                 <MetricMini label="P95 Latency" value={metrics ? fmtMs(metrics.p95LatencyMs)      : '—'} color="#F59E0B" />
                 <MetricMini label="P99 Latency" value={metrics ? fmtMs(metrics.p99LatencyMs)      : '—'} color="#F97316" />
                 <MetricMini label="Memory"      value={metrics ? fmtMiB(metrics.memoryMiB)        : '—'} color="#10B981" />
+                <MetricMini label="CPU"         value={metrics?.cpuMillicores != null ? `${metrics.cpuMillicores}m` : appData.cpuRequest || '—'} color="#A855F7" />
+                <MetricMini label="Uptime"      value={appData.deployedAt ? (() => {
+                    const diff = Math.floor((Date.now() - new Date(appData.deployedAt)) / 1000);
+                    if (diff < 3600)  return `${Math.floor(diff/60)}m`;
+                    if (diff < 86400) return `${Math.floor(diff/3600)}h`;
+                    return `${Math.floor(diff/86400)}d`;
+                })() : '—'} color="#3B82F6" />
             </div>
 
-            {/* Charts */}
+            {/* Charts — real SSE data */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
                 <div className="ns-card" style={{ padding: 20 }}>
                     <h3 style={{ fontSize: 14, fontWeight: 800, fontFamily: "'Outfit', sans-serif", margin: '0 0 3px' }} className="text-primary">Latency over time</h3>
-                    <p style={{ fontSize: 11, color: '#9CA3AF', margin: '0 0 16px' }}>P50 · last 1h</p>
-                    <ResponsiveContainer width="100%" height={130}>
-                        <AreaChart data={latencyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                            <defs>
-                                <linearGradient id="gLat" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#00D4FF" stopOpacity={0.2} />
-                                    <stop offset="100%" stopColor="#00D4FF" stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                            <XAxis dataKey="t" tick={{ fill: axisColor, fontSize: 9 }} axisLine={false} tickLine={false} interval={11} />
-                            <YAxis tick={{ fill: axisColor, fontSize: 9 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}ms`} />
-                            <Tooltip formatter={v => [`${v.toFixed(1)}ms`, 'Latency']} contentStyle={{ background: '#111827', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, fontSize: 11 }} />
-                            <Area type="monotone" dataKey="v" stroke="#00D4FF" strokeWidth={2} fill="url(#gLat)" dot={false} />
-                        </AreaChart>
-                    </ResponsiveContainer>
+                    <p style={{ fontSize: 11, color: '#9CA3AF', margin: '0 0 16px' }}>P50 · live (updates every 5s)</p>
+                    {latencyHistory.length === 0 ? (
+                        <div style={{ height: 130, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4B5563', fontSize: 12 }}>Waiting for data…</div>
+                    ) : (
+                        <ResponsiveContainer width="100%" height={130}>
+                            <AreaChart data={latencyHistory} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id="gLat" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stopColor="#00D4FF" stopOpacity={0.2} />
+                                        <stop offset="100%" stopColor="#00D4FF" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+                                <XAxis dataKey="t" tick={{ fill: axisColor, fontSize: 9 }} axisLine={false} tickLine={false} interval={11} />
+                                <YAxis tick={{ fill: axisColor, fontSize: 9 }} axisLine={false} tickLine={false} tickFormatter={v => `${v.toFixed(0)}ms`} />
+                                <Tooltip formatter={v => [`${v.toFixed(1)}ms`, 'P50 Latency']} contentStyle={{ background: '#111827', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, fontSize: 11 }} />
+                                <Area type="monotone" dataKey="v" stroke="#00D4FF" strokeWidth={2} fill="url(#gLat)" dot={false} />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    )}
                 </div>
                 <div className="ns-card" style={{ padding: 20 }}>
                     <h3 style={{ fontSize: 14, fontWeight: 800, fontFamily: "'Outfit', sans-serif", margin: '0 0 3px' }} className="text-primary">Error Rate</h3>
-                    <p style={{ fontSize: 11, color: '#9CA3AF', margin: '0 0 16px' }}>% of requests · last 1h</p>
-                    <ResponsiveContainer width="100%" height={130}>
-                        <AreaChart data={errRateData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                            <defs>
-                                <linearGradient id="gErr" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#EF4444" stopOpacity={0.2} />
-                                    <stop offset="100%" stopColor="#EF4444" stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                            <XAxis dataKey="t" tick={{ fill: axisColor, fontSize: 9 }} axisLine={false} tickLine={false} interval={11} />
-                            <YAxis tick={{ fill: axisColor, fontSize: 9 }} axisLine={false} tickLine={false} tickFormatter={v => `${v.toFixed(1)}%`} />
-                            <Tooltip formatter={v => [`${v.toFixed(2)}%`, 'Error Rate']} contentStyle={{ background: '#111827', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, fontSize: 11 }} />
-                            <Area type="monotone" dataKey="v" stroke="#EF4444" strokeWidth={2} fill="url(#gErr)" dot={false} />
-                        </AreaChart>
-                    </ResponsiveContainer>
+                    <p style={{ fontSize: 11, color: '#9CA3AF', margin: '0 0 16px' }}>% of requests · live (updates every 5s)</p>
+                    {errHistory.length === 0 ? (
+                        <div style={{ height: 130, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4B5563', fontSize: 12 }}>Waiting for data…</div>
+                    ) : (
+                        <ResponsiveContainer width="100%" height={130}>
+                            <AreaChart data={errHistory} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id="gErr" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stopColor="#EF4444" stopOpacity={0.2} />
+                                        <stop offset="100%" stopColor="#EF4444" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+                                <XAxis dataKey="t" tick={{ fill: axisColor, fontSize: 9 }} axisLine={false} tickLine={false} interval={11} />
+                                <YAxis tick={{ fill: axisColor, fontSize: 9 }} axisLine={false} tickLine={false} tickFormatter={v => `${v.toFixed(1)}%`} />
+                                <Tooltip formatter={v => [`${v.toFixed(2)}%`, 'Error Rate']} contentStyle={{ background: '#111827', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, fontSize: 11 }} />
+                                <Area type="monotone" dataKey="v" stroke="#EF4444" strokeWidth={2} fill="url(#gErr)" dot={false} />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    )}
                 </div>
             </div>
 
@@ -560,13 +582,35 @@ const AppDetails = () => {
                 </AnimatePresence>
             </div>
 
-            {/* Deployment History */}
+            {/* Deployment History — real logs filtered by DEPLOYMENT type */}
             <div className="ns-card" style={{ padding: 20 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
                     <GitBranch size={15} style={{ color: '#9CA3AF' }} />
                     <h3 style={{ fontSize: 14, fontWeight: 800, fontFamily: "'Outfit', sans-serif", margin: 0 }} className="text-primary">Deployment History</h3>
                 </div>
-                <DeploymentTimeline deployments={MOCK_DEPLOYMENTS} />
+                {(() => {
+                    const deploys = logs.filter(l => l.type?.includes('DEPLOY') || l.type?.includes('DELETE') || l.msg?.toLowerCase().includes('deploy'));
+                    if (deploys.length === 0) return <p style={{ fontSize: 12, color: '#6B7280', margin: 0 }}>No deployment events recorded yet.</p>;
+                    return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 0, position: 'relative', paddingLeft: 20 }}>
+                            <div style={{ position: 'absolute', left: 7, top: 8, bottom: 8, width: 1, background: 'rgba(0,0,0,0.08)' }} />
+                            {deploys.slice(0, 8).map((d, i) => {
+                                const isSuccess = d.level === 'INFO' || d.type === 'DEPLOYMENT_SUCCESS';
+                                const isError   = d.level === 'ERROR' || d.type?.includes('FAIL');
+                                const dot = isError ? '#EF4444' : isSuccess ? '#10B981' : '#00D4FF';
+                                return (
+                                    <div key={d.id || i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, paddingBottom: 16, position: 'relative' }}>
+                                        <div style={{ position: 'absolute', left: -14, width: 14, height: 14, borderRadius: '50%', background: dot, border: '2px solid', borderColor: isError ? '#B91C1C' : '#047857', flexShrink: 0, marginTop: 2 }} />
+                                        <div style={{ flex: 1 }}>
+                                            <p style={{ fontSize: 12, margin: 0, fontWeight: 600 }} className="text-primary">{d.msg}</p>
+                                            <p style={{ fontSize: 10, margin: '3px 0 0', color: '#9CA3AF' }}>{d.time}</p>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    );
+                })()}
             </div>
 
             {/* Log Viewer */}
@@ -610,70 +654,91 @@ const AppDetails = () => {
             </AnimatePresence>
 
             {/* Edit Modal */}
-            <AnimatePresence>
-                {editOpen && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-                        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-                            className="ns-card" style={{ width: '100%', maxWidth: 500, padding: 28, display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {editOpen && (
+                <>
+                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 9998 }} onClick={() => setEditOpen(false)} />
+                    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, pointerEvents: 'none' }}>
+                        <div className="ns-card" style={{ width: '100%', maxWidth: 560, padding: 28, display: 'flex', flexDirection: 'column', gap: 20, pointerEvents: 'auto', boxShadow: '0 25px 80px rgba(0,0,0,0.5)' }}>
+
+                            {/* Header */}
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }} className="text-primary">Edit Application</h2>
-                                <button className="btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setEditOpen(false)}>✕</button>
+                                <div>
+                                    <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, fontFamily: "'Outfit', sans-serif" }} className="text-primary">Edit Application</h2>
+                                    <p style={{ margin: '3px 0 0', fontSize: 11 }} className="text-secondary">{appData.name || appData.serviceName} — changes trigger a redeploy</p>
+                                </div>
+                                <button className="btn-ghost" style={{ padding: '6px 10px', fontSize: 16 }} onClick={() => setEditOpen(false)}>✕</button>
                             </div>
 
-                            {/* Image Tag */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                <label style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Image Tag</label>
-                                <input className="ns-input" value={editForm.imageTag} onChange={e => setEditForm(f => ({ ...f, imageTag: e.target.value }))}
-                                    placeholder="e.g. v2.0, latest" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13 }} />
+                            {/* Image */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                    <label style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Image Name</label>
+                                    <input className="ns-input" value={editForm.imageName || ''} onChange={e => setEditForm(f => ({ ...f, imageName: e.target.value }))}
+                                        placeholder="e.g. adelbettaieb/myapp" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13 }} />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                    <label style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Tag</label>
+                                    <input className="ns-input" value={editForm.imageTag || ''} onChange={e => setEditForm(f => ({ ...f, imageTag: e.target.value }))}
+                                        placeholder="latest" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13 }} />
+                                </div>
                             </div>
 
                             {/* Description */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                 <label style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Description</label>
-                                <input className="ns-input" value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                                <input className="ns-input" value={editForm.description || ''} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
                                     placeholder="App description" style={{ fontSize: 13 }} />
                             </div>
 
                             {/* Replicas */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                    <label style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Min Replicas</label>
-                                    <input className="ns-input" type="number" min="0" max="10" value={editForm.minReplicas}
-                                        onChange={e => setEditForm(f => ({ ...f, minReplicas: parseInt(e.target.value) || 0 }))} />
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                    <label style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Max Replicas</label>
-                                    <input className="ns-input" type="number" min="1" max="50" value={editForm.maxReplicas}
-                                        onChange={e => setEditForm(f => ({ ...f, maxReplicas: parseInt(e.target.value) || 1 }))} />
+                            <div>
+                                <label style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>Replicas</label>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                    <div>
+                                        <label style={{ fontSize: 10, color: '#64748B', display: 'block', marginBottom: 4 }}>Min (0 = scale-to-zero)</label>
+                                        <input className="ns-input" type="number" min="0" max="10" value={editForm.minReplicas ?? 0}
+                                            onChange={e => setEditForm(f => ({ ...f, minReplicas: parseInt(e.target.value) || 0 }))} />
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: 10, color: '#64748B', display: 'block', marginBottom: 4 }}>Max</label>
+                                        <input className="ns-input" type="number" min="1" max="50" value={editForm.maxReplicas ?? 5}
+                                            onChange={e => setEditForm(f => ({ ...f, maxReplicas: parseInt(e.target.value) || 1 }))} />
+                                    </div>
                                 </div>
                             </div>
 
                             {/* Resources */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                    <label style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.1em' }}>CPU Request</label>
-                                    <input className="ns-input" value={editForm.cpuRequest} onChange={e => setEditForm(f => ({ ...f, cpuRequest: e.target.value }))}
-                                        placeholder="e.g. 100m, 500m" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13 }} />
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                    <label style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Memory Request</label>
-                                    <input className="ns-input" value={editForm.memoryRequest} onChange={e => setEditForm(f => ({ ...f, memoryRequest: e.target.value }))}
-                                        placeholder="e.g. 128Mi, 512Mi" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13 }} />
+                            <div>
+                                <label style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>Resources</label>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                    <div>
+                                        <label style={{ fontSize: 10, color: '#64748B', display: 'block', marginBottom: 4 }}>CPU Request</label>
+                                        <input className="ns-input" value={editForm.cpuRequest || ''} onChange={e => setEditForm(f => ({ ...f, cpuRequest: e.target.value }))}
+                                            placeholder="100m" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13 }} />
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: 10, color: '#64748B', display: 'block', marginBottom: 4 }}>Memory Request</label>
+                                        <input className="ns-input" value={editForm.memoryRequest || ''} onChange={e => setEditForm(f => ({ ...f, memoryRequest: e.target.value }))}
+                                            placeholder="128Mi" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13 }} />
+                                    </div>
                                 </div>
                             </div>
 
-                            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
+                            {/* Info box */}
+                            <div style={{ padding: '10px 14px', background: 'rgba(0,212,255,0.06)', border: '1px solid rgba(0,212,255,0.15)', borderRadius: 8, fontSize: 11, color: '#5A7080' }}>
+                                ⚡ Saving will trigger a new Knative deployment. The app will briefly restart.
+                            </div>
+
+                            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
                                 <button className="btn-secondary" onClick={() => setEditOpen(false)}>Cancel</button>
-                                <button className="btn-primary" onClick={saveEdit} disabled={editSaving}
-                                    style={{ opacity: editSaving ? 0.6 : 1 }}>
+                                <button className="btn-primary" onClick={saveEdit} disabled={editSaving} style={{ opacity: editSaving ? 0.6 : 1 }}>
                                     {editSaving ? 'Saving...' : 'Save & Redeploy'}
                                 </button>
                             </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 };

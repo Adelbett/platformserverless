@@ -10,7 +10,7 @@ import {
     Box, Cpu, Zap, Clock, TrendingUp, TrendingDown, Minus,
     Rocket, ArrowRight, RefreshCw, ChevronUp, ChevronDown,
     ChevronsUpDown, X, ExternalLink, CheckCircle2,
-    Users, Activity, Globe, KeyRound
+    Users, Activity, Globe, KeyRound, AlertTriangle, CheckCircle, Timer
 } from 'lucide-react';
 import { appsApi, logsApi, metricsApi } from '../api';
 import { useTheme } from '../context/ThemeContext';
@@ -74,7 +74,7 @@ const TrendBadge = ({ value }) => {
 
 // ── KPI Card ───────────────────────────────────────────────────────────────────
 
-const KpiCard = ({ label, value, sub, trend, icon: Icon, iconBg, iconColor, sparkColor, sparkData, loading }) => {
+const KpiCard = ({ label, value, sub, trend, icon: Icon, iconBg, iconColor, sparkColor, sparkData, loading, tooltip }) => {
     if (loading) {
         return (
             <div className="ns-card" style={{ padding: 20 }}>
@@ -93,7 +93,7 @@ const KpiCard = ({ label, value, sub, trend, icon: Icon, iconBg, iconColor, spar
         >
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
                 <div style={{ minWidth: 0 }}>
-                    <p style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6, color: '#64748B' }}>{label}</p>
+                    <p style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6, color: '#64748B' }} title={tooltip || undefined}>{label}{tooltip && <span style={{ marginLeft: 4, cursor: 'help', opacity: 0.5 }}>ⓘ</span>}</p>
                     <p style={{ fontSize: 28, fontWeight: 900, fontFamily: "'Outfit', sans-serif", lineHeight: 1, margin: 0 }} className="text-primary">{value}</p>
                 </div>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -404,11 +404,26 @@ const Dashboard = () => {
     const totalReplicas = displayApps.reduce((s, a) => s + (a.replicas ?? 0), 0);
     const spark = (scale = 1) => Array.from({ length: 20 }, (_, i) => ({ value: (40 + Math.sin(i * 0.5) * 15 + Math.random() * 10) * scale }));
 
+    const failedApps   = displayApps.filter(a => a.status === 'FAILED' || a.status === 'ERROR');
+    const lastDeploy   = displayApps.reduce((latest, a) => {
+        if (!a.deployedAt) return latest;
+        return !latest || new Date(a.deployedAt) > new Date(latest) ? a.deployedAt : latest;
+    }, null);
+    const lastDeployAgo = lastDeploy ? (() => {
+        const diff = Math.floor((Date.now() - new Date(lastDeploy)) / 1000);
+        if (diff < 60)   return `${diff}s ago`;
+        if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+        if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+        return `${Math.floor(diff/86400)}d ago`;
+    })() : '—';
+
     const kpiCards = [
-        { label: 'Total Apps',         value: displayApps.length, sub: `${displayApps.filter(a=>a.status==='ERROR').length} errors`,    trend: 2,  icon: Box,   iconBg: 'rgba(0,212,255,0.1)',   iconColor: '#00D4FF', sparkColor: '#00D4FF', sparkData: spark(0.8) },
-        { label: 'Running Instances',  value: totalReplicas,       sub: `${running}/${displayApps.length} apps healthy`,                 trend: 0,  icon: Cpu,   iconBg: 'rgba(168,85,247,0.1)',  iconColor: '#A855F7', sparkColor: '#A855F7', sparkData: spark(1)   },
-        { label: 'Requests / sec',     value: fmtReq(clusterMetrics?.totalReqPerSec),  sub: clusterMetrics ? `Error: ${(clusterMetrics.clusterErrorRate*100).toFixed(2)}%` : 'No data', trend: 8,  icon: Zap,   iconBg: 'rgba(16,185,129,0.1)',  iconColor: '#10B981', sparkColor: '#10B981', sparkData: spark(1.2) },
-        { label: 'CPU Cores',          value: clusterMetrics ? clusterMetrics.totalCpuCores.toFixed(2) : '—', sub: clusterMetrics ? `${clusterMetrics.totalMemoryGiB.toFixed(1)} GiB RAM` : 'No data', trend: -3, icon: Clock, iconBg: 'rgba(245,158,11,0.1)',  iconColor: '#F59E0B', sparkColor: '#F59E0B', sparkData: spark(0.4) },
+        { label: 'Total Apps',      value: displayApps.length,  sub: `${running} running · ${failedApps.length} failed`,          trend: 2,  icon: Box,          iconBg: 'rgba(0,212,255,0.1)',   iconColor: '#00D4FF', sparkColor: '#00D4FF', sparkData: spark(0.8), tooltip: 'Total applications deployed on the platform.' },
+        { label: 'Apps Running',    value: running,              sub: `${displayApps.length - running} scaled to zero`,            trend: 0,  icon: CheckCircle,  iconBg: 'rgba(16,185,129,0.1)', iconColor: '#10B981', sparkColor: '#10B981', sparkData: spark(1),   tooltip: 'Apps with status RUNNING (Knative service ready).' },
+        { label: 'Apps Failed',     value: failedApps.length,    sub: failedApps.length > 0 ? failedApps.map(a=>a.name||a.serviceName).join(', ') : 'All good', trend: 0, icon: AlertTriangle, iconBg: failedApps.length > 0 ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)', iconColor: failedApps.length > 0 ? '#EF4444' : '#10B981', sparkColor: '#EF4444', sparkData: spark(0.2), tooltip: 'Apps that failed to deploy or are in error state.' },
+        { label: 'Running Pods',    value: totalReplicas,        sub: 'Active pods in Kubernetes',                                 trend: 0,  icon: Cpu,          iconBg: 'rgba(168,85,247,0.1)', iconColor: '#A855F7', sparkColor: '#A855F7', sparkData: spark(1),   tooltip: 'Pods currently running. 0 = scaled to zero (wakes on first request).' },
+        { label: 'Req / sec',       value: fmtReq(clusterMetrics?.totalReqPerSec), sub: clusterMetrics ? `Error: ${(clusterMetrics.clusterErrorRate*100).toFixed(2)}%` : 'No data', trend: 8, icon: Zap, iconBg: 'rgba(16,185,129,0.1)', iconColor: '#10B981', sparkColor: '#10B981', sparkData: spark(1.2), tooltip: 'Total HTTP requests/sec across all your running apps.' },
+        { label: 'Last Deploy',     value: lastDeployAgo,        sub: lastDeploy ? new Date(lastDeploy).toLocaleDateString() : '—', trend: 0, icon: Timer,        iconBg: 'rgba(245,158,11,0.1)', iconColor: '#F59E0B', sparkColor: '#F59E0B', sparkData: spark(0.3), tooltip: 'Time since your most recent deployment.' },
     ];
 
     const toggleSort = (field) => {
@@ -443,7 +458,7 @@ const Dashboard = () => {
             </div>
 
             {/* KPI Row */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
                 {kpiCards.map((card, i) => (
                     <motion.div key={card.label} style={{ animationDelay: `${i * 60}ms` }}>
                         <KpiCard {...card} loading={loading} />
@@ -527,7 +542,7 @@ const Dashboard = () => {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid rgba(0,0,0,0.07)' }}>
                         <div>
                             <h3 style={{ fontSize: 14, fontWeight: 800, fontFamily: "'Outfit', sans-serif", margin: 0 }} className="text-primary">Applications</h3>
-                            <p style={{ fontSize: 11, margin: '3px 0 0' }} className="text-secondary">{displayApps.length} services · {running} running</p>
+                            <p style={{ fontSize: 11, margin: '3px 0 0' }} className="text-secondary">{displayApps.length} services · {totalReplicas} pod{totalReplicas !== 1 ? 's' : ''} active</p>
                         </div>
                         <button className="btn-ghost" style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }} onClick={() => navigate('/apps')}>
                             View all <ArrowRight size={13} />
@@ -540,9 +555,9 @@ const Dashboard = () => {
                                     {[
                                         { label: 'App Name',    field: 'name'       },
                                         { label: 'Status',      field: 'status'     },
-                                        { label: 'Replicas',    field: 'replicas'   },
-                                        { label: 'Last Deploy', field: 'lastDeploy' },
-                                        { label: 'Traffic',     field: 'traffic'    },
+                                        { label: 'Pods',        field: 'replicas'   },
+                                        { label: 'Last Deploy', field: 'deployedAt' },
+                                        { label: 'Req / sec',   field: 'reqPerSec'  },
                                     ].map(col => (
                                         <th key={col.field}
                                             onClick={() => toggleSort(col.field)}
@@ -602,6 +617,11 @@ const Dashboard = () => {
                                         </td>
                                         <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.04)', fontSize: 12 }} className="text-secondary">
                                             {app.deployedAt ? new Date(app.deployedAt).toLocaleString() : '—'}
+                                        </td>
+                                        <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.04)', fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }} className="text-secondary">
+                                            {app.status === 'RUNNING' && clusterMetrics?.totalReqPerSec
+                                                ? fmtReq(clusterMetrics.totalReqPerSec / Math.max(1, running))
+                                                : '—'}
                                         </td>
                                         <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
                                             <div style={{ display: 'flex', gap: 6 }}>
