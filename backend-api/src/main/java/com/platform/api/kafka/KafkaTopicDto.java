@@ -14,8 +14,11 @@ import java.time.LocalDateTime;
 public class KafkaTopicDto {
     private String id;
     private String name;
+    private String userId;
     private Integer partitions;
     private Integer replicas;
+    private Long messageCount;
+    private Long consumerLag;
     private String config;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

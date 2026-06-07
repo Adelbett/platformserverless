@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './components/Toast';
+import { NotificationProvider } from './context/NotificationContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -13,6 +14,7 @@ import Eventing from './pages/Eventing';
 import LogsView from './pages/LogsView';
 import Monitoring from './pages/Monitoring';
 import Users from './pages/Users';
+import Settings from './pages/Settings';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ClusterManagement from './pages/admin/ClusterManagement';
 
@@ -67,7 +69,7 @@ const AppRoutes = () => {
                 <Route path="/logs" element={<LogsView />} />
                 <Route path="/monitoring" element={<Monitoring />} />
                 <Route path="/billing" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/settings" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/settings" element={<Settings />} />
                 <Route path="/users" element={<Users />} />
                 {/* Admin-only routes */}
                 <Route path="/admin/dashboard" element={
@@ -89,9 +91,11 @@ const AppRoutes = () => {
 function App() {
     return (
         <AuthProvider>
-            <ToastProvider>
-                <AppRoutes />
-            </ToastProvider>
+            <NotificationProvider>
+                <ToastProvider>
+                    <AppRoutes />
+                </ToastProvider>
+            </NotificationProvider>
         </AuthProvider>
     );
 }

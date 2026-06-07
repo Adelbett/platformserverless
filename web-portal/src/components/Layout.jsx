@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Bell, Sun, Moon, ChevronDown, LogOut, Settings, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useNotifications } from '../context/NotificationContext';
 import Sidebar from './Sidebar';
 
 const routeTitles = {
@@ -19,14 +20,14 @@ const routeTitles = {
     '/billing':    { title: 'Billing',         sub: 'Usage & subscription details' },
 };
 
-const MOCK_NOTIFICATIONS = [
-    { id: 1, type: 'deploy', message: 'api-gateway deployed successfully',    time: '2m ago',  read: false },
-    { id: 2, type: 'scale',  message: 'worker-service scaled to 4 replicas', time: '8m ago',  read: false },
-    { id: 3, type: 'error',  message: 'auth-service: health check failed',   time: '15m ago', read: true  },
-    { id: 4, type: 'deploy', message: 'frontend-app:v2.3.1 build complete',  time: '1h ago',  read: true  },
-];
-
-const typeEmoji = { deploy: '🚀', scale: '⚡', error: '⚠️' };
+const fmtTime = (iso) => {
+    if (!iso) return '';
+    const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
+    if (diff < 60)    return `${diff}s ago`;
+    if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+};
 
 const ThemeToggle = () => {
     const { dark, toggleTheme } = useTheme();
@@ -72,16 +73,23 @@ const ThemeToggle = () => {
 };
 
 const NotificationsPanel = () => {
-    const [open, setOpen]     = useState(false);
-    const [notifs, setNotifs] = useState(MOCK_NOTIFICATIONS);
-    const ref                 = useRef(null);
-    const unread              = notifs.filter(n => !n.read).length;
+    const [open, setOpen] = useState(false);
+    const ref             = useRef(null);
+    const { notifications, unreadCount, markAllRead, markRead } = useNotifications();
 
     useEffect(() => {
         const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
         document.addEventListener('mousedown', h);
         return () => document.removeEventListener('mousedown', h);
     }, []);
+
+    const notifColor = (type) => {
+        if (type === 'DEPLOYMENT_SUCCESS') return '#10B981';
+        if (type === 'DEPLOYMENT_FAIL')    return '#EF4444';
+        if (type === 'KAFKA_WIRED')        return '#F59E0B';
+        if (type === 'UPDATE')             return '#00D4FF';
+        return '#6B7280';
+    };
 
     return (
         <div ref={ref} style={{ position: 'relative' }}>
@@ -98,14 +106,14 @@ const NotificationsPanel = () => {
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
                 <Bell size={17} />
-                {unread > 0 && (
+                {unreadCount > 0 && (
                     <span style={{
                         position: 'absolute', top: -3, right: -3,
-                        width: 17, height: 17, borderRadius: '50%',
-                        background: '#00D4FF', fontSize: 9, fontWeight: 700,
+                        minWidth: 17, height: 17, borderRadius: 999,
+                        background: '#EF4444', fontSize: 9, fontWeight: 700, padding: '0 4px',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: '#0A0E1A',
-                    }} className="animate-pulse-dot">{unread}</span>
+                        color: '#fff', animation: 'pulseDot 2s ease-in-out infinite',
+                    }}>{unreadCount > 9 ? '9+' : unreadCount}</span>
                 )}
             </button>
 
@@ -117,35 +125,51 @@ const NotificationsPanel = () => {
                         exit={{ opacity: 0, y: 6, scale: 0.97 }}
                         transition={{ duration: 0.15 }}
                         className="ns-card"
-                        style={{
-                            position: 'absolute', right: 0, top: '100%',
-                            marginTop: 8, width: 300, zIndex: 100,
-                            overflow: 'hidden',
-                        }}
+                        style={{ position: 'absolute', right: 0, top: '100%', marginTop: 8, width: 320, zIndex: 200, overflow: 'hidden', maxHeight: 420, display: 'flex', flexDirection: 'column' }}
                     >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.07)' }}>
-                            <span style={{ fontSize: 13, fontWeight: 700 }} className="text-primary">Notifications</span>
-                            {unread > 0 && (
-                                <button onClick={() => setNotifs(n => n.map(x => ({...x, read: true})))}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.07)', flexShrink: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 13, fontWeight: 700 }} className="text-primary">Notifications</span>
+                                {unreadCount > 0 && (
+                                    <span style={{ fontSize: 10, fontWeight: 700, background: 'rgba(239,68,68,0.1)', color: '#EF4444', padding: '1px 7px', borderRadius: 999 }}>{unreadCount} new</span>
+                                )}
+                            </div>
+                            {unreadCount > 0 && (
+                                <button onClick={markAllRead}
                                     style={{ fontSize: 11, color: '#00D4FF', background: 'none', border: 'none', cursor: 'pointer' }}>
                                     Mark all read
                                 </button>
                             )}
                         </div>
-                        {notifs.map(n => (
-                            <div key={n.id} style={{
-                                display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px',
-                                borderBottom: '1px solid rgba(0,0,0,0.05)',
-                                background: !n.read ? 'rgba(0,212,255,0.03)' : 'transparent',
-                            }}>
-                                <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{typeEmoji[n.type] || '📋'}</span>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                    <p style={{ fontSize: 12, margin: 0, fontWeight: !n.read ? 600 : 400 }} className="text-primary">{n.message}</p>
-                                    <p style={{ fontSize: 10, margin: '2px 0 0', color: '#9CA3AF' }}>{n.time}</p>
+
+                        <div style={{ overflowY: 'auto', flex: 1 }}>
+                            {notifications.length === 0 ? (
+                                <div style={{ padding: '32px 16px', textAlign: 'center', color: '#64748B', fontSize: 12 }}>
+                                    <span style={{ fontSize: 24, display: 'block', marginBottom: 8 }}>🔔</span>
+                                    No notifications yet
                                 </div>
-                                {!n.read && <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#00D4FF', flexShrink: 0, marginTop: 4 }} />}
-                            </div>
-                        ))}
+                            ) : notifications.map(n => (
+                                <div key={n.id}
+                                    onClick={() => markRead(n.id)}
+                                    style={{
+                                        display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px',
+                                        borderBottom: '1px solid rgba(0,0,0,0.05)', cursor: 'pointer',
+                                        background: !n.read ? 'rgba(0,212,255,0.03)' : 'transparent',
+                                        transition: 'background 150ms',
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.03)'}
+                                    onMouseLeave={e => e.currentTarget.style.background = !n.read ? 'rgba(0,212,255,0.03)' : 'transparent'}
+                                >
+                                    <span style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }}>{n.emoji || '📋'}</span>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <p style={{ fontSize: 11, fontWeight: 700, margin: '0 0 1px', fontFamily: "'JetBrains Mono', monospace", color: notifColor(n.type) }}>{n.appName}</p>
+                                        <p style={{ fontSize: 11.5, margin: 0, fontWeight: !n.read ? 600 : 400, lineHeight: 1.4 }} className="text-primary">{n.message}</p>
+                                        <p style={{ fontSize: 10, margin: '3px 0 0', color: '#9CA3AF' }}>{fmtTime(n.time)}</p>
+                                    </div>
+                                    {!n.read && <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#00D4FF', flexShrink: 0, marginTop: 5 }} />}
+                                </div>
+                            ))}
+                        </div>
                     </motion.div>
                 )}
             </AnimatePresence>

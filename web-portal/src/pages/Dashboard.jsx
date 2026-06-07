@@ -2,53 +2,44 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-    AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-    ResponsiveContainer, LineChart, Line
-} from 'recharts';
+import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import {
     Box, Cpu, Zap, Clock, TrendingUp, TrendingDown, Minus,
     Rocket, ArrowRight, RefreshCw, ChevronUp, ChevronDown,
     ChevronsUpDown, X, ExternalLink, CheckCircle2,
-    Users, Activity, Globe, KeyRound, AlertTriangle, CheckCircle, Timer
+    Activity, Globe, KeyRound, AlertTriangle, CheckCircle, Timer,
+    AlertCircle, Server, Terminal, Bell,
 } from 'lucide-react';
 import { appsApi, logsApi, metricsApi } from '../api';
 import { useTheme } from '../context/ThemeContext';
+import { useNotifications } from '../context/NotificationContext';
 
-// ── Mock data ──────────────────────────────────────────────────────────────────
-
-const genData = (pts, base, v) =>
-    Array.from({ length: pts }, () => ({
-        value: Math.max(0, base + (Math.random() - 0.5) * v),
-        p95:   Math.max(0, base * 1.3 + (Math.random() - 0.5) * v * 0.5),
-    }));
-
-const TIME_RANGES = ['1h', '6h', '24h', '7d'];
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
 const fmtReq = v => v == null ? '—' : v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v.toFixed(1);
-const fmtMs  = v => v == null ? '—' : v < 1 ? `${(v * 1000).toFixed(0)}µs` : `${v.toFixed(0)}ms`;
 
+const fmtAgo = (iso) => {
+    if (!iso) return '—';
+    const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
+    if (diff < 60)    return `${diff}s ago`;
+    if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+};
 
 // ── Status badge ───────────────────────────────────────────────────────────────
 
 const StatusBadge = ({ status }) => {
-    const styles = {
-        RUNNING: 'badge-running',
-        IDLE:    'badge-idle',
-        ERROR:   'badge-error',
-        PENDING: 'badge-pending',
+    const map = {
+        RUNNING:   { cls: 'badge-running', dot: '#10B981', pulse: true  },
+        IDLE:      { cls: 'badge-idle',    dot: '#F59E0B', pulse: false },
+        FAILED:    { cls: 'badge-error',   dot: '#EF4444', pulse: true  },
+        DEPLOYING: { cls: 'badge-pending', dot: '#3B82F6', pulse: true  },
     };
-    const dotColors = {
-        RUNNING: '#10B981',
-        IDLE:    '#F59E0B',
-        ERROR:   '#EF4444',
-        PENDING: '#3B82F6',
-    };
-    const cls = styles[status] || 'badge-pending';
-    const dot = dotColors[status] || '#3B82F6';
+    const { cls, dot, pulse } = map[status] || { cls: 'badge-pending', dot: '#3B82F6', pulse: false };
     return (
         <span className={cls}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: dot, display: 'inline-block', ...(status === 'RUNNING' || status === 'ERROR' ? { animation: 'pulseDot 2s ease-in-out infinite' } : {}) }} />
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: dot, display: 'inline-block', ...(pulse ? { animation: 'pulseDot 2s ease-in-out infinite' } : {}) }} />
             {status || 'PENDING'}
         </span>
     );
@@ -64,6 +55,8 @@ const Sparkline = ({ data, color }) => (
     </ResponsiveContainer>
 );
 
+const spark = (scale = 1) => Array.from({ length: 20 }, (_, i) => ({ value: (40 + Math.sin(i * 0.5) * 15 + Math.random() * 10) * scale }));
+
 // ── Trend badge ────────────────────────────────────────────────────────────────
 
 const TrendBadge = ({ value }) => {
@@ -74,7 +67,7 @@ const TrendBadge = ({ value }) => {
 
 // ── KPI Card ───────────────────────────────────────────────────────────────────
 
-const KpiCard = ({ label, value, sub, trend, icon: Icon, iconBg, iconColor, sparkColor, sparkData, loading, tooltip }) => {
+const KpiCard = ({ label, value, sub, trend, icon: Icon, iconBg, iconColor, sparkColor, loading, tooltip, onClick, alert }) => {
     if (loading) {
         return (
             <div className="ns-card" style={{ padding: 20 }}>
@@ -89,18 +82,19 @@ const KpiCard = ({ label, value, sub, trend, icon: Icon, iconBg, iconColor, spar
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             className="ns-card ns-card-hover"
-            style={{ padding: 20, cursor: 'default' }}
+            onClick={onClick}
+            style={{ padding: 20, cursor: onClick ? 'pointer' : 'default', border: alert ? '1px solid rgba(239,68,68,0.3)' : undefined }}
         >
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
                 <div style={{ minWidth: 0 }}>
-                    <p style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6, color: '#64748B' }} title={tooltip || undefined}>{label}{tooltip && <span style={{ marginLeft: 4, cursor: 'help', opacity: 0.5 }}>ⓘ</span>}</p>
+                    <p style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6, color: '#64748B' }} title={tooltip}>{label}{tooltip && <span style={{ marginLeft: 4, opacity: 0.5, cursor: 'help' }}>ⓘ</span>}</p>
                     <p style={{ fontSize: 28, fontWeight: 900, fontFamily: "'Outfit', sans-serif", lineHeight: 1, margin: 0 }} className="text-primary">{value}</p>
                 </div>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <Icon size={18} style={{ color: iconColor }} />
                 </div>
             </div>
-            {sparkData && <Sparkline data={sparkData} color={sparkColor} />}
+            <Sparkline data={spark()} color={sparkColor} />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
                 <TrendBadge value={trend} />
                 {sub && <span style={{ fontSize: 10, color: '#9CA3AF' }}>{sub}</span>}
@@ -109,70 +103,10 @@ const KpiCard = ({ label, value, sub, trend, icon: Icon, iconBg, iconColor, spar
     );
 };
 
-// ── Gauge ring ─────────────────────────────────────────────────────────────────
-
-const GaugeRing = ({ value, max = 100, color, label, sublabel }) => {
-    const r     = 38;
-    const circ  = 2 * Math.PI * r;
-    const pct   = Math.min(value / max, 1);
-    const dash  = pct * circ;
-    const crit  = value > max * 0.9;
-    const warn  = value > max * 0.75;
-    const ring  = crit ? '#EF4444' : warn ? '#F59E0B' : color;
-
-    return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-            <div className="gauge-wrap">
-                <svg viewBox="0 0 88 88">
-                    <circle cx="44" cy="44" r={r} fill="none" strokeWidth="8" stroke="rgba(156,163,175,0.18)" />
-                    <circle cx="44" cy="44" r={r} fill="none" strokeWidth="8"
-                        stroke={ring} strokeLinecap="round"
-                        strokeDasharray={`${dash} ${circ}`}
-                        style={{ transition: 'stroke-dasharray 1.2s cubic-bezier(0.4,0,0.2,1)' }}
-                    />
-                </svg>
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontSize: 15, fontWeight: 900, fontFamily: "'Outfit', sans-serif" }} className="text-primary">{value}%</span>
-                </div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: 12, fontWeight: 700, margin: 0 }} className="text-primary">{label}</p>
-                <p style={{ fontSize: 10, margin: '2px 0 0' }} className="text-secondary">{sublabel}</p>
-            </div>
-        </div>
-    );
-};
-
-// ── Tooltip ────────────────────────────────────────────────────────────────────
-
-const ChartTooltip = ({ active, payload, label }) => {
-    if (!active || !payload?.length) return null;
-    return (
-        <div style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 14px', fontSize: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
-            <p style={{ color: '#9CA3AF', marginBottom: 6 }}>{label}</p>
-            {payload.map((p, i) => (
-                <p key={i} style={{ color: p.color, fontWeight: 600, margin: '2px 0' }}>
-                    {p.name}: {typeof p.value === 'number' ? p.value.toFixed(1) : p.value}
-                </p>
-            ))}
-        </div>
-    );
-};
-
 // ── Quick Deploy Panel ─────────────────────────────────────────────────────────
 
 const QuickDeployPanel = ({ onClose }) => {
-    const [form, setForm]      = useState({ name: '', image: '', port: '8080', replicas: 1 });
-    const [busy, setBusy]      = useState(false);
-    const [done, setDone]      = useState(false);
-    const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-
-    const deploy = async () => {
-        setBusy(true);
-        await new Promise(r => setTimeout(r, 1800));
-        setBusy(false); setDone(true);
-    };
-
+    const navigate = useNavigate();
     return (
         <>
             <div className="slide-over-overlay" onClick={onClose} />
@@ -183,119 +117,99 @@ const QuickDeployPanel = ({ onClose }) => {
                 transition={{ type: 'spring', damping: 26, stiffness: 280 }}
                 className="slide-over-panel"
             >
-                {/* Header */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', borderBottom: '1px solid rgba(0,0,0,0.07)', flexShrink: 0 }}>
                     <div>
-                        <h2 style={{ fontSize: 15, fontWeight: 800, margin: 0, fontFamily: "'Outfit', sans-serif" }} className="text-primary">Quick Deploy</h2>
+                        <h2 style={{ fontSize: 15, fontWeight: 800, margin: 0 }} className="text-primary">Quick Deploy</h2>
                         <p style={{ fontSize: 11, margin: '3px 0 0' }} className="text-secondary">Deploy a new service in seconds</p>
                     </div>
                     <button className="btn-ghost" style={{ width: 32, height: 32, padding: 0 }} onClick={onClose}><X size={16} /></button>
                 </div>
-
-                {/* Body */}
-                <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
-                    {done ? (
-                        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-                            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 300, gap: 16, textAlign: 'center' }}>
-                            <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <CheckCircle2 size={32} style={{ color: '#10B981' }} />
-                            </div>
-                            <div>
-                                <h3 style={{ fontSize: 17, fontWeight: 800, fontFamily: "'Outfit', sans-serif", margin: '0 0 6px' }} className="text-primary">{form.name || 'Service'} deployed!</h3>
-                                <p style={{ fontSize: 13 }} className="text-secondary">Your service is being provisioned and will be live in ~30s.</p>
-                            </div>
-                            <button className="btn-secondary" style={{ marginTop: 8 }} onClick={onClose}>Close</button>
-                        </motion.div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                            {[
-                                { label: 'Service Name', key: 'name', placeholder: 'e.g. my-api-service', mono: false },
-                                { label: 'Docker Image', key: 'image', placeholder: 'nginx:latest', mono: true },
-                            ].map(f => (
-                                <div key={f.key}>
-                                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6, color: '#64748B' }}>{f.label}</label>
-                                    <input className="ns-input" style={f.mono ? { fontFamily: "'JetBrains Mono', monospace", fontSize: 12 } : {}}
-                                        placeholder={f.placeholder} value={form[f.key]} onChange={e => set(f.key, e.target.value)} />
-                                </div>
-                            ))}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6, color: '#64748B' }}>Port</label>
-                                    <input className="ns-input" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }} placeholder="8080" value={form.port} onChange={e => set('port', e.target.value)} />
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6, color: '#64748B' }}>Replicas</label>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <button className="btn-secondary" style={{ width: 36, height: 36, padding: 0 }} onClick={() => set('replicas', Math.max(1, form.replicas - 1))}>−</button>
-                                        <span style={{ flex: 1, textAlign: 'center', fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 16 }} className="text-primary">{form.replicas}</span>
-                                        <button className="btn-secondary" style={{ width: 36, height: 36, padding: 0 }} onClick={() => set('replicas', Math.min(10, form.replicas + 1))}>+</button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div style={{ padding: 14, borderRadius: 10, background: 'rgba(0,212,255,0.05)', border: '1px solid rgba(0,212,255,0.15)' }}>
-                                <p style={{ fontSize: 11, fontWeight: 700, color: '#00D4FF', margin: '0 0 4px' }}>Deployment Preview</p>
-                                <p style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace", margin: 0, color: '#9CA3AF' }}>
-                                    {form.image || '<image>'} → {form.name || '<name>'} × {form.replicas}
-                                </p>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Footer */}
-                {!done && (
-                    <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(0,0,0,0.07)', display: 'flex', gap: 12, flexShrink: 0 }}>
-                        <button className="btn-secondary" style={{ flex: 1 }} onClick={onClose}>Cancel</button>
-                        <button className="btn-primary" style={{ flex: 1 }} disabled={busy || !form.name || !form.image} onClick={deploy}>
-                            {busy ? <><RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Deploying…</> : <><Rocket size={14} /> Deploy Now</>}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, padding: 32 }}>
+                    <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(0,212,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Rocket size={28} style={{ color: '#00D4FF' }} />
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                        <h3 style={{ fontSize: 17, fontWeight: 800, margin: '0 0 8px' }} className="text-primary">Ready to deploy?</h3>
+                        <p style={{ fontSize: 13, color: '#6B7280', margin: 0 }}>Use the full deploy form for best experience.</p>
+                    </div>
+                    <div style={{ display: 'flex', gap: 12 }}>
+                        <button className="btn-secondary" onClick={onClose}>Cancel</button>
+                        <button className="btn-primary" onClick={() => { onClose(); navigate('/apps/new'); }}>
+                            <Rocket size={14} /> Go to Deploy
                         </button>
                     </div>
-                )}
+                </div>
             </motion.div>
         </>
     );
 };
 
-// ── Role ideas card ────────────────────────────────────────────────────────────
+// ── Platform Health Bar ────────────────────────────────────────────────────────
+
+const HealthBar = ({ apps }) => {
+    const running  = apps.filter(a => a.status === 'RUNNING').length;
+    const failed   = apps.filter(a => a.status === 'FAILED' || a.status === 'ERROR').length;
+    const deploying = apps.filter(a => a.status === 'DEPLOYING').length;
+    const idle     = apps.length - running - failed - deploying;
+
+    const items = [
+        { label: 'Running',   count: running,   color: '#10B981', bg: 'rgba(16,185,129,0.1)'  },
+        { label: 'Idle',      count: idle,      color: '#F59E0B', bg: 'rgba(245,158,11,0.1)'  },
+        { label: 'Deploying', count: deploying, color: '#3B82F6', bg: 'rgba(59,130,246,0.1)'  },
+        { label: 'Failed',    count: failed,    color: '#EF4444', bg: 'rgba(239,68,68,0.1)'   },
+    ];
+
+    return (
+        <div className="ns-card" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10B981', animation: 'pulseDot 2s ease-in-out infinite' }} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#10B981' }}>Platform Healthy</span>
+            </div>
+            <div style={{ flex: 1, height: 1, background: 'rgba(0,0,0,0.06)' }} />
+            {items.map(({ label, count, color, bg }) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color, background: bg, padding: '2px 8px', borderRadius: 999 }}>{count}</span>
+                    <span style={{ fontSize: 11, color: '#6B7280' }}>{label}</span>
+                </div>
+            ))}
+        </div>
+    );
+};
+
+// ── Role Ideas Card ────────────────────────────────────────────────────────────
 
 const ROLE_IDEAS = {
     ADMIN: {
-        color: '#EF4444',
-        bg: 'rgba(239,68,68,0.08)',
-        border: 'rgba(239,68,68,0.2)',
+        color: '#EF4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.2)',
         title: 'Admin — Full Control',
-        subtitle: 'You manage the platform. Here are your key actions:',
+        subtitle: 'Manage the platform infrastructure and users',
         ideas: [
-            { icon: Users,       label: 'Manage team',         desc: 'View all users, assign DEVELOPER or VIEWER roles',  path: '/users'     },
-            { icon: Activity,    label: 'Global monitoring',   desc: 'Watch all running services across all namespaces',   path: '/monitoring'},
-            { icon: Box,         label: 'All applications',    desc: 'Browse every deployed app on the platform',         path: '/apps'      },
-            { icon: Zap,         label: 'Kafka clusters',      desc: 'Manage topics, partitions and eventing pipelines',  path: '/kafka'     },
+            { icon: Activity, label: 'Global Monitoring', desc: 'All services, pods, nodes across all tenants', path: '/monitoring' },
+            { icon: Box,      label: 'All Applications',  desc: 'Every deployed app on the platform',          path: '/apps'       },
+            { icon: Zap,      label: 'Kafka Clusters',    desc: 'Manage topics, partitions, eventing',          path: '/kafka'      },
+            { icon: Globe,    label: 'Eventing',          desc: 'KafkaSources, Triggers, Brokers',              path: '/eventing'   },
         ],
     },
     DEVELOPER: {
-        color: '#00D4FF',
-        bg: 'rgba(0,212,255,0.06)',
-        border: 'rgba(0,212,255,0.18)',
+        color: '#00D4FF', bg: 'rgba(0,212,255,0.06)', border: 'rgba(0,212,255,0.18)',
         title: 'Developer — Build & Ship',
-        subtitle: 'You deploy and operate services. Suggested next steps:',
+        subtitle: 'Deploy and operate your services',
         ideas: [
-            { icon: Rocket,      label: 'Deploy a new service', desc: 'Push a Docker image and get a live URL instantly',  path: '/apps/new'  },
-            { icon: Zap,         label: 'Create a Kafka topic', desc: 'Set up event streaming between your microservices', path: '/kafka'     },
-            { icon: Globe,       label: 'Configure eventing',   desc: 'Wire KafkaSources and Triggers for event routing',  path: '/eventing'  },
-            { icon: Activity,    label: 'Monitor your apps',    desc: 'Live metrics: req/sec, latency, error rate, CPU',   path: '/monitoring'},
+            { icon: Rocket,   label: 'Deploy Service',    desc: 'Push a Docker image and get a live URL',       path: '/apps/new'   },
+            { icon: Activity, label: 'Monitor Apps',      desc: 'Live metrics: req/sec, latency, error rate',   path: '/monitoring' },
+            { icon: Zap,      label: 'Create Kafka Topic', desc: 'Set up event streaming for your services',    path: '/kafka'      },
+            { icon: Terminal, label: 'View Logs',         desc: 'Deployment and runtime logs for your apps',    path: '/logs'       },
         ],
     },
     VIEWER: {
-        color: '#9CA3AF',
-        bg: 'rgba(156,163,175,0.06)',
-        border: 'rgba(156,163,175,0.18)',
+        color: '#9CA3AF', bg: 'rgba(156,163,175,0.06)', border: 'rgba(156,163,175,0.18)',
         title: 'Viewer — Read Only',
-        subtitle: 'You have read access. Explore the platform:',
+        subtitle: 'Explore the platform and observe services',
         ideas: [
-            { icon: Box,         label: 'Browse applications', desc: 'See all running services and their live URLs',       path: '/apps'      },
-            { icon: Activity,    label: 'Check metrics',       desc: 'View req/sec, latency and error rates per service',  path: '/monitoring'},
-            { icon: KeyRound,    label: 'Explore logs',        desc: 'Read deployment and runtime logs for any service',   path: '/logs'      },
-            { icon: Globe,       label: 'Event pipelines',     desc: 'Explore the Kafka eventing topology',                path: '/eventing'  },
+            { icon: Box,      label: 'Browse Apps',       desc: 'All running services and their live URLs',     path: '/apps'       },
+            { icon: Activity, label: 'Check Metrics',     desc: 'Req/sec, latency and error rates per service', path: '/monitoring' },
+            { icon: KeyRound, label: 'Explore Logs',      desc: 'Deployment and runtime logs',                  path: '/logs'       },
+            { icon: Globe,    label: 'Event Pipelines',   desc: 'Explore the Kafka eventing topology',          path: '/eventing'   },
         ],
     },
 };
@@ -305,12 +219,7 @@ const RoleIdeasCard = ({ role, navigate }) => {
     return (
         <div className="ns-card" style={{ padding: 24, border: `1px solid ${cfg.border}`, background: cfg.bg }}>
             <div style={{ marginBottom: 16 }}>
-                <span style={{
-                    display: 'inline-block', fontSize: 9, fontWeight: 800, letterSpacing: '0.15em',
-                    textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace",
-                    padding: '3px 8px', borderRadius: 4, marginBottom: 8,
-                    color: cfg.color, background: `${cfg.color}18`,
-                }}>{role || 'VIEWER'}</span>
+                <span style={{ display: 'inline-block', fontSize: 9, fontWeight: 800, letterSpacing: '0.15em', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", padding: '3px 8px', borderRadius: 4, marginBottom: 8, color: cfg.color, background: `${cfg.color}18` }}>{role || 'VIEWER'}</span>
                 <h3 style={{ fontSize: 15, fontWeight: 900, fontFamily: "'Outfit', sans-serif", margin: '0 0 4px' }} className="text-primary">{cfg.title}</h3>
                 <p style={{ fontSize: 12, margin: 0, color: '#9CA3AF' }}>{cfg.subtitle}</p>
             </div>
@@ -323,11 +232,7 @@ const RoleIdeasCard = ({ role, navigate }) => {
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
                             onClick={() => navigate(idea.path)}
-                            style={{
-                                display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8,
-                                padding: 14, borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)',
-                                background: 'rgba(255,255,255,0.03)', cursor: 'pointer', textAlign: 'left',
-                            }}
+                            style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8, padding: 14, borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.03)', cursor: 'pointer', textAlign: 'left' }}
                         >
                             <div style={{ width: 32, height: 32, borderRadius: 8, background: `${cfg.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <Icon size={16} style={{ color: cfg.color }} />
@@ -350,104 +255,83 @@ const Dashboard = () => {
     const navigate = useNavigate();
     const { dark } = useTheme();
     const { user } = useAuth();
+    const { notifications } = useNotifications();
 
-    const [apps,           setApps]       = useState([]);
-    const [logs,           setLogs]       = useState([]);
-    const [clusterMetrics, setCluster]    = useState(null);
-    const [loading,        setLoading]    = useState(true);
-    const [timeRange,  setTimeRange]  = useState('24h');
-    const [chartData,  setChartData]  = useState([]);
-    const [deployOpen, setDeployOpen] = useState(false);
-    const [sortField,  setSortField]  = useState('name');
-    const [sortDir,    setSortDir]    = useState('asc');
-
-    const gridColor = dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)';
-    const axisColor = dark ? '#374151' : '#94A3B8';
-
-    useEffect(() => {
-        const pts  = { '1h': 60, '6h': 72, '24h': 96, '7d': 84 }[timeRange] || 96;
-        const base = { '1h': 800, '6h': 600, '24h': 500, '7d': 450 }[timeRange] || 500;
-        const labels = Array.from({ length: pts }, (_, i) => {
-            const d = new Date();
-            d.setMinutes(d.getMinutes() - (pts - i));
-            return d.toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' });
-        });
-        setChartData(genData(pts, base, base * 0.6).map((r, i) => ({ ...r, label: labels[i] })));
-    }, [timeRange]);
+    const [apps,        setApps]       = useState([]);
+    const [logs,        setLogs]       = useState([]);
+    const [clusterMetrics, setCluster] = useState(null);
+    const [loading,     setLoading]    = useState(true);
+    const [deployOpen,  setDeployOpen] = useState(false);
+    const [sortField,   setSortField]  = useState('name');
+    const [sortDir,     setSortDir]    = useState('asc');
 
     useEffect(() => {
         let active = true;
         const load = async () => {
             setLoading(true);
             try {
-                const [res, metricsRes] = await Promise.all([
+                const [appsRes, metricsRes] = await Promise.all([
                     appsApi.list().catch(() => ({ data: [] })),
                     metricsApi.getCluster().catch(() => ({ data: null })),
                 ]);
                 if (!active) return;
-                const data = Array.isArray(res.data) ? res.data : [];
-                setApps(data);
+                setApps(Array.isArray(appsRes.data) ? appsRes.data : []);
                 setCluster(metricsRes.data);
                 if (user?.username) {
                     const logsRes = await logsApi.getByUser(user.username).catch(() => ({ data: [] }));
                     if (active) setLogs(Array.isArray(logsRes.data) ? logsRes.data : []);
                 }
-            } catch { if (active) setApps([]); }
-            finally   { if (active) setLoading(false); }
+            } finally {
+                if (active) setLoading(false);
+            }
         };
         load();
         return () => { active = false; };
-    }, []);
+    }, [user?.username]);
 
-    const displayApps  = apps;
-    const running      = displayApps.filter(a => a.status === 'RUNNING').length;
-    const totalReplicas = displayApps.reduce((s, a) => s + (a.replicas ?? 0), 0);
-    const spark = (scale = 1) => Array.from({ length: 20 }, (_, i) => ({ value: (40 + Math.sin(i * 0.5) * 15 + Math.random() * 10) * scale }));
-
-    const failedApps   = displayApps.filter(a => a.status === 'FAILED' || a.status === 'ERROR');
-    const lastDeploy   = displayApps.reduce((latest, a) => {
-        if (!a.deployedAt) return latest;
-        return !latest || new Date(a.deployedAt) > new Date(latest) ? a.deployedAt : latest;
+    const running    = apps.filter(a => a.status === 'RUNNING').length;
+    const failedApps = apps.filter(a => a.status === 'FAILED' || a.status === 'ERROR');
+    const totalReplicas = apps.reduce((s, a) => s + (a.replicas ?? 0), 0);
+    const lastDeploy = apps.reduce((l, a) => {
+        if (!a.deployedAt) return l;
+        return !l || new Date(a.deployedAt) > new Date(l) ? a.deployedAt : l;
     }, null);
-    const lastDeployAgo = lastDeploy ? (() => {
-        const diff = Math.floor((Date.now() - new Date(lastDeploy)) / 1000);
-        if (diff < 60)   return `${diff}s ago`;
-        if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
-        if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
-        return `${Math.floor(diff/86400)}d ago`;
-    })() : '—';
 
     const kpiCards = [
-        { label: 'Total Apps',      value: displayApps.length,  sub: `${running} running · ${failedApps.length} failed`,          trend: 2,  icon: Box,          iconBg: 'rgba(0,212,255,0.1)',   iconColor: '#00D4FF', sparkColor: '#00D4FF', sparkData: spark(0.8), tooltip: 'Total applications deployed on the platform.' },
-        { label: 'Apps Running',    value: running,              sub: `${displayApps.length - running} scaled to zero`,            trend: 0,  icon: CheckCircle,  iconBg: 'rgba(16,185,129,0.1)', iconColor: '#10B981', sparkColor: '#10B981', sparkData: spark(1),   tooltip: 'Apps with status RUNNING (Knative service ready).' },
-        { label: 'Apps Failed',     value: failedApps.length,    sub: failedApps.length > 0 ? failedApps.map(a=>a.name||a.serviceName).join(', ') : 'All good', trend: 0, icon: AlertTriangle, iconBg: failedApps.length > 0 ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)', iconColor: failedApps.length > 0 ? '#EF4444' : '#10B981', sparkColor: '#EF4444', sparkData: spark(0.2), tooltip: 'Apps that failed to deploy or are in error state.' },
-        { label: 'Running Pods',    value: totalReplicas,        sub: 'Active pods in Kubernetes',                                 trend: 0,  icon: Cpu,          iconBg: 'rgba(168,85,247,0.1)', iconColor: '#A855F7', sparkColor: '#A855F7', sparkData: spark(1),   tooltip: 'Pods currently running. 0 = scaled to zero (wakes on first request).' },
-        { label: 'Req / sec',       value: fmtReq(clusterMetrics?.totalReqPerSec), sub: clusterMetrics ? `Error: ${(clusterMetrics.clusterErrorRate*100).toFixed(2)}%` : 'No data', trend: 8, icon: Zap, iconBg: 'rgba(16,185,129,0.1)', iconColor: '#10B981', sparkColor: '#10B981', sparkData: spark(1.2), tooltip: 'Total HTTP requests/sec across all your running apps.' },
-        { label: 'Last Deploy',     value: lastDeployAgo,        sub: lastDeploy ? new Date(lastDeploy).toLocaleDateString() : '—', trend: 0, icon: Timer,        iconBg: 'rgba(245,158,11,0.1)', iconColor: '#F59E0B', sparkColor: '#F59E0B', sparkData: spark(0.3), tooltip: 'Time since your most recent deployment.' },
+        { label: 'Total Apps',   value: apps.length,   sub: `${running} running · ${failedApps.length} failed`,             trend: 2,  icon: Box,           iconBg: 'rgba(0,212,255,0.1)',   iconColor: '#00D4FF', sparkColor: '#00D4FF', tooltip: 'Total applications deployed on the platform.' },
+        { label: 'Apps Running', value: running,        sub: `${apps.length - running} scaled to zero`,                      trend: 0,  icon: CheckCircle,   iconBg: 'rgba(16,185,129,0.1)', iconColor: '#10B981', sparkColor: '#10B981', tooltip: 'Apps with status RUNNING.' },
+        { label: 'Apps Failed',  value: failedApps.length, sub: failedApps.length > 0 ? failedApps.map(a => a.name || a.serviceName).join(', ') : 'All good', trend: 0, icon: AlertTriangle, iconBg: failedApps.length > 0 ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)', iconColor: failedApps.length > 0 ? '#EF4444' : '#10B981', sparkColor: '#EF4444', tooltip: 'Apps in error state.', alert: failedApps.length > 0 },
+        { label: 'Running Pods', value: totalReplicas,  sub: 'Active pods in Kubernetes',                                    trend: 0,  icon: Cpu,           iconBg: 'rgba(168,85,247,0.1)', iconColor: '#A855F7', sparkColor: '#A855F7', tooltip: 'Pods currently running. 0 = scaled to zero (wakes on first request).' },
+        { label: 'Req / sec',    value: fmtReq(clusterMetrics?.totalReqPerSec), sub: clusterMetrics ? `Error: ${(clusterMetrics.clusterErrorRate * 100).toFixed(2)}%` : 'No data', trend: 8, icon: Zap, iconBg: 'rgba(16,185,129,0.1)', iconColor: '#10B981', sparkColor: '#10B981', tooltip: 'Total HTTP requests/sec across all running apps.' },
+        { label: 'Last Deploy',  value: fmtAgo(lastDeploy), sub: lastDeploy ? new Date(lastDeploy).toLocaleDateString() : '—', trend: 0, icon: Timer, iconBg: 'rgba(245,158,11,0.1)', iconColor: '#F59E0B', sparkColor: '#F59E0B', tooltip: 'Time since most recent deployment.' },
     ];
 
     const toggleSort = (field) => {
         if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
         else { setSortField(field); setSortDir('asc'); }
     };
-
-    const sortedApps = [...displayApps].sort((a, b) => {
+    const sortedApps = [...apps].sort((a, b) => {
         const va = String(a[sortField] ?? ''), vb = String(b[sortField] ?? '');
         return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
     });
-
     const SortIcon = ({ field }) => {
         if (sortField !== field) return <ChevronsUpDown size={11} style={{ color: '#9CA3AF' }} />;
         return sortDir === 'asc' ? <ChevronUp size={11} style={{ color: '#00D4FF' }} /> : <ChevronDown size={11} style={{ color: '#00D4FF' }} />;
     };
 
+    // recent notifs for activity feed
+    const recentActivity = logs.slice(0, 8);
+
     return (
-        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingBottom: 24 }}>
+        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingBottom: 24 }}>
 
             {/* Page header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                    <h2 style={{ fontSize: 22, fontWeight: 900, fontFamily: "'Outfit', sans-serif", margin: 0 }} className="text-primary">System Overview</h2>
+                    <p style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: '#00D4FF', textTransform: 'uppercase', letterSpacing: '0.15em', margin: '0 0 4px' }}>Home</p>
+                    <h2 style={{ fontSize: 22, fontWeight: 900, fontFamily: "'Outfit', sans-serif", margin: 0 }} className="text-primary">
+                        Welcome back, {(user?.username || 'User').split('@')[0]} 👋
+                    </h2>
                     <p style={{ fontSize: 12, margin: '4px 0 0' }} className="text-secondary">
                         NEXTSTEP Serverless Platform · {new Date().toLocaleDateString('en', { weekday: 'long', month: 'long', day: 'numeric' })}
                     </p>
@@ -456,6 +340,31 @@ const Dashboard = () => {
                     <Rocket size={15} /> Quick Deploy
                 </button>
             </div>
+
+            {/* Alert banner — shown only if apps failed */}
+            {failedApps.length > 0 && (
+                <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}
+                >
+                    <AlertCircle size={18} style={{ color: '#EF4444', flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}>
+                        <p style={{ fontSize: 13, fontWeight: 700, margin: 0, color: '#EF4444' }}>
+                            {failedApps.length} app{failedApps.length > 1 ? 's' : ''} in error state
+                        </p>
+                        <p style={{ fontSize: 11, margin: '2px 0 0', color: '#9CA3AF' }}>
+                            {failedApps.map(a => a.name || a.serviceName).join(', ')}
+                        </p>
+                    </div>
+                    <button className="btn-ghost" style={{ fontSize: 12, color: '#EF4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => navigate('/apps')}>
+                        View Apps <ArrowRight size={13} />
+                    </button>
+                </motion.div>
+            )}
+
+            {/* Platform health bar */}
+            {!loading && <HealthBar apps={apps} />}
 
             {/* KPI Row */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
@@ -466,87 +375,24 @@ const Dashboard = () => {
                 ))}
             </div>
 
-            {/* Chart + Gauges row */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 20 }}>
-
-                {/* Area Chart */}
-                <div className="ns-card" style={{ padding: 20 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                        <div>
-                            <h3 style={{ fontSize: 14, fontWeight: 800, fontFamily: "'Outfit', sans-serif", margin: 0 }} className="text-primary">Request Volume</h3>
-                            <p style={{ fontSize: 11, margin: '3px 0 0' }} className="text-secondary">HTTP requests / sec · last {timeRange}</p>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: dark ? '#1F2937' : '#F1F5F9', borderRadius: 8, padding: 4 }}>
-                            {TIME_RANGES.map(r => (
-                                <button key={r} onClick={() => setTimeRange(r)} style={{
-                                    padding: '4px 10px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                                    fontSize: 11, fontWeight: 700, transition: 'all 150ms',
-                                    background: timeRange === r ? (dark ? '#111827' : '#FFFFFF') : 'transparent',
-                                    color: timeRange === r ? '#00D4FF' : '#64748B',
-                                    boxShadow: timeRange === r ? '0 1px 4px rgba(0,0,0,0.12)' : 'none',
-                                }}>
-                                    {r}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    <ResponsiveContainer width="100%" height={190}>
-                        <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                            <defs>
-                                <linearGradient id="gCyan" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#00D4FF" stopOpacity={0.22} />
-                                    <stop offset="100%" stopColor="#00D4FF" stopOpacity={0} />
-                                </linearGradient>
-                                <linearGradient id="gBlue" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#0066FF" stopOpacity={0.1} />
-                                    <stop offset="100%" stopColor="#0066FF" stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                            <XAxis dataKey="label" tick={{ fill: axisColor, fontSize: 10 }} axisLine={false} tickLine={false} interval={Math.floor(chartData.length / 6)} />
-                            <YAxis tick={{ fill: axisColor, fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(1)}k` : v} />
-                            <Tooltip content={<ChartTooltip />} />
-                            <Area type="monotoneX" dataKey="value" name="req/s" stroke="#00D4FF" strokeWidth={2} fill="url(#gCyan)" dot={false} isAnimationActive animationDuration={600} />
-                            <Area type="monotoneX" dataKey="p95"   name="P95"   stroke="#0066FF" strokeWidth={1.5} strokeDasharray="4 3" fill="url(#gBlue)" dot={false} isAnimationActive animationDuration={800} />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                </div>
-
-                {/* Gauges — admin only */}
-                {user?.role === 'ADMIN' && (
-                <div className="ns-card" style={{ padding: 20 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-                        <div>
-                            <h3 style={{ fontSize: 14, fontWeight: 800, fontFamily: "'Outfit', sans-serif", margin: 0 }} className="text-primary">Resources</h3>
-                            <p style={{ fontSize: 11, margin: '3px 0 0' }} className="text-secondary">Cluster · live</p>
-                        </div>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, color: '#10B981', background: 'rgba(16,185,129,0.1)', padding: '3px 10px', borderRadius: 999 }}>
-                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981', display: 'inline-block', animation: 'pulseDot 2s ease-in-out infinite' }} />
-                            Live
-                        </span>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, alignItems: 'center' }}>
-                        <GaugeRing value={clusterMetrics?.cpuUsagePct ?? 0} color="#00D4FF" label="CPU"     sublabel={clusterMetrics ? `${clusterMetrics.totalCpuCores?.toFixed(1)} cores` : '—'} />
-                        <GaugeRing value={clusterMetrics?.memUsagePct ?? 0} color="#A855F7" label="Memory"  sublabel={clusterMetrics ? `${clusterMetrics.totalMemoryGiB?.toFixed(1)} GiB`  : '—'} />
-                        <GaugeRing value={Math.min(100, Math.round((clusterMetrics?.netSendMBs ?? 0) / 10))} color="#10B981" label="Network" sublabel={clusterMetrics ? `${clusterMetrics.netSendMBs?.toFixed(1)} MB/s` : '—'} />
-                    </div>
-                </div>
-                )}
-            </div>
-
-            {/* Table + Activity Feed */}
+            {/* Apps Table + Activity Feed */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20 }}>
 
                 {/* Applications Table */}
                 <div className="ns-card" style={{ overflow: 'hidden' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid rgba(0,0,0,0.07)' }}>
                         <div>
-                            <h3 style={{ fontSize: 14, fontWeight: 800, fontFamily: "'Outfit', sans-serif", margin: 0 }} className="text-primary">Applications</h3>
-                            <p style={{ fontSize: 11, margin: '3px 0 0' }} className="text-secondary">{displayApps.length} services · {totalReplicas} pod{totalReplicas !== 1 ? 's' : ''} active</p>
+                            <h3 style={{ fontSize: 14, fontWeight: 800, fontFamily: "'Outfit', sans-serif", margin: 0 }} className="text-primary">Your Applications</h3>
+                            <p style={{ fontSize: 11, margin: '3px 0 0' }} className="text-secondary">{apps.length} services · {totalReplicas} pod{totalReplicas !== 1 ? 's' : ''} active</p>
                         </div>
-                        <button className="btn-ghost" style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }} onClick={() => navigate('/apps')}>
-                            View all <ArrowRight size={13} />
-                        </button>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => navigate('/monitoring')}>
+                                <Activity size={13} /> Monitoring
+                            </button>
+                            <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => navigate('/apps')}>
+                                View all <ArrowRight size={13} />
+                            </button>
+                        </div>
                     </div>
                     <div style={{ overflowX: 'auto' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -563,24 +409,23 @@ const Dashboard = () => {
                                             onClick={() => toggleSort(col.field)}
                                             style={{ textAlign: 'left', padding: '10px 16px', fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#64748B', borderBottom: '1px solid rgba(0,0,0,0.07)', cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none' }}
                                         >
-                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                                                {col.label} <SortIcon field={col.field} />
-                                            </span>
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>{col.label} <SortIcon field={col.field} /></span>
                                         </th>
                                     ))}
                                     <th style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.07)' }} />
                                 </tr>
                             </thead>
                             <tbody>
-                                {sortedApps.length === 0 && (
+                                {loading ? (
+                                    <tr><td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: '#64748B' }}>Loading…</td></tr>
+                                ) : sortedApps.length === 0 ? (
                                     <tr>
                                         <td colSpan={6} style={{ padding: '48px 16px', textAlign: 'center' }}>
                                             <p style={{ fontSize: 13, color: '#6B7280', margin: 0 }}>No applications deployed yet</p>
                                             <button className="btn-primary" style={{ marginTop: 12, fontSize: 12 }} onClick={() => navigate('/apps/new')}>Deploy your first app</button>
                                         </td>
                                     </tr>
-                                )}
-                                {sortedApps.map((app, i) => (
+                                ) : sortedApps.map((app, i) => (
                                     <motion.tr
                                         key={app.id || i}
                                         initial={{ opacity: 0, x: -8 }}
@@ -593,14 +438,14 @@ const Dashboard = () => {
                                     >
                                         <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                                <div style={{ width: 28, height: 28, borderRadius: 7, background: 'rgba(0,212,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", color: '#00D4FF', flexShrink: 0 }}>
+                                                <div style={{ width: 28, height: 28, borderRadius: 7, background: app.status === 'FAILED' ? 'rgba(239,68,68,0.1)' : 'rgba(0,212,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", color: app.status === 'FAILED' ? '#EF4444' : '#00D4FF', flexShrink: 0 }}>
                                                     {(app.name || app.serviceName || 'A').slice(0, 2).toUpperCase()}
                                                 </div>
                                                 <div>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                                         <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }} className="text-primary">{app.name || app.serviceName}</p>
                                                         {app.deployedAt && (new Date() - new Date(app.deployedAt)) < 3600000 && (
-                                                            <span style={{ fontSize: 9, fontWeight: 700, background: 'rgba(16,185,129,0.15)', color: '#10B981', padding: '1px 6px', borderRadius: 999, letterSpacing: '0.05em' }}>NEW</span>
+                                                            <span style={{ fontSize: 9, fontWeight: 700, background: 'rgba(16,185,129,0.15)', color: '#10B981', padding: '1px 6px', borderRadius: 999 }}>NEW</span>
                                                         )}
                                                     </div>
                                                     {app.imageName && <p style={{ fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: '#9CA3AF', margin: '1px 0 0' }}>{app.imageName}:{app.imageTag || 'latest'}</p>}
@@ -616,7 +461,7 @@ const Dashboard = () => {
                                                 : `${app.replicas} pod${app.replicas !== 1 ? 's' : ''}`}
                                         </td>
                                         <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.04)', fontSize: 12 }} className="text-secondary">
-                                            {app.deployedAt ? new Date(app.deployedAt).toLocaleString() : '—'}
+                                            {fmtAgo(app.deployedAt)}
                                         </td>
                                         <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.04)', fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }} className="text-secondary">
                                             {app.status === 'RUNNING' && clusterMetrics?.totalReqPerSec
@@ -624,16 +469,13 @@ const Dashboard = () => {
                                                 : '—'}
                                         </td>
                                         <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
-                                            <div style={{ display: 'flex', gap: 6 }}>
-                                                {app.url && (
-                                                    <a href={app.url.startsWith('http') ? app.url : `http://${app.url}`} target="_blank" rel="noreferrer"
-                                                        onClick={e => e.stopPropagation()}
-                                                        title="Open app URL"
-                                                        style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 8px', borderRadius: 6, background: 'rgba(0,212,255,0.08)', color: '#00D4FF', border: 'none', cursor: 'pointer', textDecoration: 'none' }}>
-                                                        <ExternalLink size={12} />
-                                                    </a>
-                                                )}
-                                            </div>
+                                            {app.url && (
+                                                <a href={app.url.startsWith('http') ? app.url : `http://${app.url}`} target="_blank" rel="noreferrer"
+                                                    onClick={e => e.stopPropagation()}
+                                                    style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 8px', borderRadius: 6, background: 'rgba(0,212,255,0.08)', color: '#00D4FF', border: 'none', cursor: 'pointer', textDecoration: 'none' }}>
+                                                    <ExternalLink size={12} />
+                                                </a>
+                                            )}
                                         </td>
                                     </motion.tr>
                                 ))}
@@ -643,36 +485,39 @@ const Dashboard = () => {
                 </div>
 
                 {/* Activity Feed */}
-                <div className="ns-card" style={{ overflow: 'hidden' }}>
-                    <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(0,0,0,0.07)' }}>
-                        <h3 style={{ fontSize: 14, fontWeight: 800, fontFamily: "'Outfit', sans-serif", margin: 0 }} className="text-primary">Activity</h3>
-                        <p style={{ fontSize: 11, margin: '3px 0 0' }} className="text-secondary">Recent platform events</p>
+                <div className="ns-card" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(0,0,0,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div>
+                            <h3 style={{ fontSize: 14, fontWeight: 800, fontFamily: "'Outfit', sans-serif", margin: 0 }} className="text-primary">Activity Feed</h3>
+                            <p style={{ fontSize: 11, margin: '3px 0 0' }} className="text-secondary">Recent deployment events</p>
+                        </div>
+                        <button className="btn-ghost" style={{ fontSize: 11 }} onClick={() => navigate('/logs')}>
+                            All logs <ArrowRight size={12} />
+                        </button>
                     </div>
-                    <div>
-                        {logs.length === 0 ? (
+                    <div style={{ flex: 1, overflowY: 'auto' }}>
+                        {recentActivity.length === 0 ? (
                             <p style={{ padding: '20px', fontSize: 12, color: '#6B7280', textAlign: 'center' }}>No activity yet</p>
-                        ) : (logs || []).slice(0, 6).map((ev, i) => {
-                            const typeColors = { DEPLOYMENT_SUCCESS: '#10B981', DEPLOYMENT_FAIL: '#EF4444', DEPLOYMENT_START: '#00D4FF', DELETE: '#F59E0B' };
+                        ) : recentActivity.map((ev, i) => {
+                            const typeColors = { DEPLOYMENT_SUCCESS: '#10B981', DEPLOYMENT_FAIL: '#EF4444', DEPLOYMENT_START: '#00D4FF', DELETE: '#F59E0B', UPDATE: '#A855F7', KAFKA_WIRED: '#F59E0B' };
                             const color = typeColors[ev.type] || '#6B7280';
                             return (
-                            <motion.div
-                                key={ev.id}
-                                initial={{ opacity: 0, x: 8 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: i * 0.05 }}
-                                style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 20px', borderBottom: '1px solid rgba(0,0,0,0.04)', transition: 'background 150ms' }}
-                                onMouseEnter={e => e.currentTarget.style.background = dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'}
-                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                            >
-                                <div style={{ width: 3, minHeight: 40, borderRadius: 2, background: color, flexShrink: 0, marginTop: 2 }} />
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                    <p style={{ fontSize: 11.5, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", margin: 0, color: '#00D4FF' }}>{ev.appName || ev.appId?.slice(0, 8) || 'platform'}</p>
-                                    <p style={{ fontSize: 11, margin: '3px 0 0', lineHeight: 1.4 }} className="text-secondary">{ev.message}</p>
-                                    <p style={{ fontSize: 10, margin: '4px 0 0', color: '#9CA3AF' }}>{ev.createdAt ? new Date(ev.createdAt).toLocaleString() : ''}</p>
-                                </div>
-                            </motion.div>
-                        )})}
-
+                                <motion.div
+                                    key={ev.id}
+                                    initial={{ opacity: 0, x: 8 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: i * 0.05 }}
+                                    style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '11px 20px', borderBottom: '1px solid rgba(0,0,0,0.04)' }}
+                                >
+                                    <div style={{ width: 3, minHeight: 38, borderRadius: 2, background: color, flexShrink: 0, marginTop: 2 }} />
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <p style={{ fontSize: 11, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", margin: 0, color: '#00D4FF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.appName || ev.appId?.slice(0, 8) || 'platform'}</p>
+                                        <p style={{ fontSize: 11, margin: '3px 0 0', lineHeight: 1.4 }} className="text-secondary">{ev.message}</p>
+                                        <p style={{ fontSize: 10, margin: '4px 0 0', color: '#9CA3AF' }}>{fmtAgo(ev.createdAt)}</p>
+                                    </div>
+                                </motion.div>
+                            );
+                        })}
                     </div>
                 </div>
             </div>

@@ -1,22 +1,21 @@
 package com.platform.api.kafka;
 
+import com.platform.api.eventing.KafkaSourceRepository;
 import com.platform.api.exception.ConflictException;
 import com.platform.api.exception.NotFoundException;
 import com.platform.api.exception.UnauthorizedException;
 import com.platform.api.kafka.dto.CreateTopicRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.clients.admin.AdminClient;
-import org.apache.kafka.clients.admin.AdminClientConfig;
-import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.admin.*;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.TopicPartition;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -24,7 +23,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class KafkaService {
 
-    private final KafkaTopicRepository topicRepository;
+    private final KafkaTopicRepository    topicRepository;
+    private final KafkaSourceRepository   kafkaSourceRepository;
 
     @Value("${app.kafka.enabled:true}")
     private boolean kafkaEnabled;
@@ -34,7 +34,6 @@ public class KafkaService {
 
     @Transactional
     public KafkaTopicDto createTopic(String userId, CreateTopicRequest req) {
-        // Check if topic already exists for this user
         if (topicRepository.existsByNameAndUserId(req.getName(), userId)) {
             throw new ConflictException("Topic already exists: " + req.getName());
         }
@@ -49,7 +48,7 @@ public class KafkaService {
                 .build();
 
         topic = topicRepository.save(topic);
-        
+
         if (kafkaEnabled) {
             createTopicInKafka(topic);
         } else {
@@ -60,8 +59,17 @@ public class KafkaService {
     }
 
     public List<KafkaTopicDto> listTopics(String userId) {
-        return topicRepository.findByUserId(userId).stream()
-                .map(this::toDto)
+        List<KafkaTopic> topics = topicRepository.findByUserId(userId);
+        if (!kafkaEnabled || topics.isEmpty()) {
+            return topics.stream().map(this::toDto).collect(Collectors.toList());
+        }
+        // Fetch live metrics for all topics in a single AdminClient session
+        Map<String, long[]> metricsMap = fetchTopicMetrics(
+                topics.stream().map(KafkaTopic::getName).collect(Collectors.toList()),
+                userId
+        );
+        return topics.stream()
+                .map(t -> toDtoWithMetrics(t, metricsMap.getOrDefault(t.getName(), null)))
                 .collect(Collectors.toList());
     }
 
@@ -94,6 +102,97 @@ public class KafkaService {
         return topic;
     }
 
+    /**
+     * Returns a map: topicName → [messageCount, consumerLag].
+     * Uses a single AdminClient session for efficiency.
+     */
+    private Map<String, long[]> fetchTopicMetrics(List<String> topicNames, String userId) {
+        Map<String, long[]> result = new HashMap<>();
+        try (AdminClient admin = AdminClient.create(Map.of(
+                AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
+                AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000",
+                AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000"))) {
+
+            // 1. Describe topics to get partition list
+            DescribeTopicsResult descResult = admin.describeTopics(topicNames);
+            Map<String, TopicDescription> descriptions = new HashMap<>();
+            for (String name : topicNames) {
+                try {
+                    descriptions.put(name, descResult.values().get(name).get());
+                } catch (Exception e) {
+                    log.debug("Cannot describe topic {}: {}", name, e.getMessage());
+                }
+            }
+
+            if (descriptions.isEmpty()) return result;
+
+            // 2. Get end offsets (= total messages produced)
+            Map<TopicPartition, OffsetSpec> offsetReq = new HashMap<>();
+            for (var entry : descriptions.entrySet()) {
+                for (var p : entry.getValue().partitions()) {
+                    offsetReq.put(new TopicPartition(entry.getKey(), p.partition()), OffsetSpec.latest());
+                }
+            }
+            Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> endOffsets =
+                    admin.listOffsets(offsetReq).all().get();
+
+            // Sum end offsets per topic
+            Map<String, Long> topicMessageCount = new HashMap<>();
+            for (var entry : endOffsets.entrySet()) {
+                topicMessageCount.merge(entry.getKey().topic(), entry.getValue().offset(), Long::sum);
+            }
+
+            // 3. Get consumer lag per topic using stored consumer groups
+            Map<String, Long> topicLag = new HashMap<>();
+            for (String topicName : topicNames) {
+                KafkaTopic topic = topicRepository.findByUserId(userId).stream()
+                        .filter(t -> t.getName().equals(topicName))
+                        .findFirst().orElse(null);
+                if (topic == null) continue;
+
+                List<String> consumerGroups = kafkaSourceRepository
+                        .findByKafkaTopicId(topic.getId()).stream()
+                        .map(s -> s.getConsumerGroup())
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList());
+
+                long totalLag = 0;
+                for (String group : consumerGroups) {
+                    try {
+                        Map<TopicPartition, OffsetAndMetadata> committed =
+                                admin.listConsumerGroupOffsets(group)
+                                     .partitionsToOffsetAndMetadata().get();
+                        long committedSum = committed.entrySet().stream()
+                                .filter(e -> e.getKey().topic().equals(topicName))
+                                .mapToLong(e -> e.getValue().offset())
+                                .sum();
+                        long endSum = topicMessageCount.getOrDefault(topicName, 0L);
+                        totalLag += Math.max(0, endSum - committedSum);
+                    } catch (Exception e) {
+                        log.debug("Cannot get lag for group {} topic {}: {}", group, topicName, e.getMessage());
+                    }
+                }
+                topicLag.put(topicName, totalLag);
+            }
+
+            // 4. Assemble results
+            for (String name : topicNames) {
+                Long msgCount = topicMessageCount.get(name);
+                Long lag      = topicLag.get(name);
+                if (msgCount != null || lag != null) {
+                    result.put(name, new long[]{
+                        msgCount != null ? msgCount : -1,
+                        lag      != null ? lag      : -1
+                    });
+                }
+            }
+
+        } catch (Exception e) {
+            log.warn("Could not fetch Kafka topic metrics: {}", e.getMessage());
+        }
+        return result;
+    }
+
     private void createTopicInKafka(KafkaTopic topic) {
         try (AdminClient admin = AdminClient.create(Map.of(
                 AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers))) {
@@ -123,8 +222,30 @@ public class KafkaService {
         return KafkaTopicDto.builder()
                 .id(topic.getId())
                 .name(topic.getName())
+                .userId(topic.getUserId())
                 .partitions(topic.getPartitions())
                 .replicas(topic.getReplicas())
+                .config(topic.getConfig())
+                .createdAt(topic.getCreatedAt())
+                .updatedAt(topic.getUpdatedAt())
+                .build();
+    }
+
+    private KafkaTopicDto toDtoWithMetrics(KafkaTopic topic, long[] metrics) {
+        Long messageCount = null;
+        Long consumerLag  = null;
+        if (metrics != null) {
+            if (metrics[0] >= 0) messageCount = metrics[0];
+            if (metrics[1] >= 0) consumerLag  = metrics[1];
+        }
+        return KafkaTopicDto.builder()
+                .id(topic.getId())
+                .name(topic.getName())
+                .userId(topic.getUserId())
+                .partitions(topic.getPartitions())
+                .replicas(topic.getReplicas())
+                .messageCount(messageCount)
+                .consumerLag(consumerLag)
                 .config(topic.getConfig())
                 .createdAt(topic.getCreatedAt())
                 .updatedAt(topic.getUpdatedAt())

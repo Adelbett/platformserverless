@@ -13,9 +13,13 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class KafkaSourceDto {
     private String id;
-    private String kafkaTopicId;
-    private String namespace;
     private String name;
+    private String userId;
+    private String kafkaTopicId;
+    private String consumerGroup;
+    private String bootstrapServers;
+    private String namespace;
+    private Boolean ready;
     private String config;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
