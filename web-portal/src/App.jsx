@@ -15,8 +15,10 @@ import LogsView from './pages/LogsView';
 import Monitoring from './pages/Monitoring';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
+import Billing from './pages/Billing';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ClusterManagement from './pages/admin/ClusterManagement';
+import AdminBilling from './pages/admin/AdminBilling';
 
 const ProtectedRoute = ({ children }) => {
     const { user, loading } = useAuth();
@@ -68,7 +70,7 @@ const AppRoutes = () => {
                 <Route path="/eventing" element={<Eventing />} />
                 <Route path="/logs" element={<LogsView />} />
                 <Route path="/monitoring" element={<Monitoring />} />
-                <Route path="/billing" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/billing" element={<Billing />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/users" element={<Users />} />
                 {/* Admin-only routes */}
@@ -77,6 +79,9 @@ const AppRoutes = () => {
                 } />
                 <Route path="/admin/cluster" element={
                     <AdminRoute><ClusterManagement /></AdminRoute>
+                } />
+                <Route path="/admin/billing" element={
+                    <AdminRoute><AdminBilling /></AdminRoute>
                 } />
                 <Route path="/admin/users" element={
                     <AdminRoute><Users /></AdminRoute>

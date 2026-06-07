@@ -2,9 +2,9 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     LayoutDashboard, Box, Rocket, Activity, Zap,
-    Globe, KeyRound, Users, CreditCard, Settings,
+    Globe, Users, CreditCard, Settings,
     LogOut, ChevronLeft, ChevronRight, Hexagon,
-    Server, Shield, BarChart2, Terminal
+    Server, BarChart2, Terminal, DollarSign
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -23,9 +23,10 @@ const NAV_SECTIONS = [
     {
         label: 'Configure',
         items: [
-            { path: '/kafka',    label: 'Kafka Topics', icon: Zap,      clientOnly: true },
-            { path: '/eventing', label: 'Eventing',     icon: Globe,    clientOnly: true },
-            { path: '/settings', label: 'Settings',     icon: Settings                   },
+            { path: '/kafka',    label: 'Kafka Topics', icon: Zap,        clientOnly: true },
+            { path: '/eventing', label: 'Eventing',     icon: Globe,      clientOnly: true },
+            { path: '/billing',  label: 'Billing',      icon: CreditCard, clientOnly: true },
+            { path: '/settings', label: 'Settings',     icon: Settings                     },
         ],
     },
     {
@@ -35,8 +36,9 @@ const NAV_SECTIONS = [
             { path: '/admin/dashboard', label: 'Overview',   icon: BarChart2, adminOnly: true },
             { path: '/monitoring',      label: 'Monitoring', icon: Activity,  adminOnly: true },
             { path: '/logs',            label: 'Logs',       icon: Terminal,  adminOnly: true },
-            { path: '/admin/users',     label: 'Users',      icon: Users,     adminOnly: true },
-            { path: '/admin/cluster',   label: 'Cluster',    icon: Server,    adminOnly: true },
+            { path: '/admin/users',     label: 'Users',      icon: Users,       adminOnly: true },
+            { path: '/admin/cluster',   label: 'Cluster',    icon: Server,      adminOnly: true },
+            { path: '/admin/billing',   label: 'Revenue',    icon: DollarSign,  adminOnly: true },
         ],
     },
 ];
