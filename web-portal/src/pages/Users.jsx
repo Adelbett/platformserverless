@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Shield, UserCheck, Eye, RefreshCw } from 'lucide-react';
+import { Shield, UserCheck, Eye, RefreshCw, Users as UsersIcon, AlertCircle } from 'lucide-react';
 import { usersApi } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -39,7 +39,8 @@ const Users = () => {
     const { dark }              = useTheme();
     const [users, setUsers]     = useState([]);
     const [loading, setLoading] = useState(true);
-    const [saving,  setSaving]  = useState(null); // userId being saved
+    const [saving,  setSaving]  = useState(null);
+    const [error,   setError]   = useState(null);
 
     // Redirect non-admins
     useEffect(() => {
@@ -48,11 +49,17 @@ const Users = () => {
 
     const load = async () => {
         setLoading(true);
+        setError(null);
         try {
             const res = await usersApi.list();
             setUsers(Array.isArray(res.data) ? res.data : []);
-        } catch { setUsers([]); }
-        finally { setLoading(false); }
+        } catch (e) {
+            const status = e?.response?.status;
+            if (status === 403) setError('Access denied — you need ADMIN role to view users.');
+            else if (status === 401) setError('Session expired — please log in again.');
+            else setError(`Failed to load users (${status || 'network error'})`);
+            setUsers([]);
+        } finally { setLoading(false); }
     };
 
     useEffect(() => { load(); }, []);
@@ -116,9 +123,29 @@ const Users = () => {
                 </div>
 
                 {loading ? (
-                    <div style={{ padding: 40, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>Loading users…</div>
+                    <div style={{ padding: 48, textAlign: 'center' }}>
+                        <RefreshCw size={20} style={{ color: '#4B5563', animation: 'spin 1s linear infinite', margin: '0 auto 12px', display: 'block' }} />
+                        <p style={{ color: '#6B7280', fontSize: 13, margin: 0 }}>Loading users…</p>
+                    </div>
+                ) : error ? (
+                    <div style={{ padding: 48, textAlign: 'center' }}>
+                        <AlertCircle size={32} style={{ color: '#EF4444', margin: '0 auto 14px', display: 'block' }} />
+                        <p style={{ color: '#EF4444', fontSize: 13, fontWeight: 700, margin: '0 0 6px' }}>{error}</p>
+                        <p style={{ color: '#6B7280', fontSize: 12, margin: '0 0 16px' }}>
+                            Make sure your JWT token contains the ADMIN role and the backend is reachable.
+                        </p>
+                        <button onClick={load} className="btn-ghost" style={{ fontSize: 12, margin: '0 auto' }}>
+                            <RefreshCw size={13} /> Retry
+                        </button>
+                    </div>
                 ) : users.length === 0 ? (
-                    <div style={{ padding: 40, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>No users found.</div>
+                    <div style={{ padding: 56, textAlign: 'center' }}>
+                        <UsersIcon size={36} style={{ color: '#374151', margin: '0 auto 14px', display: 'block' }} />
+                        <p style={{ color: '#9CA3AF', fontSize: 14, fontWeight: 700, margin: '0 0 6px' }}>No users registered yet</p>
+                        <p style={{ color: '#6B7280', fontSize: 12, margin: 0 }}>
+                            Users appear here after they sign up and log in for the first time.
+                        </p>
+                    </div>
                 ) : (
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                         <thead>

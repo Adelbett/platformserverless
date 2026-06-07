@@ -13,19 +13,19 @@ const NAV_SECTIONS = [
     {
         label: 'Platform',
         items: [
-            { path: '/dashboard',  label: 'Dashboard',         icon: LayoutDashboard, clientOnly: true },
-            { path: '/apps',       label: 'Applications',      icon: Box             },
-            { path: '/apps/new',   label: 'Deploy',            icon: Rocket,  clientOnly: true },
-            { path: '/monitoring', label: 'Monitoring',        icon: Activity        },
-            { path: '/logs',       label: 'Logs',              icon: Terminal        },
+            { path: '/dashboard',  label: 'Dashboard',    icon: LayoutDashboard, clientOnly: true },
+            { path: '/apps',       label: 'Applications', icon: Box                               },
+            { path: '/apps/new',   label: 'Deploy',       icon: Rocket,          clientOnly: true },
+            { path: '/monitoring', label: 'Monitoring',   icon: Activity,        clientOnly: true },
+            { path: '/logs',       label: 'Logs',         icon: Terminal,        clientOnly: true },
         ],
     },
     {
         label: 'Configure',
         items: [
-            { path: '/kafka',      label: 'Kafka Topics',      icon: Zap             },
-            { path: '/eventing',   label: 'Eventing',          icon: Globe           },
-            { path: '/settings',   label: 'Settings',          icon: Settings        },
+            { path: '/kafka',    label: 'Kafka Topics', icon: Zap,      clientOnly: true },
+            { path: '/eventing', label: 'Eventing',     icon: Globe,    clientOnly: true },
+            { path: '/settings', label: 'Settings',     icon: Settings                   },
         ],
     },
     {
@@ -34,6 +34,7 @@ const NAV_SECTIONS = [
         items: [
             { path: '/admin/dashboard', label: 'Overview',   icon: BarChart2, adminOnly: true },
             { path: '/monitoring',      label: 'Monitoring', icon: Activity,  adminOnly: true },
+            { path: '/logs',            label: 'Logs',       icon: Terminal,  adminOnly: true },
             { path: '/admin/users',     label: 'Users',      icon: Users,     adminOnly: true },
             { path: '/admin/cluster',   label: 'Cluster',    icon: Server,    adminOnly: true },
         ],

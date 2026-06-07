@@ -16,16 +16,16 @@ public class UserService {
 
     private final UserRepository userRepository;
 
-    public UserDto getMe(String userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("User not found: " + userId));
+    public UserDto getMe(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new NotFoundException("User not found: " + username));
         return toDto(user);
     }
 
     @Transactional
-    public UserDto updateMe(String userId, UpdateUserRequest req) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("User not found: " + userId));
+    public UserDto updateMe(String username, UpdateUserRequest req) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new NotFoundException("User not found: " + username));
         if (req.getUsername() != null) user.setUsername(req.getUsername());
         if (req.getEmail() != null)    user.setEmail(req.getEmail());
         return toDto(userRepository.save(user));
