@@ -43,10 +43,11 @@ export const eventApi = {
 }
 
 export const eventingApi = {
-    listSources:   ()     => api.get('/eventing/sources'),
-    createSource:  (data) => api.post('/eventing/sources', data),
-    listTriggers:  ()     => api.get('/eventing/triggers'),
-    createTrigger: (data) => api.post('/eventing/triggers', data),
+    listSources:    ()     => api.get('/eventing/sources'),
+    createSource:   (data) => api.post('/eventing/sources', data),
+    listTriggers:   ()     => api.get('/eventing/triggers'),
+    createTrigger:  (data) => api.post('/eventing/triggers', data),
+    deleteTrigger:  (id)   => api.delete(`/eventing/triggers/${id}`),
 }
 
 export const adminApi = {

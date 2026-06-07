@@ -62,6 +62,17 @@ public class EventingController {
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
+    @DeleteMapping("/triggers/{id}")
+    @Operation(summary = "Delete a Trigger")
+    public ResponseEntity<Void> deleteTrigger(@PathVariable String id, Authentication auth) {
+        triggerRepository.findById(id).ifPresent(t -> {
+            if (t.getUserId().equals(auth.getName())) {
+                triggerRepository.delete(t);
+            }
+        });
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/triggers")
     @Operation(summary = "List all Triggers for current user")
     public ResponseEntity<List<TriggerDto>> listTriggers(Authentication auth) {
