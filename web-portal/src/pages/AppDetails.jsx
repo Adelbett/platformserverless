@@ -312,10 +312,11 @@ const AppDetails = () => {
         return () => { active = false; };
     }, [id]);
 
-    // SSE — métriques temps réel toutes les 10 secondes
+    // SSE — métriques temps réel (token promu en header par SseTokenFilter côté backend)
     useEffect(() => {
         const token = localStorage.getItem('token');
-        const es = new EventSource(`/api/metrics/apps/${id}/stream?token=${token}`);
+        if (!token) return;
+        const es = new EventSource(`/api/metrics/apps/${id}/stream?token=${encodeURIComponent(token)}`);
         es.onmessage = (e) => {
             try {
                 const m = JSON.parse(e.data);
@@ -325,7 +326,11 @@ const AppDetails = () => {
                 setErrHistory(h =>     [...h.slice(-47), { t, v: (m.errorRate ?? 0) * 100 }]);
             } catch {}
         };
-        es.onerror = () => es.close();
+        es.onerror = () => {
+            es.close();
+            // Fallback polling si SSE échoue
+            metricsApi.getApp(id).then(r => setMetrics(r.data)).catch(() => {});
+        };
         return () => es.close();
     }, [id]);
 
