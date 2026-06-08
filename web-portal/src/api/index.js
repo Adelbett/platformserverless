@@ -50,6 +50,12 @@ export const eventingApi = {
     deleteTrigger:  (id)   => api.delete(`/eventing/triggers/${id}`),
 }
 
+export const billingApi = {
+    getMyBilling:    () => api.get('/billing/me'),
+    getAdminBilling: () => api.get('/billing/admin'),
+    triggerSnapshot: () => api.post('/billing/admin/snapshot'),
+}
+
 export const adminApi = {
     getStats:          ()   => api.get('/admin/stats'),
     getAllApps:         ()   => api.get('/admin/apps'),

@@ -110,6 +110,62 @@ public class KnativeService {
         }
     }
 
+    // ── Exists check ────────────────────────────────────────────────
+
+    public boolean exists(String serviceName, String namespace) {
+        String ns = namespace != null ? namespace : defaultNamespace;
+        if (!kubernetesEnabled) return false;
+        try {
+            return kubernetesClient.genericKubernetesResources("serving.knative.dev/v1", "Service")
+                    .inNamespace(ns).withName(serviceName).get() != null;
+        } catch (Exception e) {
+            log.warn("Could not check existence of '{}': {}", serviceName, e.getMessage());
+            return false;
+        }
+    }
+
+    // ── Real Knative service status ──────────────────────────────────
+
+    /**
+     * Returns: RUNNING, SCALED_TO_ZERO, FAILED, or NOT_FOUND
+     */
+    public String getRealStatus(String serviceName, String namespace) {
+        String ns = namespace != null ? namespace : defaultNamespace;
+        if (!kubernetesEnabled) return "UNKNOWN";
+        try {
+            GenericKubernetesResource ksvc = kubernetesClient
+                    .genericKubernetesResources("serving.knative.dev/v1", "Service")
+                    .inNamespace(ns).withName(serviceName).get();
+
+            if (ksvc == null) return "NOT_FOUND";
+
+            Map<?, ?> status = (Map<?, ?>) ksvc.getAdditionalProperties().get("status");
+            if (status == null) return "DEPLOYING";
+
+            // Check conditions
+            @SuppressWarnings("unchecked")
+            List<Map<?, ?>> conditions = (List<Map<?, ?>>) status.get("conditions");
+            if (conditions != null) {
+                for (Map<?, ?> cond : conditions) {
+                    if ("Ready".equals(cond.get("type"))) {
+                        String condStatus = String.valueOf(cond.get("status"));
+                        String reason     = String.valueOf(cond.get("reason"));
+                        if ("True".equals(condStatus)) {
+                        int pods = getReadyPods(serviceName, ns);
+                        return pods > 0 ? "RUNNING" : "IDLE";
+                    }
+                        if ("False".equals(condStatus)) return reason != null && reason.contains("Scale") ? "SCALED_TO_ZERO" : "FAILED";
+                        return "DEPLOYING";
+                    }
+                }
+            }
+            return "DEPLOYING";
+        } catch (Exception e) {
+            log.warn("Could not get real status for '{}': {}", serviceName, e.getMessage());
+            return "UNKNOWN";
+        }
+    }
+
     // ── Ready pods count ─────────────────────────────────────────────
 
     public int getReadyPods(String serviceName, String namespace) {

@@ -18,12 +18,16 @@ const STATUS_CFG = {
     SCALING:          { color: '#F59E0B', bg: 'rgba(245,158,11,0.12)',  border: 'rgba(245,158,11,0.3)',  glow: '0 0 10px rgba(245,158,11,0.4)',  label: 'Scaling'        },
     DEPLOYING:        { color: '#3B82F6', bg: 'rgba(59,130,246,0.12)',  border: 'rgba(59,130,246,0.3)',  glow: '0 0 10px rgba(59,130,246,0.4)',  label: 'Deploying'      },
     FAILED:           { color: '#EF4444', bg: 'rgba(239,68,68,0.12)',   border: 'rgba(239,68,68,0.3)',   glow: '0 0 10px rgba(239,68,68,0.4)',   label: 'Failed'         },
-    'SCALED TO ZERO': { color: '#6B7280', bg: 'rgba(107,114,128,0.10)', border: 'rgba(107,114,128,0.22)', glow: 'none',                          label: 'Scaled to zero' },
-    default:          { color: '#6B7280', bg: 'rgba(107,114,128,0.07)', border: 'rgba(107,114,128,0.15)', glow: 'none',                          label: 'Unknown'        },
+    'SCALED TO ZERO': { color: '#6B7280', bg: 'rgba(107,114,128,0.10)', border: 'rgba(107,114,128,0.22)', glow: 'none', label: 'Scaled to zero' },
+    IDLE:             { color: '#6B7280', bg: 'rgba(107,114,128,0.10)', border: 'rgba(107,114,128,0.22)', glow: 'none', label: 'Scaled to zero'  },
+    DELETED:          { color: '#EF4444', bg: 'rgba(239,68,68,0.07)',   border: 'rgba(239,68,68,0.2)',   glow: 'none', label: 'Deleted'        },
+    default:          { color: '#6B7280', bg: 'rgba(107,114,128,0.07)', border: 'rgba(107,114,128,0.15)', glow: 'none', label: 'Unknown'        },
 };
 
 const getStatus = (app) => {
     if (!app.status) return 'UNKNOWN';
+    // Backend now sends IDLE directly — treat same as SCALED TO ZERO
+    if (app.status === 'IDLE') return 'IDLE';
     if (app.status === 'RUNNING' && (app.replicas === 0 || app.replicas == null)) return 'SCALED TO ZERO';
     return app.status;
 };
@@ -166,7 +170,7 @@ const UserGroup = ({ userId, apps, onDelete, navigate }) => {
     const username = userId.replace(/^user-/, '');
     const running  = apps.filter(a => getStatus(a) === 'RUNNING').length;
     const failed   = apps.filter(a => getStatus(a) === 'FAILED').length;
-    const idle     = apps.filter(a => getStatus(a) === 'SCALED TO ZERO').length;
+    const idle     = apps.filter(a => ['SCALED TO ZERO', 'IDLE'].includes(getStatus(a))).length;
     const ns       = [...new Set(apps.map(a => a.namespace).filter(Boolean))];
     const colors   = ['#8B5CF6','#3B82F6','#10B981','#F59E0B','#EF4444','#EC4899','#06B6D4'];
     const color    = colors[username.charCodeAt(0) % colors.length];

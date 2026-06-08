@@ -4,7 +4,7 @@ import {
     AreaChart, Area, BarChart, Bar,
     XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
-import { appsApi, kafkaApi } from '../../api';
+import { appsApi, kafkaApi, billingApi } from '../../api';
 import {
     CreditCard, TrendingUp, Users, Cpu, Database,
     RefreshCw, ChevronDown, ChevronRight, DollarSign,
@@ -193,17 +193,23 @@ const ClientRow = ({ client, rank, totalRevenue }) => {
 
 // ── Main ───────────────────────────────────────────────────────────────────────
 const AdminBilling = () => {
-    const [apps,    setApps]    = useState([]);
-    const [topics,  setTopics]  = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [tab,     setTab]     = useState('clients');
+    const [apps,        setApps]        = useState([]);
+    const [topics,      setTopics]      = useState([]);
+    const [adminBilling, setAdminBilling] = useState(null); // real backend data
+    const [loading,     setLoading]     = useState(true);
+    const [tab,         setTab]         = useState('clients');
 
     const load = async () => {
         setLoading(true);
         try {
-            const [ar, kr] = await Promise.allSettled([appsApi.list(), kafkaApi.list()]);
+            const [ar, kr, br] = await Promise.allSettled([
+                appsApi.list(),
+                kafkaApi.list(),
+                billingApi.getAdminBilling(),
+            ]);
             if (ar.status === 'fulfilled') setApps(ar.value.data || []);
             if (kr.status === 'fulfilled') setTopics(kr.value.data || []);
+            if (br.status === 'fulfilled') setAdminBilling(br.value.data);
         } finally { setLoading(false); }
     };
     useEffect(() => { load(); }, []);
@@ -233,15 +239,33 @@ const AdminBilling = () => {
     }, [apps]);
 
     // ── Platform totals ────────────────────────────────────────────────────────
-    const totalHourly    = clients.reduce((s, c) => s + c.hourlyRate, 0);
+    const totalHourly    = adminBilling?.platformHourlyRate  ?? clients.reduce((s, c) => s + c.hourlyRate, 0);
     const totalKafkaMo   = topics.length * PRICE.kafkaPerTopic;
     const totalKafkaH    = totalKafkaMo / PRICE.HOURS_MONTH;
-    const totalMtdCost   = (totalHourly + totalKafkaH) * hoursElapsed;
-    const totalProjected = (totalHourly + totalKafkaH) * daysInMonth * 24;
+    const totalMtdCost   = adminBilling?.platformMtdCost     ?? (totalHourly + totalKafkaH) * hoursElapsed;
+    const totalProjected = adminBilling?.platformProjected   ?? (totalHourly + totalKafkaH) * daysInMonth * 24;
     const totalMonthly   = totalHourly * PRICE.HOURS_MONTH + totalKafkaMo;
 
+    // Use real per-client data from backend when available
+    const clientsData = adminBilling?.clients?.length
+        ? adminBilling.clients.map(c => ({
+            userId:      c.userId,
+            apps:        apps.filter(a => a.userId === c.userId),
+            enriched:    apps.filter(a => a.userId === c.userId).map(a => ({
+                ...a, vcpu: parseVcpu(a.cpuRequest), ramGb: parseGb(a.memoryRequest),
+                uptime: uptimeFactor(a), hourly: appHourly(a),
+            })),
+            hourlyRate:  c.hourlyRate,
+            mtdCost:     c.mtdCost,
+            projected:   c.projectedMonthly,
+          }))
+        : clients;
+
+    // Real platform daily history
+    const platformDailyHistory = adminBilling?.platformDailyHistory ?? [];
+
     // ── Bar chart data — top 10 clients by projected ───────────────────────────
-    const barData = clients.slice(0, 10).map(c => ({
+    const barData = clientsData.slice(0, 10).map(c => ({
         name: (c.userId || 'unknown').slice(0, 10),
         mtd:  parseFloat(c.mtdCost.toFixed(5)),
         projected: parseFloat(c.projected.toFixed(5)),
@@ -249,13 +273,13 @@ const AdminBilling = () => {
 
     // ── Pie — breakdown by client ──────────────────────────────────────────────
     const PIE_COLORS = ['#3B82F6', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444', '#06B6D4', '#EC4899', '#14B8A6'];
-    const pieData = clients.slice(0, 7).map((c, i) => ({
+    const pieData = clientsData.slice(0, 7).map((c, i) => ({
         name: c.userId,
         value: parseFloat(c.projected.toFixed(5)),
         color: PIE_COLORS[i % PIE_COLORS.length],
     }));
-    if (clients.length > 7) {
-        const rest = clients.slice(7).reduce((s, c) => s + c.projected, 0);
+    if (clientsData.length > 7) {
+        const rest = clientsData.slice(7).reduce((s, c) => s + c.projected, 0);
         pieData.push({ name: 'Others', value: parseFloat(rest.toFixed(5)), color: '#475569' });
     }
 

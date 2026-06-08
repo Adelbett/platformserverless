@@ -1,7 +1,7 @@
 package com.platform.api.admin;
 
-import com.platform.api.app.App;
 import com.platform.api.app.AppRepository;
+import com.platform.api.app.AppService;
 import com.platform.api.app.KnativeService;
 import com.platform.api.app.dto.AppResponse;
 import com.platform.api.eventing.KafkaSourceRepository;
@@ -37,6 +37,7 @@ import java.util.stream.Collectors;
 public class AdminController {
 
     private final AppRepository           appRepository;
+    private final AppService              appService;
     private final KafkaTopicRepository    kafkaTopicRepository;
     private final DeploymentLogRepository logRepository;
     private final UserRepository          userRepository;
@@ -76,12 +77,9 @@ public class AdminController {
     // ── All apps ──────────────────────────────────────────────────────
 
     @GetMapping("/apps")
-    @Operation(summary = "List all applications across all tenants")
+    @Operation(summary = "List all applications across all tenants (status synced from Kubernetes)")
     public ResponseEntity<List<AppResponse>> getAllApps() {
-        List<AppResponse> apps = appRepository.findAll().stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(apps);
+        return ResponseEntity.ok(appService.listAllApps());
     }
 
     @DeleteMapping("/apps/{id}")
@@ -343,24 +341,4 @@ public class AdminController {
         return info;
     }
 
-    private AppResponse toResponse(App app) {
-        return AppResponse.builder()
-                .id(app.getId())
-                .userId(app.getUserId())
-                .imageName(app.getImageName())
-                .imageTag(app.getImageTag())
-                .description(app.getDescription())
-                .status(app.getStatus())
-                .url(app.getUrl())
-                .serviceName(app.getServiceName())
-                .namespace(app.getNamespace())
-                .port(app.getPort())
-                .minReplicas(app.getMinReplicas())
-                .maxReplicas(app.getMaxReplicas())
-                .cpuRequest(app.getCpuRequest())
-                .memoryRequest(app.getMemoryRequest())
-                .deployedAt(app.getDeployedAt())
-                .updatedAt(app.getUpdatedAt())
-                .build();
-    }
 }

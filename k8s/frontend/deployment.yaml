@@ -16,6 +16,7 @@ spec:
       containers:
       - name: platform-web
         image: adelbettaieb/platform-web:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 80
 ---

@@ -102,9 +102,49 @@ public class AppService {
     // ── Read ──────────────────────────────────────────────────────────
 
     public List<AppResponse> listApps(String userId) {
-        return appRepository.findByUserId(userId).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        List<App> apps = appRepository.findByUserId(userId);
+        syncStatusFromKubernetes(apps);
+        return apps.stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    // ── Admin: list all apps with K8s sync ───────────────────────────
+    public List<AppResponse> listAllApps() {
+        List<App> apps = appRepository.findAll();
+        syncStatusFromKubernetes(apps);
+        return apps.stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    /**
+     * For each app, ask Kubernetes what the real status is.
+     * - If the Knative service no longer exists → mark "DELETED" in DB
+     * - If status changed (e.g. RUNNING→SCALED_TO_ZERO) → update DB
+     * - Persists only if something actually changed (avoids unnecessary writes)
+     */
+    private void syncStatusFromKubernetes(List<App> apps) {
+        for (App app : apps) {
+            try {
+                String realStatus = knativeService.getRealStatus(app.getServiceName(), app.getNamespace());
+                String dbStatus   = app.getStatus();
+
+                String mapped = switch (realStatus) {
+                    case "RUNNING"        -> "RUNNING";
+                    case "SCALED_TO_ZERO" -> "IDLE";
+                    case "FAILED"         -> "FAILED";
+                    case "NOT_FOUND"      -> "DELETED";
+                    case "DEPLOYING"      -> "DEPLOYING";
+                    default               -> dbStatus; // keep DB value if unknown
+                };
+
+                if (!mapped.equals(dbStatus)) {
+                    app.setStatus(mapped);
+                    app.setUpdatedAt(LocalDateTime.now());
+                    appRepository.save(app);
+                    log.info("App {} status synced: {} → {}", app.getId(), dbStatus, mapped);
+                }
+            } catch (Exception e) {
+                log.warn("Could not sync status for app {}: {}", app.getId(), e.getMessage());
+            }
+        }
     }
 
 
