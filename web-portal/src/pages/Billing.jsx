@@ -5,7 +5,6 @@ import {
     XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
 import { appsApi, kafkaApi, billingApi } from '../api';
-import { Download } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
     CreditCard, Cpu, MemoryStick,
