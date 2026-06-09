@@ -18,6 +18,7 @@ const STATUS_CFG = {
     SCALING:          { color: '#F59E0B', bg: 'rgba(245,158,11,0.12)',  border: 'rgba(245,158,11,0.3)',  glow: '0 0 10px rgba(245,158,11,0.4)',  label: 'Scaling'        },
     DEPLOYING:        { color: '#3B82F6', bg: 'rgba(59,130,246,0.12)',  border: 'rgba(59,130,246,0.3)',  glow: '0 0 10px rgba(59,130,246,0.4)',  label: 'Deploying'      },
     FAILED:           { color: '#EF4444', bg: 'rgba(239,68,68,0.12)',   border: 'rgba(239,68,68,0.3)',   glow: '0 0 10px rgba(239,68,68,0.4)',   label: 'Failed'         },
+    SUSPENDED:        { color: '#EF4444', bg: 'rgba(239,68,68,0.10)',   border: 'rgba(239,68,68,0.25)',  glow: 'none', label: 'Suspended'      },
     'SCALED TO ZERO': { color: '#6B7280', bg: 'rgba(107,114,128,0.10)', border: 'rgba(107,114,128,0.22)', glow: 'none', label: 'Scaled to zero' },
     IDLE:             { color: '#6B7280', bg: 'rgba(107,114,128,0.10)', border: 'rgba(107,114,128,0.22)', glow: 'none', label: 'Scaled to zero'  },
     DELETED:          { color: '#EF4444', bg: 'rgba(239,68,68,0.07)',   border: 'rgba(239,68,68,0.2)',   glow: 'none', label: 'Deleted'        },
@@ -430,6 +431,25 @@ const AppsList = () => {
                     )}
                 </div>
             </div>
+
+            {/* ── Suspension banner (client only) ── */}
+            {!isAdmin && user?.suspended && (
+                <div style={{
+                    display: 'flex', gap: 12, alignItems: 'center',
+                    background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)',
+                    borderRadius: 12, padding: '14px 18px', marginBottom: 20,
+                }}>
+                    <AlertTriangle size={18} color="#EF4444" style={{ flexShrink: 0 }} />
+                    <div>
+                        <p style={{ fontSize: 14, fontWeight: 700, color: '#FCA5A5', margin: '0 0 2px' }}>
+                            Votre compte est suspendu
+                        </p>
+                        <p style={{ fontSize: 12, color: '#F87171', margin: 0 }}>
+                            Vos services ne sont plus accessibles. Veuillez contacter le support pour régulariser votre situation.
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* ── KPI bar ── */}
             {!loading && (

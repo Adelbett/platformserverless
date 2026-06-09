@@ -89,6 +89,56 @@ public class KnativeService {
         return buildServiceUrl(serviceName, ns);
     }
 
+    // ── Scale (suspend / restore) ─────────────────────────────────────
+
+    /**
+     * Patches the Knative service autoscaling annotations to change min/max replicas.
+     * Set maxReplicas=0 to suspend (scale-to-zero, 503 on traffic).
+     */
+    public void scaleService(String serviceName, String namespace, int minReplicas, int maxReplicas) {
+        String ns = namespace != null ? namespace : defaultNamespace;
+
+        if (!kubernetesEnabled) {
+            log.info("[MOCK] Scaling Knative service '{}' in namespace '{}' to min={} max={}", serviceName, ns, minReplicas, maxReplicas);
+            return;
+        }
+
+        try {
+            GenericKubernetesResource ksvc = kubernetesClient
+                    .genericKubernetesResources("serving.knative.dev/v1", "Service")
+                    .inNamespace(ns).withName(serviceName).get();
+
+            if (ksvc == null) {
+                log.warn("Cannot scale '{}': service not found in namespace '{}'", serviceName, ns);
+                return;
+            }
+
+            // Patch annotations on the spec.template.metadata
+            @SuppressWarnings("unchecked")
+            Map<String, Object> spec = (Map<String, Object>) ksvc.getAdditionalProperties().get("spec");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> template = (Map<String, Object>) spec.get("template");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> metadata = (Map<String, Object>) template.get("metadata");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> annotations = (Map<String, Object>) metadata.get("annotations");
+
+            // annotations may be immutable map from JSON — replace with mutable copy
+            Map<String, Object> newAnnotations = new java.util.HashMap<>(annotations != null ? annotations : Map.of());
+            newAnnotations.put("autoscaling.knative.dev/minScale", String.valueOf(minReplicas));
+            newAnnotations.put("autoscaling.knative.dev/maxScale", String.valueOf(maxReplicas));
+            metadata.put("annotations", newAnnotations);
+
+            kubernetesClient.genericKubernetesResources("serving.knative.dev/v1", "Service")
+                    .inNamespace(ns).resource(ksvc).update();
+
+            log.info("Scaled Knative service '{}' in '{}': min={} max={}", serviceName, ns, minReplicas, maxReplicas);
+        } catch (Exception e) {
+            log.error("Failed to scale Knative service '{}': {}", serviceName, e.getMessage());
+            throw new RuntimeException("Scale failed: " + e.getMessage(), e);
+        }
+    }
+
     // ── Delete ────────────────────────────────────────────────────────
 
     public void delete(String serviceName, String namespace) {

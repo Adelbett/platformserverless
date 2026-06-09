@@ -5,11 +5,12 @@ import {
     XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
 import { appsApi, kafkaApi, billingApi } from '../api';
+import { Download } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
     CreditCard, Cpu, MemoryStick,
     TrendingUp, Package, Database, RefreshCw,
-    Info, Zap, Clock,
+    Info, Zap, Clock, Download,
 } from 'lucide-react';
 
 const PRICE = {
@@ -94,6 +95,20 @@ const Billing = () => {
     };
     useEffect(() => { load(); }, []);
 
+    const handleExport = async () => {
+        try {
+            const res = await billingApi.exportExcel();
+            const url = URL.createObjectURL(new Blob([res.data]));
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `billing-${now.toISOString().slice(0,10)}.xlsx`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            console.error('Export failed', e);
+        }
+    };
+
     // ── Current-rate calculations from live app data ───────────────────────────
     const enriched = useMemo(() => apps.map(a => ({
         ...a,
@@ -176,6 +191,9 @@ const Billing = () => {
                         </span>
                         <button onClick={load} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                             <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+                        </button>
+                        <button onClick={handleExport} style={{ height: 32, padding: '0 12px', borderRadius: 8, border: '1px solid rgba(16,185,129,0.3)', background: 'rgba(16,185,129,0.08)', color: '#10B981', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                            <Download size={13} /> Export Excel
                         </button>
                     </div>
                 </div>
@@ -320,7 +338,8 @@ const Billing = () => {
                                     </td></tr>
                                 ) : perAppData.map((item, i) => {
                                     const app = enriched.find(a => a.id === item.appId || (a.serviceName || a.name) === item.serviceName);
-                                    const statusColor = app?.status === 'RUNNING' ? '#10B981' : app?.status === 'FAILED' ? '#EF4444' : '#6B7280';
+                                    const isDeleted   = item.deleted === true;
+                                    const statusColor = isDeleted ? '#EF4444' : app?.status === 'RUNNING' ? '#10B981' : app?.status === 'FAILED' ? '#EF4444' : '#6B7280';
                                     return (
                                         <motion.tr key={item.appId || i} initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.03 }}
                                             style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
@@ -331,7 +350,10 @@ const Billing = () => {
                                                 <p style={{ fontSize: 9, margin: '2px 0 0', color: '#334155', fontFamily: "'JetBrains Mono', monospace" }}>{item.namespace}</p>
                                             </td>
                                             <td style={{ padding: '12px 16px' }}>
-                                                {app && <span style={{ fontSize: 10, fontWeight: 700, color: statusColor, background: `${statusColor}12`, border: `1px solid ${statusColor}30`, padding: '2px 8px', borderRadius: 999 }}>● {app.status}</span>}
+                                                {isDeleted
+                                                    ? <span style={{ fontSize: 10, fontWeight: 700, color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', padding: '2px 8px', borderRadius: 999 }}>✕ DELETED</span>
+                                                    : app && <span style={{ fontSize: 10, fontWeight: 700, color: statusColor, background: `${statusColor}12`, border: `1px solid ${statusColor}30`, padding: '2px 8px', borderRadius: 999 }}>● {app.status}</span>
+                                                }
                                             </td>
                                             <td style={{ padding: '12px 16px', fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: '#06B6D4' }}>
                                                 {app ? app.vcpu.toFixed(3) : '—'}

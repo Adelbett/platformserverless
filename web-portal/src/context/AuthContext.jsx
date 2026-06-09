@@ -72,10 +72,26 @@ export const AuthProvider = ({ children }) => {
                 { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
             );
             const { access_token, refresh_token } = res.data;
-            const userData = parseToken(access_token);
-            if (!userData) throw new Error('Token invalide');
+            const tokenData = parseToken(access_token);
+            if (!tokenData) throw new Error('Token invalide');
             localStorage.setItem('token', access_token);
             localStorage.setItem('refreshToken', refresh_token);
+
+            // Fetch DB profile (role, suspended flag, ownerId)
+            let userData = tokenData;
+            try {
+                const profile = await axios.get('/api/users/me', {
+                    headers: { Authorization: `Bearer ${access_token}` }
+                });
+                userData = {
+                    ...tokenData,
+                    role:      profile.data.role      || tokenData.role,
+                    suspended: profile.data.suspended || false,
+                    ownerId:   profile.data.ownerId   || null,
+                    id:        profile.data.id,
+                };
+            } catch { /* fallback to token data */ }
+
             localStorage.setItem('user', JSON.stringify(userData));
             setUser(userData);
             startAutoRefresh(refresh_token);

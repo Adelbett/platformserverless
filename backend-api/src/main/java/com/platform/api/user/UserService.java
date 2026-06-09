@@ -60,6 +60,8 @@ public class UserService {
                 .username(u.getUsername())
                 .email(u.getEmail())
                 .role(u.getRole())
+                .ownerId(u.getOwnerId())
+                .suspended(u.isSuspended())
                 .createdAt(u.getCreatedAt())
                 .build();
     }

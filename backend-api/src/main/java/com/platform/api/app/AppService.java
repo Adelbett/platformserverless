@@ -9,6 +9,7 @@ import com.platform.api.exception.NotFoundException;
 import com.platform.api.logs.DeploymentLog;
 import com.platform.api.logs.DeploymentLogRepository;
 import com.platform.api.logs.LogSseService;
+import com.platform.api.user.UserContextService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -31,16 +32,22 @@ public class AppService {
     private final LogSseService logSseService;
     private final KafkaSourceRepository kafkaSourceRepository;
     private final TriggerRepository triggerRepository;
+    private final UserContextService userContextService;
 
     // ── Create & Deploy ──────────────────────────────────────────────
 
     @Transactional
-    public AppResponse createApp(String userId, AppRequest req) {
-        String serviceName = generateServiceName(req.getImageName(), userId);
+    public AppResponse createApp(String username, AppRequest req) {
+        // Resolve effective owner: if caller is a member, use their CLIENT_ADMIN's id+namespace
+        UserContextService.UserContext ctx = userContextService.resolve(username);
+        String effectiveUserId = ctx.effectiveUserId();
+        String namespace       = ctx.namespace();
+
+        String serviceName = generateServiceName(req.getImageName(), effectiveUserId);
 
         App app = App.builder()
                 .name(req.getName())
-                .userId(userId)
+                .userId(effectiveUserId)
                 .imageName(req.getImageName())
                 .imageTag(req.getImageTag() != null ? req.getImageTag() : "latest")
                 .description(req.getDescription())
@@ -50,12 +57,13 @@ public class AppService {
                 .cpuRequest(req.getCpuRequest() != null ? req.getCpuRequest() : "100m")
                 .memoryRequest(req.getMemoryRequest() != null ? req.getMemoryRequest() : "128Mi")
                 .serviceName(serviceName)
-.namespace(generateNamespace(userId))                .status("DEPLOYING")
+                .namespace(namespace)
+                .status("DEPLOYING")
                 .updatedAt(LocalDateTime.now())
                 .build();
 
         appRepository.save(app);
-        addLog(app.getId(), userId, "Deployment triggered", "DEPLOYMENT_START");
+        addLog(app.getId(), effectiveUserId, "Deployment triggered", "DEPLOYMENT_START");
 
         triggerDeployAsync(app, req);
 
@@ -101,8 +109,11 @@ public class AppService {
 
     // ── Read ──────────────────────────────────────────────────────────
 
-    public List<AppResponse> listApps(String userId) {
-        List<App> apps = appRepository.findByUserId(userId);
+    public List<AppResponse> listApps(String username) {
+        UserContextService.UserContext ctx = userContextService.resolve(username);
+        List<App> apps = appRepository.findByUserId(ctx.effectiveUserId()).stream()
+                .filter(a -> !"DELETED".equals(a.getStatus()))
+                .collect(Collectors.toList());
         syncStatusFromKubernetes(apps);
         return apps.stream().map(this::toResponse).collect(Collectors.toList());
     }
@@ -148,22 +159,19 @@ public class AppService {
     }
 
 
-    private String generateNamespace(String userId) {
-        String cleaned = userId.toLowerCase().replaceAll("[^a-z0-9]", "-");
-        if (cleaned.length() > 30) cleaned = cleaned.substring(0, 30);
-        return "user-" + cleaned;
-    }
-
-    public AppResponse getApp(String appId, String userId) {
-        App app = requireOwned(appId, userId);
+    public AppResponse getApp(String appId, String username) {
+        UserContextService.UserContext ctx = userContextService.resolve(username);
+        App app = requireOwned(appId, ctx.effectiveUserId());
         return toResponse(app);
     }
 
     // ── Update & Redeploy ─────────────────────────────────────────────
 
     @Transactional
-    public AppResponse updateApp(String appId, String userId, AppRequest req) {
-        App app = requireOwned(appId, userId);
+    public AppResponse updateApp(String appId, String username, AppRequest req) {
+        UserContextService.UserContext ctx = userContextService.resolve(username);
+        String effectiveUserId = ctx.effectiveUserId();
+        App app = requireOwned(appId, effectiveUserId);
         if (req.getImageTag()      != null) app.setImageTag(req.getImageTag());
         if (req.getDescription()   != null) app.setDescription(req.getDescription());
         if (req.getMinReplicas()   != null) app.setMinReplicas(req.getMinReplicas());
@@ -173,7 +181,7 @@ public class AppService {
         app.setStatus("DEPLOYING");
         app.setUpdatedAt(LocalDateTime.now());
         appRepository.save(app);
-        addLog(appId, userId, "App updated — redeploying", "UPDATE");
+        addLog(appId, effectiveUserId, "App updated — redeploying", "UPDATE");
         triggerDeployAsync(app, buildRequestFromApp(app));
         return toResponse(app);
     }
@@ -181,27 +189,32 @@ public class AppService {
     // ── Re-deploy ─────────────────────────────────────────────────────
 
     @Transactional
-    public AppResponse redeploy(String appId, String userId) {
-        App app = requireOwned(appId, userId);
+    public AppResponse redeploy(String appId, String username) {
+        UserContextService.UserContext ctx = userContextService.resolve(username);
+        String effectiveUserId = ctx.effectiveUserId();
+        App app = requireOwned(appId, effectiveUserId);
         app.setStatus("DEPLOYING");
         app.setUpdatedAt(LocalDateTime.now());
         appRepository.save(app);
-        addLog(appId, userId, "Re-deployment triggered", "DEPLOYMENT_START");
-
-        AppRequest req = buildRequestFromApp(app);
-        triggerDeployAsync(app, req);
+        addLog(appId, effectiveUserId, "Re-deployment triggered", "DEPLOYMENT_START");
+        triggerDeployAsync(app, buildRequestFromApp(app));
         return toResponse(app);
     }
 
     // ── Delete ────────────────────────────────────────────────────────
 
     @Transactional
-    public void deleteApp(String appId, String userId) {
-        App app = requireOwned(appId, userId);
+    public void deleteApp(String appId, String username) {
+        UserContextService.UserContext ctx = userContextService.resolve(username);
+        String effectiveUserId = ctx.effectiveUserId();
+        App app = requireOwned(appId, effectiveUserId);
         knativeService.delete(app.getServiceName(), app.getNamespace());
-        eventingService.deleteByServiceName(app.getServiceName(), userId);
-        addLog(appId, userId, "App deleted", "DELETE");
-        appRepository.delete(app);
+        eventingService.deleteByServiceName(app.getServiceName(), effectiveUserId);
+        addLog(appId, effectiveUserId, "App deleted", "DELETE");
+        // Mark as DELETED instead of removing — billing history must be preserved
+        app.setStatus("DELETED");
+        app.setUpdatedAt(LocalDateTime.now());
+        appRepository.save(app);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────

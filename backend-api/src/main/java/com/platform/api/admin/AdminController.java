@@ -1,5 +1,6 @@
 package com.platform.api.admin;
 
+import com.platform.api.app.App;
 import com.platform.api.app.AppRepository;
 import com.platform.api.app.AppService;
 import com.platform.api.app.KnativeService;
@@ -10,7 +11,9 @@ import com.platform.api.kafka.KafkaTopic;
 import com.platform.api.kafka.KafkaTopicRepository;
 import com.platform.api.logs.DeploymentLog;
 import com.platform.api.logs.DeploymentLogRepository;
+import com.platform.api.user.User;
 import com.platform.api.user.UserRepository;
+import com.platform.api.user.UserContextService;
 import io.fabric8.kubernetes.api.model.Node;
 import io.fabric8.kubernetes.api.model.Namespace;
 import io.fabric8.kubernetes.api.model.Pod;
@@ -45,6 +48,7 @@ public class AdminController {
     private final KnativeService          knativeService;
     private final KafkaSourceRepository   kafkaSourceRepository;
     private final TriggerRepository       triggerRepository;
+    private final UserContextService      userContextService;
 
     // ── Platform stats ────────────────────────────────────────────────
 
@@ -287,6 +291,128 @@ public class AdminController {
         overview.put("totalTriggers", triggerRepository.count());
 
         return ResponseEntity.ok(overview);
+    }
+
+    // ── Suspend / Restore — individual service ────────────────────────
+
+    @PostMapping("/apps/{id}/suspend")
+    @Operation(summary = "Suspend a specific app (scale to zero, 503 on traffic)")
+    public ResponseEntity<Map<String, Object>> suspendApp(@PathVariable String id) {
+        App app = appRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("App not found: " + id));
+
+        try {
+            knativeService.scaleService(app.getServiceName(), app.getNamespace(), 0, 0);
+        } catch (Exception e) {
+            log.warn("Could not scale Knative service for app {}: {}", id, e.getMessage());
+        }
+        app.setStatus("SUSPENDED");
+        appRepository.save(app);
+
+        return ResponseEntity.ok(Map.of("id", id, "status", "SUSPENDED"));
+    }
+
+    @PostMapping("/apps/{id}/restore")
+    @Operation(summary = "Restore a suspended app to its original replica settings")
+    public ResponseEntity<Map<String, Object>> restoreApp(@PathVariable String id) {
+        App app = appRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("App not found: " + id));
+
+        int min = app.getMinReplicas() != null ? app.getMinReplicas() : 0;
+        int max = app.getMaxReplicas() != null ? app.getMaxReplicas() : 10;
+
+        try {
+            knativeService.scaleService(app.getServiceName(), app.getNamespace(), min, max);
+        } catch (Exception e) {
+            log.warn("Could not restore Knative service for app {}: {}", id, e.getMessage());
+        }
+        app.setStatus("RUNNING");
+        appRepository.save(app);
+
+        return ResponseEntity.ok(Map.of("id", id, "status", "RUNNING"));
+    }
+
+    // ── Suspend / Restore — entire client account ─────────────────────
+
+    @PostMapping("/clients/{userId}/suspend")
+    @Operation(summary = "Suspend all services for a client (non-payment, abuse, etc.)")
+    public ResponseEntity<Map<String, Object>> suspendClient(@PathVariable String userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+
+        List<App> apps = appRepository.findByUserId(userId).stream()
+                .filter(a -> !"DELETED".equals(a.getStatus()))
+                .toList();
+
+        for (App app : apps) {
+            try {
+                knativeService.scaleService(app.getServiceName(), app.getNamespace(), 0, 0);
+            } catch (Exception e) {
+                log.warn("Could not scale app {} during client suspension: {}", app.getId(), e.getMessage());
+            }
+            app.setStatus("SUSPENDED");
+            appRepository.save(app);
+        }
+
+        user.setSuspended(true);
+        userRepository.save(user);
+
+        return ResponseEntity.ok(Map.of("userId", userId, "suspended", true, "appsAffected", apps.size()));
+    }
+
+    @PostMapping("/clients/{userId}/restore")
+    @Operation(summary = "Restore all services for a previously suspended client")
+    public ResponseEntity<Map<String, Object>> restoreClient(@PathVariable String userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+
+        List<App> apps = appRepository.findByUserId(userId).stream()
+                .filter(a -> "SUSPENDED".equals(a.getStatus()))
+                .toList();
+
+        for (App app : apps) {
+            int min = app.getMinReplicas() != null ? app.getMinReplicas() : 0;
+            int max = app.getMaxReplicas() != null ? app.getMaxReplicas() : 10;
+            try {
+                knativeService.scaleService(app.getServiceName(), app.getNamespace(), min, max);
+            } catch (Exception e) {
+                log.warn("Could not restore app {} during client restore: {}", app.getId(), e.getMessage());
+            }
+            app.setStatus("RUNNING");
+            appRepository.save(app);
+        }
+
+        user.setSuspended(false);
+        userRepository.save(user);
+
+        return ResponseEntity.ok(Map.of("userId", userId, "suspended", false, "appsRestored", apps.size()));
+    }
+
+    // ── List all clients (for admin client management page) ───────────
+
+    @GetMapping("/clients")
+    @Operation(summary = "List all CLIENT_ADMIN users with their suspension status")
+    public ResponseEntity<List<Map<String, Object>>> getAllClients() {
+        List<Map<String, Object>> clients = userRepository.findAll().stream()
+                .filter(u -> "CLIENT_ADMIN".equals(u.getRole()))
+                .map(u -> {
+                    long appCount = appRepository.findByUserId(u.getId()).stream()
+                            .filter(a -> !"DELETED".equals(a.getStatus())).count();
+                    long suspendedCount = appRepository.findByUserId(u.getId()).stream()
+                            .filter(a -> "SUSPENDED".equals(a.getStatus())).count();
+                    Map<String, Object> info = new LinkedHashMap<>();
+                    info.put("id",             u.getId());
+                    info.put("username",        u.getUsername());
+                    info.put("email",           u.getEmail());
+                    info.put("suspended",       u.isSuspended());
+                    info.put("appCount",        appCount);
+                    info.put("suspendedApps",   suspendedCount);
+                    info.put("namespace",       UserContextService.buildNamespace(u.getUsername()));
+                    info.put("createdAt",       u.getCreatedAt());
+                    return info;
+                })
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(clients);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────

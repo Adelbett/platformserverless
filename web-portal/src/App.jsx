@@ -16,9 +16,11 @@ import Monitoring from './pages/Monitoring';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
 import Billing from './pages/Billing';
+import Team from './pages/Team';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ClusterManagement from './pages/admin/ClusterManagement';
 import AdminBilling from './pages/admin/AdminBilling';
+import AdminClients from './pages/admin/AdminClients';
 
 const ProtectedRoute = ({ children }) => {
     const { user, loading } = useAuth();
@@ -48,6 +50,14 @@ const AdminRoute = ({ children }) => {
     return children;
 };
 
+const ClientAdminRoute = ({ children }) => {
+    const { user, loading } = useAuth();
+    if (loading) return null;
+    if (!user) return <Navigate to="/login" replace />;
+    if (user.role !== 'CLIENT_ADMIN') return <Navigate to="/dashboard" replace />;
+    return children;
+};
+
 const AppRoutes = () => {
     return (
         <Routes>
@@ -71,6 +81,9 @@ const AppRoutes = () => {
                 <Route path="/logs" element={<LogsView />} />
                 <Route path="/monitoring" element={<Monitoring />} />
                 <Route path="/billing" element={<Billing />} />
+                <Route path="/team" element={
+                    <ClientAdminRoute><Team /></ClientAdminRoute>
+                } />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/users" element={<Users />} />
                 {/* Admin-only routes */}
@@ -85,6 +98,9 @@ const AppRoutes = () => {
                 } />
                 <Route path="/admin/users" element={
                     <AdminRoute><Users /></AdminRoute>
+                } />
+                <Route path="/admin/clients" element={
+                    <AdminRoute><AdminClients /></AdminRoute>
                 } />
             </Route>
 

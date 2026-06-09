@@ -8,11 +8,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -124,6 +124,12 @@ public class BillingService {
             appCostMap.merge(s.getAppId(), s.getTotalCost(), Double::sum);
             appMeta.putIfAbsent(s.getAppId(), s);
         }
+        // Collect deleted app ids for this user
+        Set<String> deletedAppIds = appRepository.findByUserId(userId).stream()
+                .filter(a -> "DELETED".equals(a.getStatus()))
+                .map(App::getId)
+                .collect(java.util.stream.Collectors.toSet());
+
         List<BillingHistoryResponse.AppCostEntry> perApp = appCostMap.entrySet().stream()
                 .map(e -> {
                     BillingSnapshot meta = appMeta.get(e.getKey());
@@ -133,6 +139,7 @@ public class BillingService {
                             .namespace(meta.getNamespace())
                             .mtdCost(e.getValue())
                             .projectedMonthly(projectMonthly(e.getValue()))
+                            .deleted(deletedAppIds.contains(e.getKey()))
                             .build();
                 })
                 .sorted(Comparator.comparingDouble(BillingHistoryResponse.AppCostEntry::getMtdCost).reversed())

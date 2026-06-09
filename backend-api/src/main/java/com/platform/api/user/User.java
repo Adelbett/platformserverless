@@ -30,6 +30,18 @@ public class User {
     @Builder.Default
     private String role = "VIEWER";
 
+    /**
+     * For DEVELOPER / VIEWER / BILLING_MANAGER members:
+     * points to the CLIENT_ADMIN user who created them.
+     * NULL for ADMIN and CLIENT_ADMIN themselves.
+     */
+    @Column(name = "owner_id")
+    private String ownerId;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean suspended = false;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

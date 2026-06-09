@@ -4,41 +4,45 @@ import {
     LayoutDashboard, Box, Rocket, Activity, Zap,
     Globe, Users, CreditCard, Settings,
     LogOut, ChevronLeft, ChevronRight, Hexagon,
-    Server, BarChart2, Terminal, DollarSign
+    Server, BarChart2, Terminal, DollarSign, UserPlus, Ban
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
+// roles that can see each nav item
+// allowedRoles: undefined = all authenticated, or array of roles
 const NAV_SECTIONS = [
     {
         label: 'Platform',
         items: [
-            { path: '/dashboard',  label: 'Dashboard',    icon: LayoutDashboard, clientOnly: true },
-            { path: '/apps',       label: 'Applications', icon: Box                               },
-            { path: '/apps/new',   label: 'Deploy',       icon: Rocket,          clientOnly: true },
-            { path: '/monitoring', label: 'Monitoring',   icon: Activity,        clientOnly: true },
-            { path: '/logs',       label: 'Logs',         icon: Terminal,        clientOnly: true },
+            { path: '/dashboard',  label: 'Dashboard',    icon: LayoutDashboard, clientOnly: true, allowedRoles: ['CLIENT_ADMIN','DEVELOPER','VIEWER'] },
+            { path: '/apps',       label: 'Applications', icon: Box,                               allowedRoles: ['CLIENT_ADMIN','DEVELOPER','VIEWER'] },
+            { path: '/apps/new',   label: 'Deploy',       icon: Rocket,          clientOnly: true, allowedRoles: ['CLIENT_ADMIN','DEVELOPER'] },
+            { path: '/monitoring', label: 'Monitoring',   icon: Activity,        clientOnly: true, allowedRoles: ['CLIENT_ADMIN','DEVELOPER'] },
+            { path: '/logs',       label: 'Logs',         icon: Terminal,        clientOnly: true, allowedRoles: ['CLIENT_ADMIN','DEVELOPER'] },
         ],
     },
     {
         label: 'Configure',
         items: [
-            { path: '/kafka',    label: 'Kafka Topics', icon: Zap,        clientOnly: true },
-            { path: '/eventing', label: 'Eventing',     icon: Globe,      clientOnly: true },
-            { path: '/billing',  label: 'Billing',      icon: CreditCard, clientOnly: true },
-            { path: '/settings', label: 'Settings',     icon: Settings                     },
+            { path: '/kafka',    label: 'Kafka Topics', icon: Zap,        clientOnly: true, allowedRoles: ['CLIENT_ADMIN','DEVELOPER'] },
+            { path: '/eventing', label: 'Eventing',     icon: Globe,      clientOnly: true, allowedRoles: ['CLIENT_ADMIN','DEVELOPER'] },
+            { path: '/billing',  label: 'Billing',      icon: CreditCard, clientOnly: true, allowedRoles: ['CLIENT_ADMIN','BILLING_MANAGER'] },
+            { path: '/team',     label: 'Team',         icon: UserPlus,   clientOnly: true, allowedRoles: ['CLIENT_ADMIN'] },
+            { path: '/settings', label: 'Settings',     icon: Settings,                    allowedRoles: ['CLIENT_ADMIN','DEVELOPER','VIEWER','BILLING_MANAGER'] },
         ],
     },
     {
         label: 'Admin',
         adminSection: true,
         items: [
-            { path: '/admin/dashboard', label: 'Overview',   icon: BarChart2, adminOnly: true },
-            { path: '/monitoring',      label: 'Monitoring', icon: Activity,  adminOnly: true },
-            { path: '/logs',            label: 'Logs',       icon: Terminal,  adminOnly: true },
-            { path: '/admin/users',     label: 'Users',      icon: Users,       adminOnly: true },
-            { path: '/admin/cluster',   label: 'Cluster',    icon: Server,      adminOnly: true },
-            { path: '/admin/billing',   label: 'Revenue',    icon: DollarSign,  adminOnly: true },
+            { path: '/admin/dashboard', label: 'Overview',   icon: BarChart2,  adminOnly: true },
+            { path: '/monitoring',      label: 'Monitoring', icon: Activity,   adminOnly: true },
+            { path: '/logs',            label: 'Logs',       icon: Terminal,   adminOnly: true },
+            { path: '/admin/users',     label: 'Users',      icon: Users,      adminOnly: true },
+            { path: '/admin/clients',   label: 'Clients',    icon: Ban,        adminOnly: true },
+            { path: '/admin/cluster',   label: 'Cluster',    icon: Server,     adminOnly: true },
+            { path: '/admin/billing',   label: 'Revenue',    icon: DollarSign, adminOnly: true },
         ],
     },
 ];
@@ -46,6 +50,7 @@ const NAV_SECTIONS = [
 const NavItem = ({ item, collapsed, user }) => {
     if (item.adminOnly && user?.role !== 'ADMIN') return null;
     if (item.clientOnly && user?.role === 'ADMIN') return null;
+    if (item.allowedRoles && !item.allowedRoles.includes(user?.role)) return null;
     const Icon = item.icon;
 
     return (
@@ -86,9 +91,11 @@ const Sidebar = ({ collapsed, onToggle }) => {
     const role     = user?.role || 'VIEWER';
 
     const roleStyle = {
-        ADMIN:     { color: '#EF4444', bg: 'rgba(239,68,68,0.12)'    },
-        DEVELOPER: { color: '#00D4FF', bg: 'rgba(0,212,255,0.10)'    },
-        VIEWER:    { color: '#9CA3AF', bg: 'rgba(156,163,175,0.10)'  },
+        ADMIN:           { color: '#EF4444', bg: 'rgba(239,68,68,0.12)'    },
+        CLIENT_ADMIN:    { color: '#3B82F6', bg: 'rgba(59,130,246,0.12)'   },
+        DEVELOPER:       { color: '#00D4FF', bg: 'rgba(0,212,255,0.10)'    },
+        VIEWER:          { color: '#9CA3AF', bg: 'rgba(156,163,175,0.10)'  },
+        BILLING_MANAGER: { color: '#F59E0B', bg: 'rgba(245,158,11,0.10)'   },
     }[role] || { color: '#9CA3AF', bg: 'rgba(156,163,175,0.10)' };
 
     const handleLogout = () => { logout(); navigate('/login'); };

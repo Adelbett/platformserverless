@@ -29,5 +29,6 @@ public class BillingHistoryResponse {
         private String namespace;
         private double mtdCost;
         private double projectedMonthly;
+        private boolean deleted; // true when the Knative service has been deleted
     }
 }

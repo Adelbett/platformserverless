@@ -341,6 +341,23 @@ const Dashboard = () => {
                 </button>
             </div>
 
+            {/* Suspension banner */}
+            {user?.suspended && (
+                <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.35)' }}
+                >
+                    <AlertTriangle size={18} color="#EF4444" style={{ flexShrink: 0 }} />
+                    <div>
+                        <p style={{ fontSize: 14, fontWeight: 700, color: '#FCA5A5', margin: '0 0 2px' }}>Votre compte est suspendu</p>
+                        <p style={{ fontSize: 12, color: '#F87171', margin: 0 }}>
+                            Vos services ne sont plus accessibles. Veuillez contacter le support pour régulariser votre situation.
+                        </p>
+                    </div>
+                </motion.div>
+            )}
+
             {/* Alert banner — shown only if apps failed */}
             {failedApps.length > 0 && (
                 <motion.div

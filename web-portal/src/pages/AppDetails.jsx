@@ -276,8 +276,6 @@ const AppDetails = () => {
     const [editOpen,   setEditOpen]   = useState(false);
     const [editForm,   setEditForm]   = useState({});
     const [editSaving, setEditSaving] = useState(false);
-    const [latencyHistory, setLatencyHistory] = useState([]);
-    const [errHistory,     setErrHistory]     = useState([]);
 
     const gridColor = dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)';
     const axisColor = dark ? '#4B5563' : '#94A3B8';
@@ -322,8 +320,6 @@ const AppDetails = () => {
                 const m = JSON.parse(e.data);
                 setMetrics(m);
                 const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                setLatencyHistory(h => [...h.slice(-47), { t, v: m.p50LatencyMs ?? 0 }]);
-                setErrHistory(h =>     [...h.slice(-47), { t, v: (m.errorRate ?? 0) * 100 }]);
             } catch {}
         };
         es.onerror = () => {
@@ -443,56 +439,6 @@ const AppDetails = () => {
                     if (diff < 86400) return `${Math.floor(diff/3600)}h`;
                     return `${Math.floor(diff/86400)}d`;
                 })() : '—'} color="#3B82F6" />
-            </div>
-
-            {/* Charts — real SSE data */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-                <div className="ns-card" style={{ padding: 20 }}>
-                    <h3 style={{ fontSize: 14, fontWeight: 800, fontFamily: "'Outfit', sans-serif", margin: '0 0 3px' }} className="text-primary">Latency over time</h3>
-                    <p style={{ fontSize: 11, color: '#9CA3AF', margin: '0 0 16px' }}>P50 · live (updates every 5s)</p>
-                    {latencyHistory.length === 0 ? (
-                        <div style={{ height: 130, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4B5563', fontSize: 12 }}>Waiting for data…</div>
-                    ) : (
-                        <ResponsiveContainer width="100%" height={130}>
-                            <AreaChart data={latencyHistory} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="gLat" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor="#00D4FF" stopOpacity={0.2} />
-                                        <stop offset="100%" stopColor="#00D4FF" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                                <XAxis dataKey="t" tick={{ fill: axisColor, fontSize: 9 }} axisLine={false} tickLine={false} interval={11} />
-                                <YAxis tick={{ fill: axisColor, fontSize: 9 }} axisLine={false} tickLine={false} tickFormatter={v => `${v.toFixed(0)}ms`} />
-                                <Tooltip formatter={v => [`${v.toFixed(1)}ms`, 'P50 Latency']} contentStyle={{ background: '#111827', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, fontSize: 11 }} />
-                                <Area type="monotone" dataKey="v" stroke="#00D4FF" strokeWidth={2} fill="url(#gLat)" dot={false} />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    )}
-                </div>
-                <div className="ns-card" style={{ padding: 20 }}>
-                    <h3 style={{ fontSize: 14, fontWeight: 800, fontFamily: "'Outfit', sans-serif", margin: '0 0 3px' }} className="text-primary">Error Rate</h3>
-                    <p style={{ fontSize: 11, color: '#9CA3AF', margin: '0 0 16px' }}>% of requests · live (updates every 5s)</p>
-                    {errHistory.length === 0 ? (
-                        <div style={{ height: 130, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4B5563', fontSize: 12 }}>Waiting for data…</div>
-                    ) : (
-                        <ResponsiveContainer width="100%" height={130}>
-                            <AreaChart data={errHistory} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="gErr" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor="#EF4444" stopOpacity={0.2} />
-                                        <stop offset="100%" stopColor="#EF4444" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                                <XAxis dataKey="t" tick={{ fill: axisColor, fontSize: 9 }} axisLine={false} tickLine={false} interval={11} />
-                                <YAxis tick={{ fill: axisColor, fontSize: 9 }} axisLine={false} tickLine={false} tickFormatter={v => `${v.toFixed(1)}%`} />
-                                <Tooltip formatter={v => [`${v.toFixed(2)}%`, 'Error Rate']} contentStyle={{ background: '#111827', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, fontSize: 11 }} />
-                                <Area type="monotone" dataKey="v" stroke="#EF4444" strokeWidth={2} fill="url(#gErr)" dot={false} />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    )}
-                </div>
             </div>
 
             {/* Replica slider */}

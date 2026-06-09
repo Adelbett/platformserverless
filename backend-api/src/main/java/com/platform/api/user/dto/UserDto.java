@@ -16,5 +16,7 @@ public class UserDto {
     private String username;
     private String email;
     private String role;
+    private String ownerId;
+    private boolean suspended;
     private LocalDateTime createdAt;
 }
