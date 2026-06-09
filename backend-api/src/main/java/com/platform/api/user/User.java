@@ -38,7 +38,7 @@ public class User {
     @Column(name = "owner_id")
     private String ownerId;
 
-    @Column(nullable = false)
+    @Column(columnDefinition = "boolean default false")
     @Builder.Default
     private boolean suspended = false;
 
