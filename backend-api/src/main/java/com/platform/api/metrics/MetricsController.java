@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -18,6 +19,7 @@ import java.util.concurrent.Executors;
 @RequiredArgsConstructor
 @Tag(name = "Metrics", description = "Prometheus metrics for apps and the cluster")
 @SecurityRequirement(name = "bearerAuth")
+@PreAuthorize("@permissionService.has(authentication.name, 'VIEW_MONITORING')")
 public class MetricsController {
 
     private final MetricsService metricsService;

@@ -197,7 +197,7 @@ const Settings = () => {
     const username = user?.username || 'user';
     const email    = user?.email || '';
     const initials = username.slice(0, 2).toUpperCase();
-    const role     = user?.role || 'DEVELOPER';
+    const role     = user?.role || 'MEMBER';
 
     // Password change state
     const [pwForm, setPwForm]   = useState({ current: '', next: '', confirm: '' });
@@ -232,7 +232,7 @@ const Settings = () => {
         setPwForm({ current: '', next: '', confirm: '' });
     };
 
-    const roleColor = { ADMIN: '#EF4444', DEVELOPER: '#00D4FF', VIEWER: '#9CA3AF' }[role] || '#00D4FF';
+    const roleColor = { ADMIN: '#EF4444', CLIENT_ADMIN: '#3B82F6', MEMBER: '#00D4FF' }[role] || '#00D4FF';
 
     return (
         <div style={{ maxWidth: 760, display: 'flex', flexDirection: 'column', gap: 20, paddingBottom: 40 }}>

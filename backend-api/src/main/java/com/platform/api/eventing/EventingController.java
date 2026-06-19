@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,6 +29,7 @@ public class EventingController {
     // ── KafkaSources ─────────────────────────────────────────────────
 
     @PostMapping("/sources")
+    @PreAuthorize("@permissionService.has(authentication.name, 'MANAGE_EVENTING')")
     @Operation(summary = "Create a KafkaSource")
     public ResponseEntity<KafkaSourceDto> createSource(@RequestBody Map<String, String> body,
                                                         Authentication auth) {
@@ -50,6 +52,7 @@ public class EventingController {
     // ── Triggers ──────────────────────────────────────────────────────
 
     @PostMapping("/triggers")
+    @PreAuthorize("@permissionService.has(authentication.name, 'MANAGE_EVENTING')")
     @Operation(summary = "Create a Trigger")
     public ResponseEntity<Void> createTrigger(@RequestBody Map<String, String> body,
                                                Authentication auth) {
@@ -63,6 +66,7 @@ public class EventingController {
     }
 
     @DeleteMapping("/triggers/{id}")
+    @PreAuthorize("@permissionService.has(authentication.name, 'MANAGE_EVENTING')")
     @Operation(summary = "Delete a Trigger")
     public ResponseEntity<Void> deleteTrigger(@PathVariable String id, Authentication auth) {
         triggerRepository.findById(id).ifPresent(t -> {

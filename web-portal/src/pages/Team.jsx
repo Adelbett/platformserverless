@@ -1,20 +1,26 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Plus, Trash2, Edit2, X, Check, Shield } from 'lucide-react';
+import { Users, Plus, Trash2, X, Check, Shield, Settings } from 'lucide-react';
 import { teamApi } from '../api';
 import { useTheme } from '../context/ThemeContext';
 
-const ROLES = ['DEVELOPER', 'VIEWER', 'BILLING_MANAGER'];
+const MEMBER_COLOR = { color: '#00D4FF', bg: 'rgba(0,212,255,0.12)' };
 
-const ROLE_COLOR = {
-    DEVELOPER:       { color: '#3B82F6', bg: 'rgba(59,130,246,0.12)' },
-    VIEWER:          { color: '#6B7280', bg: 'rgba(107,114,128,0.12)' },
-    BILLING_MANAGER: { color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
-};
+// ── Granular feature permissions for MEMBER accounts ────────────────────────────
+const PERMISSIONS = [
+    { key: 'DEPLOY_APP',      label: 'Déployer une application' },
+    { key: 'DELETE_APP',      label: 'Supprimer une application' },
+    { key: 'MANAGE_KAFKA',    label: 'Gérer Kafka (créer/supprimer topics)' },
+    { key: 'MANAGE_EVENTING', label: 'Gérer Eventing (KafkaSource / Triggers)' },
+    { key: 'VIEW_LOGS',       label: 'Voir les logs' },
+    { key: 'VIEW_MONITORING', label: 'Voir le monitoring' },
+    { key: 'VIEW_BILLING',    label: 'Consulter la facturation' },
+    { key: 'EXPORT_BILLING',  label: 'Exporter le rapport Excel' },
+];
 
 // ── Add Member Modal ───────────────────────────────────────────────────────────
 const AddModal = ({ onClose, onAdded }) => {
-    const [form, setForm] = useState({ username: '', email: '', password: '', role: 'DEVELOPER' });
+    const [form, setForm] = useState({ username: '', email: '', password: '' });
     const [saving, setSaving] = useState(false);
     const [error, setError]   = useState('');
 
@@ -39,8 +45,11 @@ const AddModal = ({ onClose, onAdded }) => {
                     background: 'none', border: 'none', color: '#475569', cursor: 'pointer' }}>
                     <X size={18} />
                 </button>
-                <h2 style={{ fontSize: 16, fontWeight: 800, color: '#F1F5F9', margin: '0 0 20px',
+                <h2 style={{ fontSize: 16, fontWeight: 800, color: '#F1F5F9', margin: '0 0 4px',
                     fontFamily: "'Outfit', sans-serif" }}>Add Team Member</h2>
+                <p style={{ fontSize: 11.5, color: '#64748B', margin: '0 0 20px' }}>
+                    Created with role MEMBER — set their permissions afterwards
+                </p>
 
                 {[
                     { key: 'username', label: 'Username', type: 'text' },
@@ -58,19 +67,9 @@ const AddModal = ({ onClose, onAdded }) => {
                     </div>
                 ))}
 
-                <div style={{ marginBottom: 20 }}>
-                    <label style={{ fontSize: 11, color: '#64748B', display: 'block', marginBottom: 5,
-                        textTransform: 'uppercase', letterSpacing: '0.08em' }}>Role</label>
-                    <select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))}
-                        style={{ width: '100%', background: '#0F172A', border: '1px solid rgba(255,255,255,0.1)',
-                            borderRadius: 8, padding: '9px 12px', color: '#F1F5F9', fontSize: 13 }}>
-                        {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                </div>
-
                 {error && <p style={{ color: '#EF4444', fontSize: 12, marginBottom: 12 }}>{error}</p>}
 
-                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 6 }}>
                     <button onClick={onClose} style={{ padding: '9px 18px', borderRadius: 8,
                         border: '1px solid rgba(255,255,255,0.1)', background: 'transparent',
                         color: '#94A3B8', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
@@ -86,78 +85,137 @@ const AddModal = ({ onClose, onAdded }) => {
     );
 };
 
-// ── Member Row ────────────────────────────────────────────────────────────────
-const MemberRow = ({ member, onRoleChange, onRemove }) => {
-    const [editing, setEditing] = useState(false);
-    const [role, setRole]       = useState(member.role);
-    const [saving, setSaving]   = useState(false);
+// ── Permissions Modal ───────────────────────────────────────────────────────────
+const PermissionsModal = ({ member, onClose, onSaved, dark }) => {
+    const [draft, setDraft]   = useState(new Set(member.permissions || []));
+    const [saving, setSaving] = useState(false);
 
-    const saveRole = async () => {
-        if (role === member.role) { setEditing(false); return; }
-        setSaving(true);
-        try {
-            await teamApi.changeRole(member.id, role);
-            onRoleChange(member.id, role);
-        } finally { setSaving(false); setEditing(false); }
+    const toggle = (key) => {
+        setDraft(prev => {
+            const next = new Set(prev);
+            next.has(key) ? next.delete(key) : next.add(key);
+            return next;
+        });
     };
 
-    const rc = ROLE_COLOR[member.role] || ROLE_COLOR.VIEWER;
+    const save = async () => {
+        setSaving(true);
+        try {
+            const res = await teamApi.updatePermissions(member.id, Array.from(draft));
+            onSaved(member.id, res.data.permissions);
+            onClose();
+        } catch (e) {
+            console.error('Failed to update permissions', e);
+        } finally { setSaving(false); }
+    };
 
     return (
-        <motion.tr initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}
-            style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.025)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-            <td style={{ padding: '13px 16px' }}>
-                <p style={{ fontSize: 13, fontWeight: 700, color: '#F1F5F9', margin: 0 }}>{member.username}</p>
-                <p style={{ fontSize: 11, color: '#475569', margin: '2px 0 0' }}>{member.email}</p>
-            </td>
-            <td style={{ padding: '13px 16px' }}>
-                {editing ? (
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <select value={role} onChange={e => setRole(e.target.value)}
-                            style={{ background: '#0F172A', border: '1px solid rgba(255,255,255,0.12)',
-                                borderRadius: 6, padding: '4px 8px', color: '#F1F5F9', fontSize: 12 }}>
-                            {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                        </select>
-                        <button onClick={saveRole} disabled={saving}
-                            style={{ background: '#10B981', border: 'none', borderRadius: 6,
-                                padding: '4px 8px', cursor: 'pointer', color: '#fff' }}>
-                            <Check size={12} />
-                        </button>
-                        <button onClick={() => { setRole(member.role); setEditing(false); }}
-                            style={{ background: 'rgba(255,255,255,0.06)', border: 'none',
-                                borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#94A3B8' }}>
-                            <X size={12} />
-                        </button>
+        <div
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000,
+                display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            onClick={() => !saving && onClose()}
+        >
+            <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+                onClick={e => e.stopPropagation()}
+                style={{ background: '#0F172A', border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 16, width: 460, maxWidth: '90vw', overflow: 'hidden' }}
+            >
+                <div style={{ padding: '18px 22px', borderBottom: '1px solid rgba(255,255,255,0.08)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                        <h3 style={{ fontSize: 15, fontWeight: 800, color: '#F1F5F9', margin: 0 }}>
+                            Permissions — {member.username}
+                        </h3>
+                        <p style={{ fontSize: 11.5, margin: '3px 0 0', color: '#64748B' }}>
+                            Contrôle individuel des fonctionnalités autorisées
+                        </p>
                     </div>
-                ) : (
-                    <span style={{ fontSize: 11, fontWeight: 700, color: rc.color,
-                        background: rc.bg, padding: '3px 10px', borderRadius: 999 }}>
-                        {member.role}
-                    </span>
-                )}
-            </td>
-            <td style={{ padding: '13px 16px', fontSize: 11, color: '#475569' }}>
-                {member.createdAt ? new Date(member.createdAt).toLocaleDateString() : '—'}
-            </td>
-            <td style={{ padding: '13px 16px', textAlign: 'right' }}>
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                    <button onClick={() => setEditing(true)}
-                        style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)',
-                            borderRadius: 7, padding: '6px 10px', cursor: 'pointer', color: '#3B82F6' }}>
-                        <Edit2 size={13} />
-                    </button>
-                    <button onClick={() => onRemove(member.id)}
-                        style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)',
-                            borderRadius: 7, padding: '6px 10px', cursor: 'pointer', color: '#EF4444' }}>
-                        <Trash2 size={13} />
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', padding: 4 }}>
+                        <X size={16} />
                     </button>
                 </div>
-            </td>
-        </motion.tr>
+
+                <div style={{ padding: '14px 22px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {PERMISSIONS.map(p => {
+                        const checked = draft.has(p.key);
+                        return (
+                            <label key={p.key}
+                                style={{ display: 'flex', alignItems: 'center', gap: 12,
+                                    padding: '10px 8px', borderRadius: 8, cursor: 'pointer' }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                            >
+                                <span style={{
+                                    width: 18, height: 18, borderRadius: 5, flexShrink: 0,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    border: `1.5px solid ${checked ? '#00D4FF' : '#475569'}`,
+                                    background: checked ? '#00D4FF' : 'transparent',
+                                }}>
+                                    {checked && <Check size={12} color="#07090E" strokeWidth={3} />}
+                                </span>
+                                <input type="checkbox" checked={checked} onChange={() => toggle(p.key)} style={{ display: 'none' }} />
+                                <span style={{ fontSize: 13, fontWeight: 600, color: '#F1F5F9' }}>{p.label}</span>
+                            </label>
+                        );
+                    })}
+                </div>
+
+                <div style={{ padding: '14px 22px', borderTop: '1px solid rgba(255,255,255,0.08)',
+                    display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                    <button onClick={onClose} disabled={saving}
+                        style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)',
+                            background: 'transparent', color: '#94A3B8', cursor: 'pointer', fontSize: 12.5 }}>
+                        Annuler
+                    </button>
+                    <button onClick={save} disabled={saving}
+                        style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#3B82F6',
+                            color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 12.5,
+                            display: 'flex', alignItems: 'center', gap: 6, opacity: saving ? 0.6 : 1 }}>
+                        <Check size={13} /> {saving ? 'Sauvegarde…' : 'Sauvegarder'}
+                    </button>
+                </div>
+            </motion.div>
+        </div>
     );
 };
+
+// ── Member Row ────────────────────────────────────────────────────────────────
+const MemberRow = ({ member, onRemove, onManagePermissions }) => (
+    <motion.tr initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.025)'}
+        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+        <td style={{ padding: '13px 16px' }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: '#F1F5F9', margin: 0 }}>{member.username}</p>
+            <p style={{ fontSize: 11, color: '#475569', margin: '2px 0 0' }}>{member.email}</p>
+        </td>
+        <td style={{ padding: '13px 16px' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: MEMBER_COLOR.color,
+                background: MEMBER_COLOR.bg, padding: '3px 10px', borderRadius: 999 }}>
+                MEMBER
+            </span>
+        </td>
+        <td style={{ padding: '13px 16px', fontSize: 11, color: '#475569' }}>
+            {member.createdAt ? new Date(member.createdAt).toLocaleDateString() : '—'}
+        </td>
+        <td style={{ padding: '13px 16px', textAlign: 'right' }}>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button onClick={() => onManagePermissions(member)}
+                    style={{ background: 'rgba(0,212,255,0.1)', border: '1px solid rgba(0,212,255,0.25)',
+                        borderRadius: 7, padding: '6px 10px', cursor: 'pointer', color: '#00D4FF',
+                        display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 700 }}>
+                    <Settings size={13} /> Permissions
+                </button>
+                <button onClick={() => onRemove(member.id)}
+                    style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)',
+                        borderRadius: 7, padding: '6px 10px', cursor: 'pointer', color: '#EF4444' }}>
+                    <Trash2 size={13} />
+                </button>
+            </div>
+        </td>
+    </motion.tr>
+);
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 const Team = () => {
@@ -165,6 +223,7 @@ const Team = () => {
     const [members, setMembers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showAdd, setShowAdd] = useState(false);
+    const [permMember, setPermMember] = useState(null);
 
     const load = async () => {
         setLoading(true);
@@ -176,9 +235,10 @@ const Team = () => {
 
     useEffect(() => { load(); }, []);
 
-    const handleAdded   = (m)          => setMembers(p => [...p, m]);
-    const handleRole    = (id, role)    => setMembers(p => p.map(m => m.id === id ? { ...m, role } : m));
-    const handleRemove  = async (id)   => {
+    const handleAdded  = (m)        => setMembers(p => [...p, m]);
+    const handlePermsSaved = (id, permissions) =>
+        setMembers(p => p.map(m => m.id === id ? { ...m, permissions } : m));
+    const handleRemove = async (id) => {
         if (!window.confirm('Remove this member?')) return;
         await teamApi.removeMember(id);
         setMembers(p => p.filter(m => m.id !== id));
@@ -207,22 +267,15 @@ const Team = () => {
 
             {/* Role legend */}
             <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
-                {[
-                    { role: 'DEVELOPER',       desc: 'Deploy, logs, metrics, Kafka' },
-                    { role: 'VIEWER',           desc: 'Read-only access' },
-                    { role: 'BILLING_MANAGER',  desc: 'Billing page only' },
-                ].map(({ role, desc }) => {
-                    const rc = ROLE_COLOR[role];
-                    return (
-                        <div key={role} style={{ display: 'flex', alignItems: 'center', gap: 7,
-                            background: rc.bg, border: `1px solid ${rc.color}30`,
-                            borderRadius: 8, padding: '6px 12px' }}>
-                            <Shield size={11} color={rc.color} />
-                            <span style={{ fontSize: 11, fontWeight: 700, color: rc.color }}>{role}</span>
-                            <span style={{ fontSize: 11, color: '#475569' }}>— {desc}</span>
-                        </div>
-                    );
-                })}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7,
+                    background: MEMBER_COLOR.bg, border: `1px solid ${MEMBER_COLOR.color}30`,
+                    borderRadius: 8, padding: '6px 12px' }}>
+                    <Shield size={11} color={MEMBER_COLOR.color} />
+                    <span style={{ fontSize: 11, fontWeight: 700, color: MEMBER_COLOR.color }}>MEMBER</span>
+                    <span style={{ fontSize: 11, color: '#475569' }}>
+                        — Deploy, logs, metrics, Kafka, Eventing, billing — chaque case est activable individuellement
+                    </span>
+                </div>
             </div>
 
             {/* Table */}
@@ -253,7 +306,7 @@ const Team = () => {
                             </td></tr>
                         ) : members.map(m => (
                             <MemberRow key={m.id} member={m}
-                                onRoleChange={handleRole} onRemove={handleRemove} />
+                                onRemove={handleRemove} onManagePermissions={setPermMember} />
                         ))}
                     </tbody>
                 </table>
@@ -261,6 +314,14 @@ const Team = () => {
 
             <AnimatePresence>
                 {showAdd && <AddModal onClose={() => setShowAdd(false)} onAdded={handleAdded} />}
+                {permMember && (
+                    <PermissionsModal
+                        member={permMember}
+                        dark={dark}
+                        onClose={() => setPermMember(null)}
+                        onSaved={handlePermsSaved}
+                    />
+                )}
             </AnimatePresence>
         </div>
     );

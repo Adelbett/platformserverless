@@ -19,8 +19,4 @@ public class AddMemberRequest {
     @NotBlank
     @Size(min = 8)
     private String password;
-
-    /** DEVELOPER | VIEWER | BILLING_MANAGER */
-    @NotBlank
-    private String role;
 }

@@ -1,23 +1,25 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Shield, UserCheck, Eye, RefreshCw, Users as UsersIcon, AlertCircle } from 'lucide-react';
+import { Shield, UserCheck, RefreshCw, Users as UsersIcon, AlertCircle } from 'lucide-react';
 import { usersApi } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
 // ── Role config ────────────────────────────────────────────────────────────────
+// Global platform roles only. Per-member feature permissions (deploy, billing,
+// Kafka, etc.) are managed by each CLIENT_ADMIN on their own team — see /team.
 
-const ROLES = ['ADMIN', 'DEVELOPER', 'VIEWER'];
+const ROLES = ['ADMIN', 'CLIENT_ADMIN', 'MEMBER'];
 
 const ROLE_META = {
-    ADMIN:     { color: '#EF4444', bg: 'rgba(239,68,68,0.12)',    icon: Shield,    desc: 'Full platform access'           },
-    DEVELOPER: { color: '#00D4FF', bg: 'rgba(0,212,255,0.10)',    icon: UserCheck, desc: 'Deploy & manage own services'   },
-    VIEWER:    { color: '#9CA3AF', bg: 'rgba(156,163,175,0.10)', icon: Eye,       desc: 'Read-only access'               },
+    ADMIN:        { color: '#EF4444', bg: 'rgba(239,68,68,0.12)',  icon: Shield,    desc: 'Full platform access'        },
+    CLIENT_ADMIN: { color: '#3B82F6', bg: 'rgba(59,130,246,0.12)', icon: UserCheck, desc: 'Manages their own team'      },
+    MEMBER:       { color: '#00D4FF', bg: 'rgba(0,212,255,0.10)',  icon: UserCheck, desc: 'Deploys within their team'   },
 };
 
 const RoleBadge = ({ role }) => {
-    const m = ROLE_META[role] || ROLE_META.VIEWER;
+    const m = ROLE_META[role] || ROLE_META.MEMBER;
     return (
         <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 5,
@@ -89,7 +91,7 @@ const Users = () => {
                         Team & Access
                     </h2>
                     <p style={{ fontSize: 12, margin: '4px 0 0' }} className="text-secondary">
-                        Manage user roles — ADMIN only
+                        Global platform roles — ADMIN only. Per-member feature permissions are managed on the Team page by each CLIENT_ADMIN.
                     </p>
                 </div>
                 <button className="btn-ghost" onClick={load} disabled={loading} style={{ fontSize: 12 }}>
@@ -201,7 +203,7 @@ const Users = () => {
 
                                     {/* Current role badge */}
                                     <td style={{ padding: '13px 20px', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
-                                        <RoleBadge role={u.role || 'VIEWER'} />
+                                        <RoleBadge role={u.role || 'MEMBER'} />
                                     </td>
 
                                     {/* Joined date */}
@@ -217,14 +219,14 @@ const Users = () => {
                                             <RefreshCw size={14} style={{ color: '#9CA3AF', animation: 'spin 1s linear infinite' }} />
                                         ) : (
                                             <select
-                                                value={u.role || 'VIEWER'}
+                                                value={u.role || 'MEMBER'}
                                                 onChange={e => handleRoleChange(u.id, e.target.value)}
                                                 style={{
                                                     padding: '5px 10px', borderRadius: 7, fontSize: 12, fontWeight: 700,
                                                     fontFamily: "'JetBrains Mono', monospace",
-                                                    border: `1px solid ${ROLE_META[u.role || 'VIEWER']?.color || '#9CA3AF'}40`,
+                                                    border: `1px solid ${ROLE_META[u.role || 'MEMBER']?.color || '#9CA3AF'}40`,
                                                     background: dark ? '#1F2937' : '#F8FAFC',
-                                                    color: ROLE_META[u.role || 'VIEWER']?.color || '#9CA3AF',
+                                                    color: ROLE_META[u.role || 'MEMBER']?.color || '#9CA3AF',
                                                     cursor: 'pointer',
                                                 }}
                                             >

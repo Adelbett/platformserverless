@@ -15,7 +15,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/team")
@@ -44,16 +44,6 @@ public class TeamController {
         return ResponseEntity.ok(teamService.addMember(ownerId, req));
     }
 
-    @PatchMapping("/members/{id}/role")
-    @PreAuthorize("hasRole('CLIENT_ADMIN')")
-    @Operation(summary = "Change a member's role")
-    public ResponseEntity<UserDto> changeRole(@PathVariable String id,
-                                              @RequestBody Map<String, String> body,
-                                              Authentication auth) {
-        String ownerId = resolveId(auth);
-        return ResponseEntity.ok(teamService.changeRole(ownerId, id, body.get("role")));
-    }
-
     @DeleteMapping("/members/{id}")
     @PreAuthorize("hasRole('CLIENT_ADMIN')")
     @Operation(summary = "Remove a member from my team")
@@ -61,6 +51,16 @@ public class TeamController {
         String ownerId = resolveId(auth);
         teamService.removeMember(ownerId, id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/members/{id}/permissions")
+    @PreAuthorize("hasRole('CLIENT_ADMIN')")
+    @Operation(summary = "Set a DEVELOPER member's granular feature permissions")
+    public ResponseEntity<UserDto> updatePermissions(@PathVariable String id,
+                                                      @RequestBody Set<String> permissions,
+                                                      Authentication auth) {
+        String ownerId = resolveId(auth);
+        return ResponseEntity.ok(teamService.updatePermissions(ownerId, id, permissions));
     }
 
     // resolve the DB id of the authenticated CLIENT_ADMIN from their username

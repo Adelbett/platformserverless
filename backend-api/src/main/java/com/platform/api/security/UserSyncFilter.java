@@ -47,13 +47,13 @@ public class UserSyncFilter extends OncePerRequestFilter {
                     }
 
                     // Derive role from Keycloak realm_access.roles
-                    String role = "VIEWER";
+                    String role = "MEMBER";
                     Object realmAccess = jwt.getClaims().get("realm_access");
                     if (realmAccess instanceof Map<?, ?> map) {
                         Object roles = map.get("roles");
                         if (roles instanceof List<?> list) {
                             if (list.contains("admin") || list.contains("ADMIN")) role = "ADMIN";
-                            else if (list.contains("developer") || list.contains("DEVELOPER")) role = "DEVELOPER";
+                            else if (list.contains("client_admin") || list.contains("CLIENT_ADMIN")) role = "CLIENT_ADMIN";
                         }
                     }
 

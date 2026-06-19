@@ -7,9 +7,9 @@ import org.springframework.stereotype.Service;
 /**
  * Resolves the effective userId and namespace for any authenticated user.
  *
- * - CLIENT_ADMIN  → uses their own id and namespace
- * - DEVELOPER / VIEWER / BILLING_MANAGER → delegates to their CLIENT_ADMIN's id/namespace
- * - ADMIN → uses their own id (no namespace isolation)
+ * - CLIENT_ADMIN → uses their own id and namespace
+ * - MEMBER       → delegates to their CLIENT_ADMIN's id/namespace
+ * - ADMIN        → uses their own id (no namespace isolation)
  */
 @Service
 @RequiredArgsConstructor

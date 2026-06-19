@@ -190,36 +190,26 @@ const ROLE_IDEAS = {
             { icon: Globe,    label: 'Eventing',          desc: 'KafkaSources, Triggers, Brokers',              path: '/eventing'   },
         ],
     },
-    DEVELOPER: {
+    MEMBER: {
         color: '#00D4FF', bg: 'rgba(0,212,255,0.06)', border: 'rgba(0,212,255,0.18)',
-        title: 'Developer — Build & Ship',
-        subtitle: 'Deploy and operate your services',
+        title: 'Member — Build & Ship',
+        subtitle: 'Deploy and operate the services you have access to',
         ideas: [
-            { icon: Rocket,   label: 'Deploy Service',    desc: 'Push a Docker image and get a live URL',       path: '/apps/new'   },
-            { icon: Activity, label: 'Monitor Apps',      desc: 'Live metrics: req/sec, latency, error rate',   path: '/monitoring' },
+            { icon: Rocket,   label: 'Deploy Service',     desc: 'Push a Docker image and get a live URL',       path: '/apps/new'   },
+            { icon: Activity, label: 'Monitor Apps',       desc: 'Live metrics: req/sec, latency, error rate',   path: '/monitoring' },
             { icon: Zap,      label: 'Create Kafka Topic', desc: 'Set up event streaming for your services',    path: '/kafka'      },
-            { icon: Terminal, label: 'View Logs',         desc: 'Deployment and runtime logs for your apps',    path: '/logs'       },
-        ],
-    },
-    VIEWER: {
-        color: '#9CA3AF', bg: 'rgba(156,163,175,0.06)', border: 'rgba(156,163,175,0.18)',
-        title: 'Viewer — Read Only',
-        subtitle: 'Explore the platform and observe services',
-        ideas: [
-            { icon: Box,      label: 'Browse Apps',       desc: 'All running services and their live URLs',     path: '/apps'       },
-            { icon: Activity, label: 'Check Metrics',     desc: 'Req/sec, latency and error rates per service', path: '/monitoring' },
-            { icon: KeyRound, label: 'Explore Logs',      desc: 'Deployment and runtime logs',                  path: '/logs'       },
-            { icon: Globe,    label: 'Event Pipelines',   desc: 'Explore the Kafka eventing topology',          path: '/eventing'   },
+            { icon: Terminal, label: 'View Logs',          desc: 'Deployment and runtime logs for your apps',    path: '/logs'       },
+            { icon: KeyRound, label: 'Check Billing',      desc: 'Your cost breakdown and Excel export',         path: '/billing'    },
         ],
     },
 };
 
 const RoleIdeasCard = ({ role, navigate }) => {
-    const cfg = ROLE_IDEAS[role] || ROLE_IDEAS.VIEWER;
+    const cfg = ROLE_IDEAS[role] || ROLE_IDEAS.MEMBER;
     return (
         <div className="ns-card" style={{ padding: 24, border: `1px solid ${cfg.border}`, background: cfg.bg }}>
             <div style={{ marginBottom: 16 }}>
-                <span style={{ display: 'inline-block', fontSize: 9, fontWeight: 800, letterSpacing: '0.15em', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", padding: '3px 8px', borderRadius: 4, marginBottom: 8, color: cfg.color, background: `${cfg.color}18` }}>{role || 'VIEWER'}</span>
+                <span style={{ display: 'inline-block', fontSize: 9, fontWeight: 800, letterSpacing: '0.15em', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", padding: '3px 8px', borderRadius: 4, marginBottom: 8, color: cfg.color, background: `${cfg.color}18` }}>{role || 'MEMBER'}</span>
                 <h3 style={{ fontSize: 15, fontWeight: 900, fontFamily: "'Outfit', sans-serif", margin: '0 0 4px' }} className="text-primary">{cfg.title}</h3>
                 <p style={{ fontSize: 12, margin: 0, color: '#9CA3AF' }}>{cfg.subtitle}</p>
             </div>

@@ -28,7 +28,7 @@ public class BillingController {
 
     // ── Client: get my billing history ──────────────────────────────────────────
     @GetMapping("/me")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("@permissionService.has(authentication.name, 'VIEW_BILLING')")
     public ResponseEntity<BillingHistoryResponse> getMyBilling(
             @AuthenticationPrincipal Jwt jwt) {
         String username = jwt.getSubject();
@@ -52,7 +52,7 @@ public class BillingController {
 
     // ── Export Excel billing report ──────────────────────────────────────────────
     @GetMapping("/export")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("@permissionService.has(authentication.name, 'EXPORT_BILLING')")
     public ResponseEntity<byte[]> exportExcel(Authentication auth) throws Exception {
         UserContextService.UserContext ctx = userContextService.resolve(auth.getName());
         byte[] data = exportService.exportExcel(ctx.effectiveUserId());

@@ -1,0 +1,453 @@
+@startuml PlatformServerlessArchitecture
+
+!define ABSTRACT abstract
+!define ENTITY entity
+
+skinparam backgroundColor #FFFFFF
+skinparam classBackgroundColor #F0F0F0
+skinparam classBorderColor #333333
+skinparam arrowColor #333333
+skinparam linetype ortho
+
+' ═════════════════════════════════════════════════════════════════════════════
+' DOMAIN ENTITIES (JPA)
+' ═════════════════════════════════════════════════════════════════════════════
+
+class User {
+  +String id (UUID)
+  +String username
+  +String email
+  +String role (ENUM)
+  +String ownerId (for team members)
+  +boolean suspended
+  +LocalDateTime createdAt
+}
+
+class App {
+  +String id (UUID)
+  +String name
+  +String userId (FK)
+  +String imageName
+  +String imageTag
+  +String url
+  +String status (DEPLOYING|RUNNING|FAILED|etc)
+  +String serviceName (Knative)
+  +String namespace
+  +Integer port
+  +Integer minReplicas
+  +Integer maxReplicas
+  +String cpuRequest
+  +String memoryRequest
+  +LocalDateTime deployedAt
+  +LocalDateTime updatedAt
+}
+
+class KafkaTopic {
+  +String id (UUID)
+  +String name (unique)
+  +Integer partitions
+  +Integer replicas
+  +String userId
+  +String config (JSON)
+  +LocalDateTime createdAt
+}
+
+class KafkaSource {
+  +String id (UUID)
+  +String name
+  +String userId
+  +String kafkaTopicId (FK)
+  +String consumerGroup
+  +String bootstrapServers
+  +String namespace
+  +Boolean ready
+  +LocalDateTime createdAt
+}
+
+class Trigger {
+  +String id (UUID)
+  +String name
+  +String userId
+  +String kafkaSourceId (FK)
+  +String subscriberName
+  +String brokerName
+  +String filter (event type)
+  +String action (target URL)
+  +Boolean active
+  +LocalDateTime createdAt
+}
+
+class Metric {
+  +String id (UUID)
+  +String appId (FK)
+  +String userId
+  +Double cpu
+  +Double memory
+  +Double requests
+  +Double latencyP95
+  +Double errorRate
+  +LocalDateTime timestamp
+}
+
+class BillingSnapshot {
+  +String id (UUID)
+  +String userId
+  +String appId (FK)
+  +String serviceName
+  +double cpuVcpu
+  +double memoryGb
+  +int replicas
+  +double uptimeFactor (1.0|0.2|0.0)
+  +double totalCost
+  +LocalDateTime snapshotTime
+}
+
+class DeploymentLog {
+  +String id (UUID)
+  +String appId (FK)
+  +String appName
+  +String userId
+  +String message (TEXT)
+  +String type (DEPLOYMENT_START|SUCCESS|FAIL)
+  +LocalDateTime createdAt
+}
+
+enum UserRole {
+  ADMIN
+  CLIENT_ADMIN
+  DEVELOPER
+  VIEWER
+  BILLING_MANAGER
+}
+
+' ═════════════════════════════════════════════════════════════════════════════
+' REPOSITORIES (Data Access)
+' ═════════════════════════════════════════════════════════════════════════════
+
+interface UserRepository {
+  + findByUsername(String)
+  + findByOwnerId(String)
+  + existsByEmail(String)
+}
+
+interface AppRepository {
+  + findByUserId(String)
+  + findById(String)
+}
+
+interface KafkaTopicRepository {
+  + findByUserId(String)
+  + findByName(String)
+}
+
+interface KafkaSourceRepository {
+  + findByKafkaTopicId(String)
+  + findByUserId(String)
+}
+
+interface TriggerRepository {
+  + findByKafkaSourceId(String)
+  + findByUserId(String)
+}
+
+interface MetricRepository {
+  + save(Metric)
+  + findByAppId(String)
+}
+
+interface BillingSnapshotRepository {
+  + findByUserIdAndSnapshotTime(...)
+  + existsByAppIdAndSnapshotTime(...)
+}
+
+interface DeploymentLogRepository {
+  + findByAppIdOrderByCreatedAt(String)
+  + findByUserIdOrderByCreatedAt(String)
+}
+
+' ═════════════════════════════════════════════════════════════════════════════
+' SERVICES (Business Logic)
+' ═════════════════════════════════════════════════════════════════════════════
+
+class AppService {
+  - appRepository: AppRepository
+  - logRepository: DeploymentLogRepository
+  - knativeService: KnativeService
+  - eventingService: EventingService
+  --
+  + createApp(String, AppRequest)
+  + listApps(String userId)
+  + updateApp(String, String, AppRequest)
+  + redeploy(String, String)
+  + deleteApp(String, String)
+  - triggerDeployAsync(App, AppRequest)
+}
+
+class UserService {
+  - userRepository: UserRepository
+  --
+  + getMe(String username)
+  + updateMe(String, UpdateUserRequest)
+  + listAll()
+  + changeRole(String userId, String newRole)
+}
+
+class TeamService {
+  - userRepository: UserRepository
+  --
+  + listMembers(String ownerId)
+  + addMember(String ownerId, AddMemberRequest)
+  + changeRole(String ownerId, String memberId, String role)
+  + removeMember(String ownerId, String memberId)
+}
+
+class KafkaService {
+  - topicRepository: KafkaTopicRepository
+  - bootstrapServers: String
+  --
+  + createTopic(String, CreateTopicRequest)
+  + listTopics(String userId)
+  + getTopic(String, String)
+  + deleteTopic(String, String)
+  - fetchTopicMetrics(List, String)
+}
+
+class EventingService {
+  - kafkaSourceRepository: KafkaSourceRepository
+  - triggerRepository: TriggerRepository
+  - brokerUrl: String
+  --
+  + publish(Map<String, Object>)
+  + createKafkaSource(String, String, String, String)
+  + createTrigger(String, String, String, String)
+  + deleteByServiceName(String, String)
+  + listTriggers(String, String)
+}
+
+class MetricsService {
+  - appRepository: AppRepository
+  - prometheusUrl: String
+  --
+  + getAppMetrics(String appId)
+  + getClusterMetrics()
+  - scalarOr0(String query)
+}
+
+class BillingService {
+  - snapshotRepo: BillingSnapshotRepository
+  - appRepository: AppRepository
+  --
+  + takeSnapshot()
+  + getMyBilling(String userId)
+  + getAdminBilling()
+  - projectMonthly(double mtdCost)
+}
+
+class LogService {
+  - logRepository: DeploymentLogRepository
+  --
+  + getLogsByApp(String appId)
+  + getLogsByUser(String userId)
+}
+
+class AuthService {
+  + login(LoginRequest)
+  + register(RegisterRequest)
+  + refreshToken()
+}
+
+' ═════════════════════════════════════════════════════════════════════════════
+' CONTROLLERS (REST API)
+' ═════════════════════════════════════════════════════════════════════════════
+
+class AppController {
+  - appService: AppService
+  --
+  [POST] /api/apps
+  [GET] /api/apps
+  [GET] /api/apps/{id}
+  [PATCH] /api/apps/{id}
+  [POST] /api/apps/{id}/redeploy
+  [DELETE] /api/apps/{id}
+}
+
+class UserController {
+  - userService: UserService
+  --
+  [GET] /api/users/me
+  [PATCH] /api/users/me
+  [GET] /api/users (ADMIN)
+  [PATCH] /api/users/{id}/role (ADMIN)
+}
+
+class TeamController {
+  - teamService: TeamService
+  --
+  [GET] /api/team/members
+  [POST] /api/team/members
+  [PATCH] /api/team/members/{id}/role
+  [DELETE] /api/team/members/{id}
+}
+
+class KafkaController {
+  - kafkaService: KafkaService
+  --
+  [POST] /api/kafka/topics
+  [GET] /api/kafka/topics
+  [GET] /api/kafka/topics/{id}
+  [DELETE] /api/kafka/topics/{id}
+}
+
+class EventingController {
+  - eventingService: EventingService
+  --
+  [GET] /api/events/sources
+  [POST] /api/events/sources
+  [GET] /api/events/sources/{id}
+  [GET] /api/events/triggers
+  [POST] /api/events/triggers
+}
+
+class MetricsController {
+  - metricsService: MetricsService
+  --
+  [GET] /api/metrics/app/{appId}
+  [GET] /api/metrics/cluster
+}
+
+class BillingController {
+  - billingService: BillingService
+  --
+  [GET] /api/billing/my
+  [GET] /api/billing/admin (ADMIN)
+}
+
+class LogController {
+  - logService: LogService
+  --
+  [GET] /api/logs/app/{appId}
+  [GET] /api/logs/user
+  [GET] /api/logs/stream (SSE)
+}
+
+class AuthController {
+  - authService: AuthService
+  --
+  [POST] /api/auth/login
+  [POST] /api/auth/register
+  [POST] /api/auth/refresh
+}
+
+class AdminController {
+  - userService: UserService
+  --
+  [GET] /api/admin/users
+  [PATCH] /api/admin/users/{id}
+}
+
+' ═════════════════════════════════════════════════════════════════════════════
+' INFRASTRUCTURE & SERVICES
+' ═════════════════════════════════════════════════════════════════════════════
+
+class KnativeService {
+  + deploy(String, String, String, AppRequest)
+  + delete(String serviceName, String namespace)
+  + getRealStatus(String, String)
+}
+
+class KnativeWatcher {
+  ' Watches Knative Service resources
+}
+
+class UserContextService {
+  - userRepository: UserRepository
+  --
+  + resolve(String username): UserContext
+}
+
+class LogSseService {
+  + push(DeploymentLog)
+  + subscribe(String userId): Flux<DeploymentLog>
+}
+
+class SecurityConfig {
+  ' OAuth2 + Keycloak + JWT
+}
+
+class OpenApiConfig {
+  ' Swagger/OpenAPI 3.0
+}
+
+class KeycloakJwtAuthConverter {
+  ' JWT conversion
+}
+
+class GlobalExceptionHandler {
+  ' Centralized exception handling
+}
+
+' ═════════════════════════════════════════════════════════════════════════════
+' RELATIONSHIPS
+' ═════════════════════════════════════════════════════════════════════════════
+
+' Entity relationships
+User --> UserRole : has
+User "1" --> "0..*" App : owns
+User "1" --> "0..*" KafkaTopic : owns
+User "1" --> "0..*" KafkaSource : owns
+User "1" --> "0..*" Trigger : owns
+User "1" --> "0..*" BillingSnapshot : billed for
+User "1" --> "0..*" DeploymentLog : creates
+
+App "1" --> "0..*" Metric : generates
+App "1" --> "0..*" BillingSnapshot : costs tracked
+App "1" --> "0..*" DeploymentLog : deployment history
+
+KafkaTopic "1" --> "0..*" KafkaSource : produces
+KafkaSource "1" --> "0..*" Trigger : drives
+
+' Repository to Entity
+UserRepository --> User
+AppRepository --> App
+KafkaTopicRepository --> KafkaTopic
+KafkaSourceRepository --> KafkaSource
+TriggerRepository --> Trigger
+MetricRepository --> Metric
+BillingSnapshotRepository --> BillingSnapshot
+DeploymentLogRepository --> DeploymentLog
+
+' Service to Repository
+AppService --> AppRepository
+AppService --> DeploymentLogRepository
+AppService --> KafkaSourceRepository
+AppService --> TriggerRepository
+UserService --> UserRepository
+TeamService --> UserRepository
+KafkaService --> KafkaTopicRepository
+KafkaService --> KafkaSourceRepository
+EventingService --> KafkaSourceRepository
+EventingService --> TriggerRepository
+MetricsService --> MetricRepository
+BillingService --> BillingSnapshotRepository
+BillingService --> AppRepository
+LogService --> DeploymentLogRepository
+
+' Service to Infrastructure
+AppService --> KnativeService
+AppService --> EventingService
+AppService --> LogSseService
+AppService --> UserContextService
+
+' Controller to Service
+AppController --> AppService
+UserController --> UserService
+TeamController --> TeamService
+KafkaController --> KafkaService
+EventingController --> EventingService
+MetricsController --> MetricsService
+BillingController --> BillingService
+LogController --> LogService
+AuthController --> AuthService
+AdminController --> UserService
+
+@enduml

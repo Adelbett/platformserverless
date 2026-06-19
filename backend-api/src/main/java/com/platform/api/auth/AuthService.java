@@ -98,7 +98,7 @@ public class AuthService {
         return AuthResponse.builder()
                 .username(req.getUsername())
                 .email(req.getEmail())
-                .role("VIEWER")
+                .role("MEMBER")
                 .build();
     }
 }

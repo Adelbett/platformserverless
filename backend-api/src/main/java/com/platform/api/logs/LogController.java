@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -17,6 +18,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @Tag(name = "Logs", description = "Deployment & audit logs")
 @SecurityRequirement(name = "bearerAuth")
+@PreAuthorize("@permissionService.has(authentication.name, 'VIEW_LOGS')")
 public class LogController {
 
     private final LogService logService;

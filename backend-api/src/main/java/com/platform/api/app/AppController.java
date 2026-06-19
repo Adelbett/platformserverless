@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,6 +25,7 @@ public class AppController {
     private final AppService appService;
 
     @PostMapping
+    @PreAuthorize("@permissionService.has(authentication.name, 'DEPLOY_APP')")
     @Operation(summary = "Deploy a new application")
     public ResponseEntity<AppResponse> createApp(@Valid @RequestBody AppRequest request,
                                                   Authentication auth) {
@@ -58,6 +60,7 @@ public class AppController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("@permissionService.has(authentication.name, 'DELETE_APP')")
     @Operation(summary = "Delete an application and its Knative service")
     public ResponseEntity<Void> deleteApp(@PathVariable String id, Authentication auth) {
         appService.deleteApp(id, auth.getName());

@@ -7,7 +7,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -44,11 +46,25 @@ public class UserService {
         // Validate role value
         try { UserRole.valueOf(newRole); }
         catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid role: " + newRole + ". Allowed: ADMIN, DEVELOPER, VIEWER");
+            throw new IllegalArgumentException("Invalid role: " + newRole + ". Allowed: ADMIN, CLIENT_ADMIN, MEMBER");
         }
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found: " + userId));
         user.setRole(newRole);
+        return toDto(userRepository.save(user));
+    }
+
+    @Transactional
+    public UserDto updatePermissions(String userId, Set<String> permissions) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found: " + userId));
+
+        Set<String> valid = new HashSet<>();
+        for (String p : permissions) {
+            try { Permission.valueOf(p); valid.add(p); }
+            catch (IllegalArgumentException ignored) { /* skip unknown keys */ }
+        }
+        user.setPermissions(valid);
         return toDto(userRepository.save(user));
     }
 
@@ -62,6 +78,7 @@ public class UserService {
                 .role(u.getRole())
                 .ownerId(u.getOwnerId())
                 .suspended(u.isSuspended())
+                .permissions(u.getPermissions())
                 .createdAt(u.getCreatedAt())
                 .build();
     }

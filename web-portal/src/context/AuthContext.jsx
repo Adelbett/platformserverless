@@ -15,12 +15,12 @@ const parseToken = (token) => {
     try {
         const payload = JSON.parse(atob(token.split('.')[1]));
         const roles   = payload.realm_access?.roles || [];
-        // Priority: ADMIN > DEVELOPER > VIEWER
+        // Priority: ADMIN > CLIENT_ADMIN > MEMBER
         // Keycloak role names are lowercase by convention, accept both cases
         const has = (...names) => names.some(n => roles.includes(n));
-        const role = has('admin', 'ADMIN')           ? 'ADMIN'
-                   : has('developer', 'DEVELOPER')   ? 'DEVELOPER'
-                   : 'VIEWER';
+        const role = has('admin', 'ADMIN')                  ? 'ADMIN'
+                   : has('client_admin', 'CLIENT_ADMIN')     ? 'CLIENT_ADMIN'
+                   : 'MEMBER';
         return {
             username: payload.preferred_username || payload.sub,
             email:    payload.email || '',

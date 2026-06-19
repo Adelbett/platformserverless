@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,6 +24,7 @@ public class KafkaController {
     private final KafkaService kafkaService;
 
     @PostMapping
+    @PreAuthorize("@permissionService.has(authentication.name, 'MANAGE_KAFKA')")
     @Operation(summary = "Create a new Kafka topic")
     public ResponseEntity<KafkaTopicDto> createTopic(@Valid @RequestBody CreateTopicRequest request,
                                                      Authentication auth) {
@@ -43,6 +45,7 @@ public class KafkaController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("@permissionService.has(authentication.name, 'MANAGE_KAFKA')")
     @Operation(summary = "Delete a Kafka topic")
     public ResponseEntity<Void> deleteTopic(@PathVariable String id, Authentication auth) {
         kafkaService.deleteTopic(id, auth.getName());

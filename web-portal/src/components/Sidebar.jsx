@@ -15,21 +15,21 @@ const NAV_SECTIONS = [
     {
         label: 'Platform',
         items: [
-            { path: '/dashboard',  label: 'Dashboard',    icon: LayoutDashboard, clientOnly: true, allowedRoles: ['CLIENT_ADMIN','DEVELOPER','VIEWER'] },
-            { path: '/apps',       label: 'Applications', icon: Box,                               allowedRoles: ['CLIENT_ADMIN','DEVELOPER','VIEWER'] },
-            { path: '/apps/new',   label: 'Deploy',       icon: Rocket,          clientOnly: true, allowedRoles: ['CLIENT_ADMIN','DEVELOPER'] },
-            { path: '/monitoring', label: 'Monitoring',   icon: Activity,        clientOnly: true, allowedRoles: ['CLIENT_ADMIN','DEVELOPER'] },
-            { path: '/logs',       label: 'Logs',         icon: Terminal,        clientOnly: true, allowedRoles: ['CLIENT_ADMIN','DEVELOPER'] },
+            { path: '/dashboard',  label: 'Dashboard',    icon: LayoutDashboard, clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
+            { path: '/apps',       label: 'Applications', icon: Box,                               allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
+            { path: '/apps/new',   label: 'Deploy',       icon: Rocket,          clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
+            { path: '/monitoring', label: 'Monitoring',   icon: Activity,        clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
+            { path: '/logs',       label: 'Logs',         icon: Terminal,        clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
         ],
     },
     {
         label: 'Configure',
         items: [
-            { path: '/kafka',    label: 'Kafka Topics', icon: Zap,        clientOnly: true, allowedRoles: ['CLIENT_ADMIN','DEVELOPER'] },
-            { path: '/eventing', label: 'Eventing',     icon: Globe,      clientOnly: true, allowedRoles: ['CLIENT_ADMIN','DEVELOPER'] },
-            { path: '/billing',  label: 'Billing',      icon: CreditCard, clientOnly: true, allowedRoles: ['CLIENT_ADMIN','BILLING_MANAGER'] },
+            { path: '/kafka',    label: 'Kafka Topics', icon: Zap,        clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
+            { path: '/eventing', label: 'Eventing',     icon: Globe,      clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
+            { path: '/billing',  label: 'Billing',      icon: CreditCard, clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
             { path: '/team',     label: 'Team',         icon: UserPlus,   clientOnly: true, allowedRoles: ['CLIENT_ADMIN'] },
-            { path: '/settings', label: 'Settings',     icon: Settings,                    allowedRoles: ['CLIENT_ADMIN','DEVELOPER','VIEWER','BILLING_MANAGER'] },
+            { path: '/settings', label: 'Settings',     icon: Settings,                    allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
         ],
     },
     {
@@ -88,14 +88,12 @@ const Sidebar = ({ collapsed, onToggle }) => {
     const email    = user?.email || user?.username || 'user@nextstep.io';
     const username = user?.username || email.split('@')[0];
     const initials = username.slice(0, 2).toUpperCase();
-    const role     = user?.role || 'VIEWER';
+    const role     = user?.role || 'MEMBER';
 
     const roleStyle = {
-        ADMIN:           { color: '#EF4444', bg: 'rgba(239,68,68,0.12)'    },
-        CLIENT_ADMIN:    { color: '#3B82F6', bg: 'rgba(59,130,246,0.12)'   },
-        DEVELOPER:       { color: '#00D4FF', bg: 'rgba(0,212,255,0.10)'    },
-        VIEWER:          { color: '#9CA3AF', bg: 'rgba(156,163,175,0.10)'  },
-        BILLING_MANAGER: { color: '#F59E0B', bg: 'rgba(245,158,11,0.10)'   },
+        ADMIN:        { color: '#EF4444', bg: 'rgba(239,68,68,0.12)'  },
+        CLIENT_ADMIN: { color: '#3B82F6', bg: 'rgba(59,130,246,0.12)' },
+        MEMBER:       { color: '#00D4FF', bg: 'rgba(0,212,255,0.10)'  },
     }[role] || { color: '#9CA3AF', bg: 'rgba(156,163,175,0.10)' };
 
     const handleLogout = () => { logout(); navigate('/login'); };

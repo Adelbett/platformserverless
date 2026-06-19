@@ -185,7 +185,7 @@ const UserMenu = ({ user, onLogout }) => {
     const email    = user?.email || user?.username || 'user@nextstep.io';
     const username = email.split('@')[0];
     const initials = username.slice(0, 2).toUpperCase();
-    const role     = user?.role || 'DEVELOPER';
+    const role     = user?.role || 'MEMBER';
 
     useEffect(() => {
         const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };

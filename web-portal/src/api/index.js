@@ -58,10 +58,10 @@ export const billingApi = {
 }
 
 export const teamApi = {
-    listMembers:  ()           => api.get('/team/members'),
-    addMember:    (data)       => api.post('/team/members', data),
-    changeRole:   (id, role)   => api.patch(`/team/members/${id}/role`, { role }),
-    removeMember: (id)         => api.delete(`/team/members/${id}`),
+    listMembers:       ()                 => api.get('/team/members'),
+    addMember:         (data)             => api.post('/team/members', data),
+    removeMember:      (id)               => api.delete(`/team/members/${id}`),
+    updatePermissions: (id, permissions)  => api.put(`/team/members/${id}/permissions`, permissions),
 }
 
 export const adminApi = {
