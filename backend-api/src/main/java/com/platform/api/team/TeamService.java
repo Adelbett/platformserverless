@@ -1,5 +1,6 @@
 package com.platform.api.team;
 
+import com.platform.api.auth.KeycloakAdminService;
 import com.platform.api.exception.NotFoundException;
 import com.platform.api.team.dto.AddMemberRequest;
 import com.platform.api.user.Permission;
@@ -21,6 +22,7 @@ public class TeamService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final KeycloakAdminService keycloakAdminService;
 
     // ── List all members of this CLIENT_ADMIN ────────────────────────────────────
     public List<UserDto> listMembers(String ownerId) {
@@ -30,12 +32,16 @@ public class TeamService {
     }
 
     // ── Add a new member — always created with role MEMBER ───────────────────────
+    // Created in BOTH Keycloak (so they can actually log in) and the local DB
+    // (so the app knows their role/permissions/ownerId).
     @Transactional
     public UserDto addMember(String ownerId, AddMemberRequest req) {
         if (userRepository.existsByEmail(req.getEmail()))
             throw new IllegalArgumentException("Email already in use: " + req.getEmail());
         if (userRepository.existsByUsername(req.getUsername()))
             throw new IllegalArgumentException("Username already in use: " + req.getUsername());
+
+        keycloakAdminService.createUser(req.getUsername(), req.getEmail(), req.getPassword());
 
         User member = User.builder()
                 .username(req.getUsername())
@@ -49,9 +55,11 @@ public class TeamService {
     }
 
     // ── Remove a member ──────────────────────────────────────────────────────────
+    // Removed from both the local DB and Keycloak, so they lose login access too.
     @Transactional
     public void removeMember(String ownerId, String memberId) {
         User member = getMemberOf(ownerId, memberId);
+        keycloakAdminService.deleteUser(member.getUsername());
         userRepository.delete(member);
     }
 
