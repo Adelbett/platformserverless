@@ -236,6 +236,22 @@ public class KnativeService {
         }
     }
 
+    // ── Pod lookup (for log streaming) ─────────────────────────────────
+
+    public String getFirstPodName(String serviceName, String namespace) {
+        String ns = namespace != null ? namespace : defaultNamespace;
+        if (!kubernetesEnabled) return null;
+        try {
+            var pods = kubernetesClient.pods().inNamespace(ns)
+                    .withLabel("serving.knative.dev/service", serviceName)
+                    .list().getItems();
+            return pods.isEmpty() ? null : pods.get(0).getMetadata().getName();
+        } catch (Exception e) {
+            log.warn("Could not find pod for '{}': {}", serviceName, e.getMessage());
+            return null;
+        }
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────
 
     private GenericKubernetesResource buildKnativeManifest(String name, String namespace, AppRequest req) {

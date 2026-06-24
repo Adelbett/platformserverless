@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -212,6 +212,74 @@ const LogViewer = ({ logs, dark }) => {
                 {filtered.length === 0 && (
                     <div style={{ padding: '32px 20px', textAlign: 'center', fontSize: 12, color: '#9CA3AF' }}>No matching log entries</div>
                 )}
+            </div>
+        </div>
+    );
+};
+
+// ── Container log viewer (live stdout/stderr via SSE) ──────────────────────────
+
+const ContainerLogViewer = ({ appId, dark }) => {
+    const [lines, setLines] = useState([]);
+    const [connected, setConnected] = useState(false);
+    const [autoScroll, setAutoScroll] = useState(true);
+    const endRef = useRef(null);
+
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (!token || !appId) return;
+
+        const es = new EventSource(`/api/logs/apps/${appId}/pod-logs/stream?token=${encodeURIComponent(token)}`);
+
+        es.onopen = () => setConnected(true);
+        es.onmessage = (e) => {
+            setLines((prev) => [...prev.slice(-499), e.data]);
+        };
+        es.onerror = () => {
+            setConnected(false);
+            es.close();
+        };
+
+        return () => es.close();
+    }, [appId]);
+
+    useEffect(() => {
+        if (autoScroll) endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [lines, autoScroll]);
+
+    return (
+        <div className="ns-card" style={{ overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid rgba(0,0,0,0.07)', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Terminal size={15} style={{ color: '#64748B' }} />
+                    <span style={{ fontSize: 14, fontWeight: 800, fontFamily: "'Outfit', sans-serif" }} className="text-primary">Container Logs</span>
+                    <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 8px', borderRadius: 20,
+                        background: connected ? 'rgba(63,185,80,0.1)' : 'rgba(148,163,184,0.1)',
+                        border: `1px solid ${connected ? 'rgba(63,185,80,0.25)' : 'rgba(148,163,184,0.25)'}`,
+                        fontSize: 10, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700,
+                        color: connected ? '#3FB950' : '#94A3B8',
+                    }}>
+                        {connected ? 'LIVE' : 'CONNECTING'}
+                    </span>
+                </div>
+                <button onClick={() => setAutoScroll((v) => !v)} className="btn-secondary" style={{ padding: '5px 10px', fontSize: 11 }}>
+                    Auto-scroll: {autoScroll ? 'ON' : 'OFF'}
+                </button>
+            </div>
+            <div style={{
+                background: '#020408', fontFamily: "'JetBrains Mono', monospace", fontSize: 11,
+                minHeight: 240, maxHeight: 420, overflowY: 'auto', padding: '14px 16px',
+                display: 'flex', flexDirection: 'column', gap: 2,
+            }}>
+                {lines.length === 0 ? (
+                    <div style={{ color: '#5A7080' }}>Waiting for container output…</div>
+                ) : (
+                    lines.map((line, i) => (
+                        <div key={i} style={{ color: '#A8B8C8', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{line}</div>
+                    ))
+                )}
+                <div ref={endRef} />
             </div>
         </div>
     );
@@ -566,6 +634,9 @@ const AppDetails = () => {
 
             {/* Log Viewer */}
             <LogViewer logs={logs.length > 0 ? logs : MOCK_LOGS} dark={dark} />
+
+            {/* Container Logs (live stdout/stderr) */}
+            <ContainerLogViewer appId={id} dark={dark} />
 
             {/* Danger Zone */}
             <div className="ns-card" style={{ padding: 20, borderColor: 'rgba(239,68,68,0.25)' }}>
