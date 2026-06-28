@@ -26,15 +26,17 @@ public class LogController {
     private final PodLogStreamService podLogStreamService;
 
     @GetMapping("/apps/{id}")
-    @Operation(summary = "Get deployment logs for a specific app")
-    public ResponseEntity<List<DeploymentLog>> getAppLogs(@PathVariable String id) {
-        return ResponseEntity.ok(logService.getLogsByApp(id));
+    @Operation(summary = "Get deployment logs for a specific app, optionally filtered by level (INFO/WARN/ERROR)")
+    public ResponseEntity<List<DeploymentLog>> getAppLogs(@PathVariable String id,
+                                                           @RequestParam(required = false) String level) {
+        return ResponseEntity.ok(logService.getLogsByApp(id, level));
     }
 
     @GetMapping("/users/{id}")
-    @Operation(summary = "Get all deployment logs for a user")
-    public ResponseEntity<List<DeploymentLog>> getUserLogs(@PathVariable String id) {
-        return ResponseEntity.ok(logService.getLogsByUser(id));
+    @Operation(summary = "Get all deployment logs for a user, optionally filtered by level (INFO/WARN/ERROR)")
+    public ResponseEntity<List<DeploymentLog>> getUserLogs(@PathVariable String id,
+                                                            @RequestParam(required = false) String level) {
+        return ResponseEntity.ok(logService.getLogsByUser(id, level));
     }
 
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

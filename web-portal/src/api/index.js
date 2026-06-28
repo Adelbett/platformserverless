@@ -13,6 +13,8 @@ export const appsApi = {
     deploy: (id) => api.post(`/apps/${id}/deploy`),
     update: (id, data) => api.put(`/apps/${id}`, data),
     delete: (id) => api.delete(`/apps/${id}`),
+    listRevisions: (id) => api.get(`/apps/${id}/revisions`),
+    rollback: (id, revisionName) => api.post(`/apps/${id}/rollback/${revisionName}`),
 }
 
 export const metricsApi = {

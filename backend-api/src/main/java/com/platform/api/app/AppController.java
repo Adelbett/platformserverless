@@ -46,12 +46,14 @@ public class AppController {
     }
 
     @PostMapping("/{id}/deploy")
+    @PreAuthorize("@permissionService.has(authentication.name, 'DEPLOY_APP')")
     @Operation(summary = "Re-deploy an existing application")
     public ResponseEntity<AppResponse> redeploy(@PathVariable String id, Authentication auth) {
         return ResponseEntity.ok(appService.redeploy(id, auth.getName()));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("@permissionService.has(authentication.name, 'DEPLOY_APP')")
     @Operation(summary = "Update application settings and redeploy")
     public ResponseEntity<AppResponse> updateApp(@PathVariable String id,
                                                   @RequestBody AppRequest req,
@@ -64,6 +66,20 @@ public class AppController {
     @Operation(summary = "Delete an application and its Knative service")
     public ResponseEntity<Void> deleteApp(@PathVariable String id, Authentication auth) {
         appService.deleteApp(id, auth.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/revisions")
+    @Operation(summary = "List Knative revisions for this app (for rollback)")
+    public ResponseEntity<List<java.util.Map<String, String>>> listRevisions(@PathVariable String id, Authentication auth) {
+        return ResponseEntity.ok(appService.listRevisions(id, auth.getName()));
+    }
+
+    @PostMapping("/{id}/rollback/{revisionName}")
+    @PreAuthorize("@permissionService.has(authentication.name, 'DEPLOY_APP')")
+    @Operation(summary = "Roll traffic back to a previous revision")
+    public ResponseEntity<Void> rollback(@PathVariable String id, @PathVariable String revisionName, Authentication auth) {
+        appService.rollback(id, revisionName, auth.getName());
         return ResponseEntity.noContent().build();
     }
 }

@@ -75,7 +75,9 @@ public class KafkaService {
 
     public KafkaTopicDto getTopic(String topicId, String userId) {
         KafkaTopic topic = requireOwned(topicId, userId);
-        return toDto(topic);
+        if (!kafkaEnabled) return toDto(topic);
+        Map<String, long[]> metricsMap = fetchTopicMetrics(List.of(topic.getName()), userId);
+        return toDtoWithMetrics(topic, metricsMap.get(topic.getName()));
     }
 
     @Transactional

@@ -217,6 +217,58 @@ public class AppService {
         appRepository.save(app);
     }
 
+    // ── Revisions (rollback) ──────────────────────────────────────────
+
+    public List<java.util.Map<String, String>> listRevisions(String appId, String username) {
+        UserContextService.UserContext ctx = userContextService.resolve(username);
+        App app = requireOwned(appId, ctx.effectiveUserId());
+        return knativeService.listRevisions(app.getServiceName(), app.getNamespace());
+    }
+
+    @Transactional
+    public void rollback(String appId, String revisionName, String username) {
+        UserContextService.UserContext ctx = userContextService.resolve(username);
+        App app = requireOwned(appId, ctx.effectiveUserId());
+        knativeService.rollbackToRevision(app.getServiceName(), app.getNamespace(), revisionName);
+        addLog(appId, ctx.effectiveUserId(), "Rolled back to revision " + revisionName, "ROLLBACK");
+    }
+
+    // ── Crash-loop detection ──────────────────────────────────────────
+
+    private static final int CRASH_LOOP_RESTART_THRESHOLD = 5;
+    private static final int CRASH_LOOP_ALERT_COOLDOWN_HOURS = 1;
+
+    @Transactional
+    public void checkCrashLoops() {
+        List<java.util.Map<String, Object>> crashing = knativeService.findCrashLoopingPods(CRASH_LOOP_RESTART_THRESHOLD);
+
+        for (var info : crashing) {
+            String serviceName = (String) info.get("serviceName");
+            String namespace   = (String) info.get("namespace");
+            int restartCount   = (int) info.get("restartCount");
+
+            List<App> apps = appRepository.findByServiceNameAndNamespace(serviceName, namespace);
+            for (App app : apps) {
+                boolean alreadyAlerted = logRepository.existsByAppIdAndTypeAndCreatedAtAfter(
+                        app.getId(), "CRASH_LOOP_ALERT",
+                        LocalDateTime.now().minusHours(CRASH_LOOP_ALERT_COOLDOWN_HOURS));
+                if (alreadyAlerted) continue;
+
+                DeploymentLog alert = logRepository.save(DeploymentLog.builder()
+                        .appId(app.getId())
+                        .appName(app.getName())
+                        .userId(app.getUserId())
+                        .message("L'application redémarre en boucle (CrashLoopBackOff) — "
+                                + restartCount + " redémarrages détectés.")
+                        .type("CRASH_LOOP_ALERT")
+                        .build());
+
+                logSseService.push(alert);
+                log.warn("Crash-loop alert sent for app '{}' ({} restarts)", app.getName(), restartCount);
+            }
+        }
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────
 
     private App requireOwned(String appId, String userId) {

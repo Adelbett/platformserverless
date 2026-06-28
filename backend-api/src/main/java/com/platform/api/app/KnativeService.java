@@ -12,8 +12,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -233,6 +237,106 @@ public class KnativeService {
         } catch (Exception e) {
             log.warn("Could not get pod count for '{}': {}", serviceName, e.getMessage());
             return 0;
+        }
+    }
+
+    // ── Revisions (rollback) ────────────────────────────────────────────
+
+    public List<Map<String, String>> listRevisions(String serviceName, String namespace) {
+        String ns = namespace != null ? namespace : defaultNamespace;
+        if (!kubernetesEnabled) return List.of();
+        try {
+            var revisions = kubernetesClient
+                    .genericKubernetesResources("serving.knative.dev/v1", "Revision")
+                    .inNamespace(ns)
+                    .withLabel("serving.knative.dev/service", serviceName)
+                    .list().getItems();
+
+            return revisions.stream()
+                    .sorted(Comparator.comparing(
+                            (GenericKubernetesResource r) -> r.getMetadata().getCreationTimestamp()
+                    ).reversed())
+                    .map(r -> {
+                        Map<String, String> info = new java.util.HashMap<>();
+                        info.put("name", r.getMetadata().getName());
+                        info.put("createdAt", r.getMetadata().getCreationTimestamp());
+                        return info;
+                    })
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.warn("Could not list revisions for '{}': {}", serviceName, e.getMessage());
+            return List.of();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public void rollbackToRevision(String serviceName, String namespace, String revisionName) {
+        String ns = namespace != null ? namespace : defaultNamespace;
+        if (!kubernetesEnabled) {
+            log.info("[MOCK] Rolling back '{}' to revision '{}'", serviceName, revisionName);
+            return;
+        }
+        try {
+            GenericKubernetesResource ksvc = kubernetesClient
+                    .genericKubernetesResources("serving.knative.dev/v1", "Service")
+                    .inNamespace(ns).withName(serviceName).get();
+
+            if (ksvc == null) {
+                throw new RuntimeException("Knative service not found: " + serviceName);
+            }
+
+            Map<String, Object> spec = (Map<String, Object>) ksvc.getAdditionalProperties().get("spec");
+            spec.put("traffic", List.of(Map.of(
+                    "revisionName", revisionName,
+                    "percent", 100
+            )));
+
+            kubernetesClient.genericKubernetesResources("serving.knative.dev/v1", "Service")
+                    .inNamespace(ns).resource(ksvc).update();
+
+            log.info("Rolled back '{}' to revision '{}'", serviceName, revisionName);
+        } catch (Exception e) {
+            log.error("Failed to rollback '{}' to revision '{}': {}", serviceName, revisionName, e.getMessage());
+            throw new RuntimeException("Rollback failed: " + e.getMessage(), e);
+        }
+    }
+
+    // ── Crash-loop detection (cluster-wide scan) ────────────────────────
+
+    public List<Map<String, Object>> findCrashLoopingPods(int restartThreshold) {
+        if (!kubernetesEnabled) return List.of();
+        try {
+            var pods = kubernetesClient.pods().inAnyNamespace()
+                    .withLabel("serving.knative.dev/service")
+                    .list().getItems();
+
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (var pod : pods) {
+                String serviceName = pod.getMetadata().getLabels().get("serving.knative.dev/service");
+                String namespace = pod.getMetadata().getNamespace();
+                var statuses = pod.getStatus() != null ? pod.getStatus().getContainerStatuses() : null;
+                if (statuses == null) continue;
+
+                for (var cs : statuses) {
+                    boolean isCrashLoop = cs.getState() != null
+                            && cs.getState().getWaiting() != null
+                            && "CrashLoopBackOff".equals(cs.getState().getWaiting().getReason());
+                    int restarts = cs.getRestartCount() != null ? cs.getRestartCount() : 0;
+
+                    if (isCrashLoop || restarts >= restartThreshold) {
+                        Map<String, Object> info = new HashMap<>();
+                        info.put("serviceName", serviceName);
+                        info.put("namespace", namespace);
+                        info.put("restartCount", restarts);
+                        result.add(info);
+                        break; // one alert per pod is enough, even with multiple containers
+                    }
+                }
+            }
+            return result;
+        } catch (Exception e) {
+            log.warn("Could not scan for crash-looping pods: {}", e.getMessage());
+            return List.of();
         }
     }
 

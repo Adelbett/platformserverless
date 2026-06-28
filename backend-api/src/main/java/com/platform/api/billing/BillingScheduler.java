@@ -17,5 +17,6 @@ public class BillingScheduler {
     public void hourlySnapshot() {
         log.info("Running hourly billing snapshot...");
         billingService.takeSnapshot();
+        billingService.checkBudgetAlerts();
     }
 }

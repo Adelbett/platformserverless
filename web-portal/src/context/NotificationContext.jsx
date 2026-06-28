@@ -10,6 +10,9 @@ const NOTIF_META = {
     KAFKA_WIRED:        { emoji: '⚡', color: '#F59E0B' },
     DELETE:             { emoji: '🗑️', color: '#6B7280' },
     UPDATE:             { emoji: '🔄', color: '#00D4FF' },
+    ROLLBACK:           { emoji: '↩️', color: '#00D4FF' },
+    BUDGET_ALERT:       { emoji: '💰', color: '#F59E0B' },
+    CRASH_LOOP_ALERT:   { emoji: '💥', color: '#EF4444' },
 };
 const SHOW_TYPES = Object.keys(NOTIF_META);
 

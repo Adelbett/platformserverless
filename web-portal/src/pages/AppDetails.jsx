@@ -217,6 +217,144 @@ const LogViewer = ({ logs, dark }) => {
     );
 };
 
+// ── Rollback confirm modal ───────────────────────────────────────────────────────
+
+const RollbackModal = ({ revisionName, onConfirm, onClose, loading }) => (
+    <>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 50 }} onClick={onClose} />
+        <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 51, padding: 16 }}>
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
+                className="ns-card" style={{ width: '100%', maxWidth: 420, padding: 24, boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(0,212,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <GitBranch size={20} style={{ color: '#00D4FF' }} />
+                    </div>
+                    <div>
+                        <h3 style={{ fontSize: 14, fontWeight: 800, fontFamily: "'Outfit', sans-serif", margin: 0 }} className="text-primary">Roll back traffic</h3>
+                        <p style={{ fontSize: 12, margin: '2px 0 0' }} className="text-secondary">100% of traffic will be redirected.</p>
+                    </div>
+                </div>
+                <div style={{ padding: 12, borderRadius: 8, background: 'rgba(0,212,255,0.05)', border: '1px solid rgba(0,212,255,0.2)', marginBottom: 16 }}>
+                    <p style={{ fontSize: 12, color: '#0EA5C4', margin: 0 }}>
+                        Traffic will be routed to <strong style={{ fontFamily: "'JetBrains Mono', monospace" }}>{revisionName}</strong>. No rebuild needed — this is instant.
+                    </p>
+                </div>
+                <div style={{ display: 'flex', gap: 12 }}>
+                    <button className="btn-secondary" style={{ flex: 1 }} onClick={onClose} disabled={loading}>Cancel</button>
+                    <button className="btn-primary" style={{ flex: 1, opacity: loading ? 0.6 : 1 }} onClick={onConfirm} disabled={loading}>
+                        {loading ? 'Rolling back…' : <><GitBranch size={14} /> Confirm rollback</>}
+                    </button>
+                </div>
+            </motion.div>
+        </div>
+    </>
+);
+
+// ── Revision history (Knative revisions + rollback) ─────────────────────────────
+
+const RevisionHistory = ({ appId, dark }) => {
+    const [revisions, setRevisions] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [target, setTarget] = useState(null);
+    const [rollingBack, setRollingBack] = useState(false);
+    const [error, setError] = useState(null);
+
+    const load = async () => {
+        try {
+            setLoading(true);
+            const res = await appsApi.listRevisions(appId);
+            setRevisions(Array.isArray(res.data) ? res.data : []);
+        } catch {
+            setRevisions([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { load(); }, [appId]);
+
+    const handleConfirm = async () => {
+        if (!target) return;
+        setRollingBack(true);
+        setError(null);
+        try {
+            await appsApi.rollback(appId, target);
+            setTarget(null);
+            await load();
+        } catch {
+            setError('Rollback failed. Check that the revision still exists on the cluster.');
+        } finally {
+            setRollingBack(false);
+        }
+    };
+
+    return (
+        <div className="ns-card" style={{ padding: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <GitBranch size={15} style={{ color: '#9CA3AF' }} />
+                    <h3 style={{ fontSize: 14, fontWeight: 800, fontFamily: "'Outfit', sans-serif", margin: 0 }} className="text-primary">Revisions &amp; Rollback</h3>
+                    <span style={{ fontSize: 11, color: '#9CA3AF' }}>({revisions.length})</span>
+                </div>
+                <button className="btn-secondary" style={{ padding: '5px 10px', fontSize: 11 }} onClick={load}>
+                    <RefreshCw size={12} /> Refresh
+                </button>
+            </div>
+
+            {error && (
+                <div style={{ padding: 10, borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', marginBottom: 12 }}>
+                    <p style={{ fontSize: 12, color: '#EF4444', margin: 0 }}>{error}</p>
+                </div>
+            )}
+
+            {loading ? (
+                <p style={{ fontSize: 12, color: '#6B7280', margin: 0 }}>Loading revisions…</p>
+            ) : revisions.length === 0 ? (
+                <p style={{ fontSize: 12, color: '#6B7280', margin: 0 }}>No Knative revisions found for this app yet.</p>
+            ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {revisions.map((rev, i) => (
+                        <div key={rev.name} style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '10px 14px', borderRadius: 8,
+                            background: dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                            border: '1px solid rgba(0,0,0,0.05)',
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <span style={{
+                                    fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                                    background: i === 0 ? 'rgba(16,185,129,0.1)' : 'rgba(148,163,184,0.1)',
+                                    color: i === 0 ? '#10B981' : '#94A3B8',
+                                }}>
+                                    {i === 0 ? 'ACTIVE' : 'OLDER'}
+                                </span>
+                                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }} className="text-primary">{rev.name}</span>
+                                <span style={{ fontSize: 11, color: '#9CA3AF' }}>{rev.createdAt ? new Date(rev.createdAt).toLocaleString() : ''}</span>
+                            </div>
+                            {i !== 0 && (
+                                <button className="btn-secondary" style={{ padding: '5px 10px', fontSize: 11 }} onClick={() => setTarget(rev.name)}>
+                                    Rollback here
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            <AnimatePresence>
+                {target && (
+                    <RollbackModal
+                        revisionName={target}
+                        onConfirm={handleConfirm}
+                        onClose={() => !rollingBack && setTarget(null)}
+                        loading={rollingBack}
+                    />
+                )}
+            </AnimatePresence>
+        </div>
+    );
+};
+
 // ── Container log viewer (live stdout/stderr via SSE) ──────────────────────────
 
 const ContainerLogViewer = ({ appId, dark }) => {
@@ -631,6 +769,9 @@ const AppDetails = () => {
                     );
                 })()}
             </div>
+
+            {/* Revisions & Rollback */}
+            <RevisionHistory appId={id} dark={dark} />
 
             {/* Log Viewer */}
             <LogViewer logs={logs.length > 0 ? logs : MOCK_LOGS} dark={dark} />

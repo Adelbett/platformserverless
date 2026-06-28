@@ -46,6 +46,10 @@ app:
     secret: "c2VjcmV0S2V5Rm9yUGxhdGZvcm1TZXJ2ZXJsZXNzUGxhdGZvcm1CYWNrZW5kQXBpMjAyNg=="  # base64 encoded secret
     expiration-ms: 86400000  # 24 hours
 
+  # Billing alerts
+  billing:
+    alert-threshold-usd: 50.0
+
   # Kubernetes / Knative
   kubernetes:
     enabled: true

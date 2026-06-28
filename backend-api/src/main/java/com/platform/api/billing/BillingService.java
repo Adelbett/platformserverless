@@ -4,8 +4,12 @@ import com.platform.api.app.App;
 import com.platform.api.app.AppRepository;
 import com.platform.api.billing.dto.AdminBillingResponse;
 import com.platform.api.billing.dto.BillingHistoryResponse;
+import com.platform.api.logs.DeploymentLog;
+import com.platform.api.logs.DeploymentLogRepository;
+import com.platform.api.logs.LogSseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -22,6 +26,11 @@ public class BillingService {
 
     private final BillingSnapshotRepository snapshotRepo;
     private final AppRepository appRepository;
+    private final DeploymentLogRepository logRepository;
+    private final LogSseService logSseService;
+
+    @Value("${app.billing.alert-threshold-usd:50.0}")
+    private double alertThresholdUsd;
 
     // ── Pricing constants ────────────────────────────────────────────────────────
     static final double CPU_PER_VCPU_HOUR  = 0.048;
@@ -96,6 +105,42 @@ public class BillingService {
             saved++;
         }
         log.info("Billing snapshot saved: {} entries at {}", saved, hour);
+    }
+
+    // ── Budget alerts: warn once per month if a client's running cost exceeds the threshold ──
+    public void checkBudgetAlerts() {
+        LocalDateTime monthStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+        LocalDateTime now        = LocalDateTime.now();
+
+        List<BillingSnapshot> snapshots = snapshotRepo
+                .findBySnapshotTimeBetweenOrderBySnapshotTimeAsc(monthStart, now);
+
+        Map<String, Double> costByUser = new HashMap<>();
+        for (BillingSnapshot s : snapshots) {
+            costByUser.merge(s.getUserId(), s.getTotalCost(), Double::sum);
+        }
+
+        for (var entry : costByUser.entrySet()) {
+            String userId    = entry.getKey();
+            double totalCost = entry.getValue();
+            if (totalCost <= alertThresholdUsd) continue;
+
+            boolean alreadyAlerted = logRepository
+                    .existsByUserIdAndTypeAndCreatedAtAfter(userId, "BUDGET_ALERT", monthStart);
+            if (alreadyAlerted) continue;
+
+            DeploymentLog alert = logRepository.save(DeploymentLog.builder()
+                    .userId(userId)
+                    .message(String.format(
+                            "Votre consommation a dépassé %.2f$ ce mois-ci (actuellement %.2f$). " +
+                            "Cette estimation sera incluse dans votre facture de fin de mois.",
+                            alertThresholdUsd, totalCost))
+                    .type("BUDGET_ALERT")
+                    .build());
+
+            logSseService.push(alert);
+            log.info("Budget alert sent to user {} — {}$ / {}$ threshold", userId, totalCost, alertThresholdUsd);
+        }
     }
 
     // ── Client billing: current month ───────────────────────────────────────────

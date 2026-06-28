@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -23,6 +24,7 @@ public class EventController {
      * Body example: { "type": "DEPLOYMENT_SUCCESS", "appId": "abc123", "data": {} }
      */
     @PostMapping
+    @PreAuthorize("@permissionService.has(authentication.name, 'MANAGE_EVENTING')")
     @Operation(summary = "Push a CloudEvent to the Knative Eventing broker")
     public ResponseEntity<Map<String, String>> pushEvent(@RequestBody Map<String, Object> payload) {
         eventService.publish(payload);
