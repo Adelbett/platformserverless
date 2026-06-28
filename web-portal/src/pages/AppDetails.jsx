@@ -85,10 +85,11 @@ const StatusBadge = ({ status }) => {
 
 // ── Metric mini ────────────────────────────────────────────────────────────────
 
-const MetricMini = ({ label, value, color }) => (
+const MetricMini = ({ label, value, color, sublabel }) => (
     <div className="ns-card" style={{ padding: 16, textAlign: 'center' }}>
         <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#64748B', margin: '0 0 6px' }}>{label}</p>
         <p style={{ fontSize: 20, fontWeight: 900, fontFamily: "'Outfit', sans-serif", margin: 0, color }}>{value}</p>
+        {sublabel && <p style={{ fontSize: 9, color: '#475569', margin: '4px 0 0', fontFamily: "'JetBrains Mono', monospace" }}>{sublabel}</p>}
     </div>
 );
 
@@ -357,15 +358,20 @@ const RevisionHistory = ({ appId, dark }) => {
 
 // ── Container log viewer (live stdout/stderr via SSE) ──────────────────────────
 
-const ContainerLogViewer = ({ appId, dark }) => {
+const ContainerLogViewer = ({ appId, dark, appStatus }) => {
     const [lines, setLines] = useState([]);
     const [connected, setConnected] = useState(false);
     const [autoScroll, setAutoScroll] = useState(true);
     const endRef = useRef(null);
 
+    const hasActivePod = appStatus === 'RUNNING';
+
     useEffect(() => {
         const token = localStorage.getItem('token');
-        if (!token || !appId) return;
+        if (!token || !appId || !hasActivePod) {
+            setConnected(false);
+            return;
+        }
 
         const es = new EventSource(`/api/logs/apps/${appId}/pod-logs/stream?token=${encodeURIComponent(token)}`);
 
@@ -379,7 +385,7 @@ const ContainerLogViewer = ({ appId, dark }) => {
         };
 
         return () => es.close();
-    }, [appId]);
+    }, [appId, hasActivePod]);
 
     useEffect(() => {
         if (autoScroll) endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -393,12 +399,12 @@ const ContainerLogViewer = ({ appId, dark }) => {
                     <span style={{ fontSize: 14, fontWeight: 800, fontFamily: "'Outfit', sans-serif" }} className="text-primary">Container Logs</span>
                     <span style={{
                         display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 8px', borderRadius: 20,
-                        background: connected ? 'rgba(63,185,80,0.1)' : 'rgba(148,163,184,0.1)',
-                        border: `1px solid ${connected ? 'rgba(63,185,80,0.25)' : 'rgba(148,163,184,0.25)'}`,
+                        background: connected ? 'rgba(63,185,80,0.1)' : !hasActivePod ? 'rgba(245,158,11,0.1)' : 'rgba(148,163,184,0.1)',
+                        border: `1px solid ${connected ? 'rgba(63,185,80,0.25)' : !hasActivePod ? 'rgba(245,158,11,0.25)' : 'rgba(148,163,184,0.25)'}`,
                         fontSize: 10, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700,
-                        color: connected ? '#3FB950' : '#94A3B8',
+                        color: connected ? '#3FB950' : !hasActivePod ? '#F59E0B' : '#94A3B8',
                     }}>
-                        {connected ? 'LIVE' : 'CONNECTING'}
+                        {connected ? 'LIVE' : !hasActivePod ? 'NO ACTIVE POD' : 'CONNECTING'}
                     </span>
                 </div>
                 <button onClick={() => setAutoScroll((v) => !v)} className="btn-secondary" style={{ padding: '5px 10px', fontSize: 11 }}>
@@ -410,7 +416,11 @@ const ContainerLogViewer = ({ appId, dark }) => {
                 minHeight: 240, maxHeight: 420, overflowY: 'auto', padding: '14px 16px',
                 display: 'flex', flexDirection: 'column', gap: 2,
             }}>
-                {lines.length === 0 ? (
+                {!hasActivePod ? (
+                    <div style={{ color: '#F59E0B' }}>
+                        App is scaled to zero (idle) — no active pod to stream logs from. Logs will resume on the next request that wakes the app.
+                    </div>
+                ) : lines.length === 0 ? (
                     <div style={{ color: '#5A7080' }}>Waiting for container output…</div>
                 ) : (
                     lines.map((line, i) => (
@@ -612,7 +622,6 @@ const AppDetails = () => {
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 6, flexWrap: 'wrap' }}>
                                 <span style={{ fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }} className="text-secondary">{appImage}</span>
-                                <span style={{ fontSize: 12, color: '#9CA3AF' }}>ns: {appData.namespace || 'production'}</span>
                                 <span style={{ fontSize: 12, color: '#9CA3AF' }}>Created {createdFmt}</span>
                                 {appUrl && (
                                     <a href={appUrl.startsWith('http') ? appUrl : `https://${appUrl}`} target="_blank" rel="noreferrer"
@@ -637,8 +646,10 @@ const AppDetails = () => {
                 <MetricMini label="P50 Latency" value={metrics ? fmtMs(metrics.p50LatencyMs)      : '—'} color={dark ? '#F9FAFB' : '#0F172A'} />
                 <MetricMini label="P95 Latency" value={metrics ? fmtMs(metrics.p95LatencyMs)      : '—'} color="#F59E0B" />
                 <MetricMini label="P99 Latency" value={metrics ? fmtMs(metrics.p99LatencyMs)      : '—'} color="#F97316" />
-                <MetricMini label="Memory"      value={metrics ? fmtMiB(metrics.memoryMiB)        : '—'} color="#10B981" />
-                <MetricMini label="CPU"         value={metrics?.cpuMillicores != null ? `${metrics.cpuMillicores}m` : appData.cpuRequest || '—'} color="#A855F7" />
+                <MetricMini label="Memory"      value={metrics ? fmtMiB(metrics.memoryMiB)        : '—'} color="#10B981"
+                    sublabel={metrics ? `of ${appData.memoryRequest || '—'} allocated` : 'no live data'} />
+                <MetricMini label="CPU"         value={metrics?.cpuMillicores != null ? `${metrics.cpuMillicores}m` : appData.cpuRequest || '—'} color="#A855F7"
+                    sublabel={metrics?.cpuMillicores != null ? `of ${appData.cpuRequest || '—'} allocated` : 'requested (no live data)'} />
                 <MetricMini label="Uptime"      value={appData.deployedAt ? (() => {
                     const diff = Math.floor((Date.now() - new Date(appData.deployedAt)) / 1000);
                     if (diff < 3600)  return `${Math.floor(diff/60)}m`;
@@ -716,7 +727,6 @@ const AppDetails = () => {
                                 { key: 'APP_NAME',      value: appData.name || appData.serviceName || id,                      secret: false },
                                 { key: 'IMAGE',         value: appImage,                                                        secret: false },
                                 { key: 'PORT',          value: String(appData.port || '—'),                                     secret: false },
-                                { key: 'NAMESPACE',     value: appData.namespace || '—',                                        secret: false },
                                 { key: 'STATUS',        value: appData.status || '—',                                           secret: false },
                                 { key: 'MIN_REPLICAS',  value: String(appData.minReplicas ?? '—'),                              secret: false },
                                 { key: 'MAX_REPLICAS',  value: String(appData.maxReplicas ?? '—'),                              secret: false },
@@ -777,7 +787,7 @@ const AppDetails = () => {
             <LogViewer logs={logs.length > 0 ? logs : MOCK_LOGS} dark={dark} />
 
             {/* Container Logs (live stdout/stderr) */}
-            <ContainerLogViewer appId={id} dark={dark} />
+            <ContainerLogViewer appId={id} dark={dark} appStatus={app?.status} />
 
             {/* Danger Zone */}
             <div className="ns-card" style={{ padding: 20, borderColor: 'rgba(239,68,68,0.25)' }}>

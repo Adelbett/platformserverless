@@ -162,6 +162,7 @@ public class AppService {
     public AppResponse getApp(String appId, String username) {
         UserContextService.UserContext ctx = userContextService.resolve(username);
         App app = requireOwned(appId, ctx.effectiveUserId());
+        syncStatusFromKubernetes(List.of(app));
         return toResponse(app);
     }
 

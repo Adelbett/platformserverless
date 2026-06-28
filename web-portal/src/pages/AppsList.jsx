@@ -278,7 +278,6 @@ const AppCard = ({ app, onDelete, navigate }) => {
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                     <Chip icon={Cpu} label={`${app.cpuRequest || '100m'} CPU`} color="#3B82F6" />
                     <Chip icon={MemoryStick} label={`${app.memoryRequest || '128Mi'} RAM`} color="#8B5CF6" />
-                    {app.namespace && <Chip icon={Server} label={app.namespace} color="#F59E0B" />}
                 </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 10 }}>
