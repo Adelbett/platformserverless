@@ -31,6 +31,7 @@ export const usersApi = {
 export const logsApi = {
     getByApp: (id) => api.get(`/logs/apps/${id}`),
     getByUser: (id) => api.get(`/logs/users/${id}`),
+    getMine: () => api.get('/logs/me'),
 }
 
 export const kafkaApi = {

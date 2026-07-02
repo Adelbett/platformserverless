@@ -39,6 +39,13 @@ public class LogController {
         return ResponseEntity.ok(logService.getLogsByUser(id, level));
     }
 
+    @GetMapping("/me")
+    @Operation(summary = "Get all logs for the authenticated user")
+    public ResponseEntity<List<DeploymentLog>> getMyLogs(Authentication auth,
+                                                          @RequestParam(required = false) String level) {
+        return ResponseEntity.ok(logService.getMyLogs(auth.getName(), level));
+    }
+
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "SSE stream of live deployment logs for the authenticated user")
     public SseEmitter streamLogs(Authentication auth) {

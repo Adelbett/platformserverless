@@ -1,5 +1,8 @@
 package com.platform.api.eventing;
 
+import com.platform.api.logs.DeploymentLog;
+import com.platform.api.logs.DeploymentLogRepository;
+import com.platform.api.logs.LogSseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,6 +18,8 @@ import java.util.UUID;
 public class EventService {
 
     private final WebClient.Builder webClientBuilder;
+    private final DeploymentLogRepository logRepository;
+    private final LogSseService logSseService;
 
     /**
      * Broker URL — set via environment variable or application.yml.
@@ -31,12 +36,17 @@ public class EventService {
      * CloudEvents spec: https://cloudevents.io
      */
     public void publish(Map<String, Object> payload) {
+        publish(payload, null);
+    }
+
+    public void publish(Map<String, Object> payload, String userId) {
         String eventType = payload.getOrDefault("type", "PLATFORM_EVENT").toString();
         String eventId   = UUID.randomUUID().toString();
         String appId     = payload.getOrDefault("appId", "").toString();
 
         if (!kubernetesEnabled) {
             log.info("[MOCK] Would publish CloudEvent id={} type={} appId={} payload={}", eventId, eventType, appId, payload);
+            saveEventLog(userId, appId, eventType, eventId, true);
             return;
         }
 
@@ -49,7 +59,6 @@ public class EventService {
                     .header("Ce-Source", "platform-backend")
                     .header("Ce-Id", eventId);
 
-            // Si appId fourni → ajouter comme attribut CloudEvent pour le routage par Trigger
             if (!appId.isBlank()) {
                 request = request.header("Ce-Appid", appId);
             }
@@ -60,8 +69,25 @@ public class EventService {
                     .block();
 
             log.info("CloudEvent published: id={} type={} appId={}", eventId, eventType, appId);
+            saveEventLog(userId, appId, eventType, eventId, true);
         } catch (Exception e) {
             log.error("Failed to publish CloudEvent: {}", e.getMessage());
+            saveEventLog(userId, appId, eventType, eventId, false);
+        }
+    }
+
+    private void saveEventLog(String userId, String appId, String eventType, String eventId, boolean success) {
+        try {
+            DeploymentLog entry = DeploymentLog.builder()
+                    .userId(userId)
+                    .appId(appId.isBlank() ? null : appId)
+                    .message("CloudEvent published — type: " + eventType + " | id: " + eventId)
+                    .type(success ? "EVENT_PUBLISHED" : "EVENT_FAILED")
+                    .build();
+            logRepository.save(entry);
+            logSseService.push(entry);
+        } catch (Exception e) {
+            log.warn("Could not save event log: {}", e.getMessage());
         }
     }
 }

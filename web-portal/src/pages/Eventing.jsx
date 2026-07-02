@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { eventApi, eventingApi, kafkaApi, appsApi } from '../api';
+import { eventApi, eventingApi, kafkaApi, appsApi, logsApi } from '../api';
 import { useTheme } from '../context/ThemeContext';
 import {
     Zap, Database, GitBranch, Box, RefreshCw, ChevronRight,
@@ -327,15 +327,25 @@ const PublishForm = ({ topics, triggers }) => {
 
 // ── Event Log ──────────────────────────────────────────────────────────────────
 const EventLog = ({ triggers, apps }) => {
-    const [log, setLog] = useState(() => {
-        try { return JSON.parse(localStorage.getItem('event_log') || '[]'); } catch { return []; }
-    });
+    const [log, setLog]       = useState([]);
+    const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('');
 
+    const load = async () => {
+        try {
+            const { data } = await logsApi.getMine();
+            const events = (Array.isArray(data) ? data : [])
+                .filter(e => e.type === 'EVENT_PUBLISHED' || e.type === 'EVENT_FAILED');
+            setLog(events);
+        } catch { setLog([]); }
+        finally { setLoading(false); }
+    };
+
+    useEffect(() => { load(); }, []);
+
     const filtered = log.filter(e =>
-        !filter || e.type?.toLowerCase().includes(filter.toLowerCase()) ||
-        e.topic?.toLowerCase().includes(filter.toLowerCase()) ||
-        e.appHint?.toLowerCase().includes(filter.toLowerCase())
+        !filter || e.message?.toLowerCase().includes(filter.toLowerCase()) ||
+        e.type?.toLowerCase().includes(filter.toLowerCase())
     );
 
     const fmtTime = (iso) => {
@@ -365,45 +375,34 @@ const EventLog = ({ triggers, apps }) => {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
                     <tr style={{ borderBottom: '1px solid rgba(0,0,0,0.07)' }}>
-                        {['TIMESTAMP', 'EVENT TYPE', 'TOPIC', 'APP TRIGGERED', 'DURATION', 'STATUS'].map(h => (
+                        {['TIMESTAMP', 'MESSAGE', 'STATUS'].map(h => (
                             <th key={h} style={{ padding: '9px 16px', textAlign: 'left', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#64748B' }}>{h}</th>
                         ))}
                     </tr>
                 </thead>
                 <tbody>
-                    {filtered.length === 0 ? (
-                        <tr><td colSpan={6} style={{ padding: '48px 16px', textAlign: 'center', color: '#64748B', fontSize: 13 }}>
+                    {loading ? (
+                        <tr><td colSpan={3} style={{ padding: '48px 16px', textAlign: 'center', color: '#64748B' }}>Loading…</td></tr>
+                    ) : filtered.length === 0 ? (
+                        <tr><td colSpan={3} style={{ padding: '48px 16px', textAlign: 'center', color: '#64748B', fontSize: 13 }}>
                             <FileText size={24} style={{ margin: '0 auto 10px', display: 'block', color: '#374151' }} />
                             No events logged yet — publish an event from the Publish tab
                         </td></tr>
-                    ) : filtered.map((ev, i) => {
-                        const isWarm = parseFloat(ev.duration) < 1;
-                        const isCold = parseFloat(ev.duration) > 2;
-                        return (
-                            <tr key={ev.id || i} style={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
-                                <td style={{ padding: '11px 16px', fontFamily: "'JetBrains Mono', monospace", color: '#64748B', whiteSpace: 'nowrap' }}>
-                                    {fmtTime(ev.timestamp)}
-                                </td>
-                                <td style={{ padding: '11px 16px', fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#A855F7' }}>
-                                    {ev.type}
-                                </td>
-                                <td style={{ padding: '11px 16px', fontFamily: "'JetBrains Mono', monospace", color: '#F59E0B' }}>
-                                    {ev.topic || '—'}
-                                </td>
-                                <td style={{ padding: '11px 16px', color: '#00D4FF', fontFamily: "'JetBrains Mono', monospace", maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {ev.appHint || '—'}
-                                </td>
-                                <td style={{ padding: '11px 16px', fontFamily: "'JetBrains Mono', monospace", color: isCold ? '#F59E0B' : '#10B981' }}>
-                                    {ev.duration}s {isCold ? '⚠️ cold start' : ''}
-                                </td>
-                                <td style={{ padding: '11px 16px' }}>
-                                    {ev.ok
-                                        ? <span style={{ fontSize: 10, fontWeight: 700, color: '#10B981', background: 'rgba(16,185,129,0.1)', padding: '2px 8px', borderRadius: 999 }}>✅ OK</span>
-                                        : <span style={{ fontSize: 10, fontWeight: 700, color: '#EF4444', background: 'rgba(239,68,68,0.1)', padding: '2px 8px', borderRadius: 999 }}>✗ FAILED</span>}
-                                </td>
-                            </tr>
-                        );
-                    })}
+                    ) : filtered.map((ev, i) => (
+                        <tr key={ev.id || i} style={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
+                            <td style={{ padding: '11px 16px', fontFamily: "'JetBrains Mono', monospace", color: '#64748B', whiteSpace: 'nowrap' }}>
+                                {fmtTime(ev.createdAt)}
+                            </td>
+                            <td style={{ padding: '11px 16px', color: '#DDE6F0', maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {ev.message}
+                            </td>
+                            <td style={{ padding: '11px 16px' }}>
+                                {ev.type === 'EVENT_PUBLISHED'
+                                    ? <span style={{ fontSize: 10, fontWeight: 700, color: '#10B981', background: 'rgba(16,185,129,0.1)', padding: '2px 8px', borderRadius: 999 }}>✅ OK</span>
+                                    : <span style={{ fontSize: 10, fontWeight: 700, color: '#EF4444', background: 'rgba(239,68,68,0.1)', padding: '2px 8px', borderRadius: 999 }}>✗ FAILED</span>}
+                            </td>
+                        </tr>
+                    ))}
                 </tbody>
             </table>
         </div>

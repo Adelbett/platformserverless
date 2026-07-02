@@ -276,7 +276,8 @@ const Dashboard = () => {
             }
         };
         load();
-        return () => { active = false; };
+        const interval = setInterval(load, 30_000);
+        return () => { active = false; clearInterval(interval); };
     }, [user?.username]);
 
     const running    = apps.filter(a => a.status === 'RUNNING').length;
