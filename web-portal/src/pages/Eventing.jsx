@@ -180,7 +180,8 @@ const PublishForm = ({ topics, triggers }) => {
         setResult(null); setPublishing(true);
         const t0 = Date.now();
         try {
-            const payload = { type: form.type, topicId: form.topicId || undefined, data: JSON.parse(form.data) };
+            const topicName = topics.find(t => t.id === form.topicId)?.name;
+            const payload = { type: form.type, topic: topicName || undefined, data: JSON.parse(form.data) };
             await eventApi.publish(payload);
             const duration = ((Date.now() - t0) / 1000).toFixed(2);
 
