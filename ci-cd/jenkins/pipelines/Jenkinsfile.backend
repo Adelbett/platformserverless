@@ -11,9 +11,12 @@ pipeline {
     }
 
     environment {
-        IMAGE_NAME = 'adelbettaieb/platform-api'
-        IMAGE_TAG  = "v${BUILD_NUMBER}"
-        NAMESPACE  = 'platform'
+        IMAGE_NAME        = 'adelbettaieb/platform-api'
+        IMAGE_TAG         = "v${BUILD_NUMBER}"
+        NAMESPACE         = 'platform'
+        // Force JNA to use a persistent directory instead of /tmp
+        // This prevents Kaniko from corrupting the spawn helper during build
+        JAVA_TOOL_OPTIONS = '-Djna.tmpdir=/var/jenkins_home/.jna-tmp'
     }
 
     stages {
@@ -76,13 +79,13 @@ pipeline {
 
     post {
         always {
-            // Supprime le @script corrompu après chaque build
-            // Sans ça, le prochain build échoue sur "corrupt .git repository"
-            sh '''
-                find /var/jenkins_home/workspace -maxdepth 1 \
-                    -name "*@script*" -type d \
-                    -exec rm -rf {} + 2>/dev/null || true
-            '''
+            // Groovy-native delete: no shell, no spawn helper, survives JNA corruption
+            script {
+                def ws = new File('/var/jenkins_home/workspace')
+                if (ws.exists()) {
+                    ws.listFiles()?.findAll { it.name.contains('@script') }?.each { it.deleteDir() }
+                }
+            }
         }
         success {
             echo "✅ Backend déployé avec succès — ${IMAGE_NAME}:${IMAGE_TAG}"

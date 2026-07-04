@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: jenkins-workspace-cleanup
+  namespace: jenkins
+spec:
+  schedule: "0 2 * * *"        # chaque nuit à 2h00
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: cleanup
+              image: busybox
+              command:
+                - sh
+                - -c
+                - |
+                  echo "Cleaning Jenkins @script workspaces..."
+                  find /jenkins-home/workspace -maxdepth 1 -name "*@script*" -type d \
+                    -exec rm -rf {} + 2>/dev/null || true
+                  find /tmp -maxdepth 1 -name "jna-*" -type d \
+                    -exec rm -rf {} + 2>/dev/null || true
+                  echo "Cleanup done."
+              volumeMounts:
+                - name: jenkins-home
+                  mountPath: /jenkins-home
+          volumes:
+            - name: jenkins-home
+              persistentVolumeClaim:
+                claimName: jenkins-pvc

@@ -90,7 +90,7 @@ const ApiKeysSection = () => {
     const create = () => {
         if (!newName.trim()) return;
         const token = {
-            id:        crypto.randomUUID(),
+            id:        Date.now() + '-' + Math.random().toString(36).slice(2),
             name:      newName.trim(),
             value:     generateToken(),
             createdAt: new Date().toISOString(),

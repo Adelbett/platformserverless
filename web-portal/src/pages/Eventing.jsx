@@ -190,7 +190,7 @@ const PublishForm = ({ topics, triggers }) => {
             const appHint = trigger ? (trigger.subscriberName?.split('-').slice(0, 3).join('-') || 'service') : null;
 
             const entry = {
-                id: crypto.randomUUID(),
+                id: Date.now() + '-' + Math.random().toString(36).slice(2),
                 time: new Date().toLocaleTimeString([], { hour12: false }),
                 timestamp: new Date().toISOString(),
                 type: form.type,

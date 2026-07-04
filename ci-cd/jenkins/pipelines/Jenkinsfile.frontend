@@ -6,9 +6,10 @@ pipeline {
     }
 
     environment {
-        IMAGE_NAME = 'adelbettaieb/platform-web'
-        IMAGE_TAG  = "v${BUILD_NUMBER}"
-        NAMESPACE  = 'platform'
+        IMAGE_NAME        = 'adelbettaieb/platform-web'
+        IMAGE_TAG         = "v${BUILD_NUMBER}"
+        NAMESPACE         = 'platform'
+        JAVA_TOOL_OPTIONS = '-Djna.tmpdir=/var/jenkins_home/.jna-tmp'
     }
 
     stages {
@@ -70,11 +71,12 @@ pipeline {
 
     post {
         always {
-            sh '''
-                find /var/jenkins_home/workspace -maxdepth 1 \
-                    -name "*@script*" -type d \
-                    -exec rm -rf {} + 2>/dev/null || true
-            '''
+            script {
+                def ws = new File('/var/jenkins_home/workspace')
+                if (ws.exists()) {
+                    ws.listFiles()?.findAll { it.name.contains('@script') }?.each { it.deleteDir() }
+                }
+            }
         }
         success {
             echo "✅ Frontend déployé avec succès — ${IMAGE_NAME}:${IMAGE_TAG}"
