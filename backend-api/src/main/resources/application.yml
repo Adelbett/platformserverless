@@ -50,6 +50,12 @@ app:
   billing:
     alert-threshold-usd: 50.0
 
+  # Stripe
+  stripe:
+    secret-key: ${STRIPE_SECRET_KEY:sk_test_REPLACE_ME}
+    publishable-key: ${STRIPE_PUBLISHABLE_KEY:pk_test_REPLACE_ME}
+    webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_REPLACE_ME}
+
   # Kubernetes / Knative
   kubernetes:
     enabled: true

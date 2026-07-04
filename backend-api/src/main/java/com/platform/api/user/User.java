@@ -58,6 +58,9 @@ public class User {
             "VIEW_LOGS", "VIEW_MONITORING", "VIEW_BILLING", "EXPORT_BILLING"
     ));
 
+    @Column(name = "stripe_customer_id")
+    private String stripeCustomerId;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

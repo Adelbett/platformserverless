@@ -4,12 +4,14 @@ import {
     AreaChart, Area,
     XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
-import { appsApi, kafkaApi, billingApi } from '../api';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { appsApi, kafkaApi, billingApi, paymentApi } from '../api';
 import { useAuth } from '../context/AuthContext';
 import {
     CreditCard, Cpu, MemoryStick,
     TrendingUp, Package, Database, RefreshCw,
-    Info, Zap, Clock, Download,
+    Info, Zap, Clock, Download, Trash2, Plus, CheckCircle, XCircle, AlertCircle,
 } from 'lucide-react';
 
 const PRICE = {
@@ -66,6 +68,315 @@ const MetricCard = ({ label, value, sub, color, icon: Icon, highlight }) => (
         <p style={{ fontSize: 10, color: '#334155', margin: 0, fontFamily: "'JetBrains Mono', monospace" }}>{sub}</p>
     </motion.div>
 );
+
+// ── Stripe card element style ──────────────────────────────────────────────
+const CARD_STYLE = {
+    style: {
+        base: {
+            color: '#F1F5F9', fontSize: '14px', fontFamily: "'JetBrains Mono', monospace",
+            '::placeholder': { color: '#475569' },
+            iconColor: '#3B82F6',
+        },
+        invalid: { color: '#EF4444', iconColor: '#EF4444' },
+    },
+};
+
+// ── Add Card Form (needs Stripe Elements context) ──────────────────────────
+const AddCardForm = ({ onSuccess, onCancel }) => {
+    const stripe   = useStripe();
+    const elements = useElements();
+    const [saving, setSaving] = useState(false);
+    const [error,  setError]  = useState(null);
+
+    const submit = async (e) => {
+        e.preventDefault();
+        if (!stripe || !elements) return;
+        setSaving(true);
+        setError(null);
+        try {
+            const { data } = await paymentApi.createSetupIntent();
+            const result = await stripe.confirmCardSetup(data.clientSecret, {
+                payment_method: { card: elements.getElement(CardElement) },
+            });
+            if (result.error) { setError(result.error.message); }
+            else               { onSuccess(); }
+        } catch (err) {
+            setError('Failed to save card. Please try again.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ padding: '14px 16px', borderRadius: 10, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.04)' }}>
+                <CardElement options={CARD_STYLE} />
+            </div>
+            {error && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#EF4444' }}>
+                    <XCircle size={14} /> {error}
+                </div>
+            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+                <button type="submit" disabled={saving || !stripe}
+                    style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', background: '#3B82F6', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, opacity: saving ? 0.6 : 1 }}>
+                    {saving ? 'Saving…' : 'Save Card'}
+                </button>
+                <button type="button" onClick={onCancel}
+                    style={{ padding: '10px 18px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#94A3B8', cursor: 'pointer', fontSize: 13 }}>
+                    Cancel
+                </button>
+            </div>
+        </form>
+    );
+};
+
+// ── Pay Invoice Form ───────────────────────────────────────────────────────
+const PayInvoiceForm = ({ amount, methods, onSuccess }) => {
+    const stripe              = useStripe();
+    const elements            = useElements();
+    const [selectedMethod, setSelectedMethod] = useState(methods[0]?.id || 'new');
+    const [paying, setPaying] = useState(false);
+    const [error,  setError]  = useState(null);
+    const [done,   setDone]   = useState(false);
+
+    const pay = async (e) => {
+        e.preventDefault();
+        setPaying(true); setError(null);
+        try {
+            if (selectedMethod !== 'new') {
+                const { data } = await paymentApi.pay({
+                    amount,
+                    paymentMethodId: selectedMethod,
+                    description: `Platform invoice — ${new Date().toLocaleDateString('en', { month: 'long', year: 'numeric' })}`,
+                });
+                if (data.status === 'succeeded') { setDone(true); onSuccess(data); }
+                else setError(`Payment status: ${data.status}`);
+            } else {
+                // new card flow
+                const { data: intentData } = await paymentApi.pay({
+                    amount,
+                    description: `Platform invoice — ${new Date().toLocaleDateString('en', { month: 'long', year: 'numeric' })}`,
+                });
+                const result = await stripe.confirmCardPayment(intentData.clientSecret, {
+                    payment_method: { card: elements.getElement(CardElement) },
+                });
+                if (result.error) setError(result.error.message);
+                else { setDone(true); onSuccess(result.paymentIntent); }
+            }
+        } catch { setError('Payment failed. Please try again.'); }
+        finally   { setPaying(false); }
+    };
+
+    if (done) return (
+        <div style={{ textAlign: 'center', padding: '24px 0' }}>
+            <CheckCircle size={40} style={{ color: '#10B981', margin: '0 auto 12px', display: 'block' }} />
+            <p style={{ fontSize: 16, fontWeight: 700, color: '#10B981', margin: 0 }}>Payment successful!</p>
+            <p style={{ fontSize: 12, color: '#475569', margin: '6px 0 0' }}>{fmtUsd(amount, 2)} charged</p>
+        </div>
+    );
+
+    return (
+        <form onSubmit={pay} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {methods.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {methods.map(m => (
+                        <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8, border: `1px solid ${selectedMethod === m.id ? 'rgba(59,130,246,0.5)' : 'rgba(255,255,255,0.08)'}`, cursor: 'pointer', background: selectedMethod === m.id ? 'rgba(59,130,246,0.07)' : 'transparent' }}>
+                            <input type="radio" name="method" value={m.id} checked={selectedMethod === m.id} onChange={() => setSelectedMethod(m.id)} style={{ accentColor: '#3B82F6' }} />
+                            <CreditCard size={14} style={{ color: '#3B82F6' }} />
+                            <span style={{ fontSize: 13, color: '#F1F5F9' }}>{m.brand?.toUpperCase()} •••• {m.last4}</span>
+                            <span style={{ fontSize: 11, color: '#475569', marginLeft: 'auto' }}>{m.expMonth}/{m.expYear}</span>
+                        </label>
+                    ))}
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8, border: `1px solid ${selectedMethod === 'new' ? 'rgba(59,130,246,0.5)' : 'rgba(255,255,255,0.08)'}`, cursor: 'pointer' }}>
+                        <input type="radio" name="method" value="new" checked={selectedMethod === 'new'} onChange={() => setSelectedMethod('new')} style={{ accentColor: '#3B82F6' }} />
+                        <Plus size={14} style={{ color: '#94A3B8' }} />
+                        <span style={{ fontSize: 13, color: '#94A3B8' }}>Use a new card</span>
+                    </label>
+                </div>
+            )}
+            {(selectedMethod === 'new' || methods.length === 0) && (
+                <div style={{ padding: '14px 16px', borderRadius: 10, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.04)' }}>
+                    <CardElement options={CARD_STYLE} />
+                </div>
+            )}
+            {error && <div style={{ display: 'flex', gap: 8, fontSize: 12, color: '#EF4444', alignItems: 'center' }}><XCircle size={13} />{error}</div>}
+            <button type="submit" disabled={paying || !stripe}
+                style={{ padding: '12px', borderRadius: 8, border: 'none', background: '#3B82F6', color: '#fff', fontWeight: 800, cursor: 'pointer', fontSize: 14, opacity: paying ? 0.6 : 1 }}>
+                {paying ? 'Processing…' : `Pay ${fmtUsd(amount, 2)}`}
+            </button>
+        </form>
+    );
+};
+
+// ── Payment Tab ────────────────────────────────────────────────────────────
+const PaymentTab = ({ mtdCost }) => {
+    const [stripePromise, setStripePromise] = useState(null);
+    const [methods,   setMethods]   = useState([]);
+    const [txHistory, setTxHistory] = useState([]);
+    const [loading,   setLoading]   = useState(true);
+    const [showAddCard, setShowAddCard] = useState(false);
+    const [showPayNow,  setShowPayNow]  = useState(false);
+
+    useEffect(() => {
+        paymentApi.getConfig().then(({ data }) => {
+            if (data.publishableKey && !data.publishableKey.includes('REPLACE_ME')) {
+                setStripePromise(loadStripe(data.publishableKey));
+            }
+        }).catch(() => {});
+        loadData();
+    }, []);
+
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            const [mRes, tRes] = await Promise.allSettled([
+                paymentApi.listMethods(),
+                paymentApi.getTransactions(),
+            ]);
+            if (mRes.status === 'fulfilled') setMethods(mRes.value.data || []);
+            if (tRes.status === 'fulfilled') setTxHistory(tRes.value.data || []);
+        } finally { setLoading(false); }
+    };
+
+    const removeMethod = async (id) => {
+        await paymentApi.deleteMethod(id);
+        setMethods(prev => prev.filter(m => m.id !== id));
+    };
+
+    const statusIcon = (s) => {
+        if (s === 'succeeded') return <CheckCircle size={13} style={{ color: '#10B981' }} />;
+        if (s === 'failed')    return <XCircle     size={13} style={{ color: '#EF4444' }} />;
+        return                        <AlertCircle size={13} style={{ color: '#F59E0B' }} />;
+    };
+    const statusColor = (s) => s === 'succeeded' ? '#10B981' : s === 'failed' ? '#EF4444' : '#F59E0B';
+
+    if (!stripePromise) return (
+        <div style={{ padding: 40, textAlign: 'center', color: '#475569' }}>
+            <CreditCard size={32} style={{ display: 'block', margin: '0 auto 12px', color: '#334155' }} />
+            <p style={{ fontSize: 13, margin: 0 }}>Stripe not configured.</p>
+            <p style={{ fontSize: 11, margin: '6px 0 0', color: '#334155' }}>
+                Set <code style={{ color: '#3B82F6' }}>STRIPE_SECRET_KEY</code> and <code style={{ color: '#3B82F6' }}>STRIPE_PUBLISHABLE_KEY</code> in your deployment.
+            </p>
+        </div>
+    );
+
+    return (
+        <Elements stripe={stripePromise}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+                {/* Balance + Pay Now */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                    <div style={{ background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 14, padding: '20px 22px' }}>
+                        <p style={{ fontSize: 10, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 8px', fontFamily: "'JetBrains Mono', monospace" }}>Amount due this month</p>
+                        <p style={{ fontSize: 34, fontWeight: 900, color: '#3B82F6', margin: '0 0 4px', fontFamily: "'Outfit', sans-serif" }}>{fmtUsd(mtdCost, 2)}</p>
+                        <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>{new Date().toLocaleDateString('en', { month: 'long', year: 'numeric' })}</p>
+                    </div>
+                    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '20px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                        <div>
+                            <p style={{ fontSize: 11, color: '#475569', margin: '0 0 6px' }}>Pay your current invoice instantly with a saved card or a new card.</p>
+                        </div>
+                        <button onClick={() => setShowPayNow(v => !v)}
+                            style={{ padding: '10px 0', borderRadius: 8, border: 'none', background: '#3B82F6', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+                            {showPayNow ? 'Cancel' : '💳 Pay Now'}
+                        </button>
+                    </div>
+                </div>
+
+                {showPayNow && (
+                    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 14, padding: '20px 22px' }}>
+                        <h4 style={{ fontSize: 13, fontWeight: 700, color: '#F1F5F9', margin: '0 0 16px' }}>Pay Invoice — {fmtUsd(mtdCost, 2)}</h4>
+                        <PayInvoiceForm amount={mtdCost} methods={methods} onSuccess={() => { setShowPayNow(false); loadData(); }} />
+                    </div>
+                )}
+
+                {/* Saved payment methods */}
+                <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, overflow: 'hidden' }}>
+                    <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <CreditCard size={14} style={{ color: '#3B82F6' }} />
+                            <span style={{ fontSize: 13, fontWeight: 700, color: '#F1F5F9' }}>Payment Methods</span>
+                            <span style={{ fontSize: 11, color: '#475569', fontFamily: "'JetBrains Mono', monospace" }}>{methods.length} saved</span>
+                        </div>
+                        <button onClick={() => setShowAddCard(v => !v)}
+                            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, border: '1px solid rgba(59,130,246,0.35)', background: showAddCard ? 'rgba(59,130,246,0.15)' : 'transparent', color: '#3B82F6', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                            <Plus size={12} /> Add Card
+                        </button>
+                    </div>
+
+                    {showAddCard && (
+                        <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                            <AddCardForm onSuccess={() => { setShowAddCard(false); loadData(); }} onCancel={() => setShowAddCard(false)} />
+                        </div>
+                    )}
+
+                    <div style={{ padding: methods.length === 0 && !showAddCard ? 32 : 0 }}>
+                        {loading ? (
+                            <div style={{ padding: 24, textAlign: 'center', color: '#475569', fontSize: 12 }}>Loading…</div>
+                        ) : methods.length === 0 && !showAddCard ? (
+                            <div style={{ textAlign: 'center', color: '#475569', fontSize: 12 }}>
+                                <CreditCard size={24} style={{ display: 'block', margin: '0 auto 8px', color: '#334155' }} />
+                                No payment methods saved
+                            </div>
+                        ) : methods.map(m => (
+                            <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                <div style={{ width: 40, height: 26, borderRadius: 5, background: 'rgba(59,130,246,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <CreditCard size={14} style={{ color: '#3B82F6' }} />
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <p style={{ fontSize: 13, fontWeight: 700, color: '#F1F5F9', margin: 0 }}>{m.brand?.toUpperCase()} •••• {m.last4}</p>
+                                    <p style={{ fontSize: 11, color: '#475569', margin: '2px 0 0' }}>Expires {m.expMonth}/{m.expYear}</p>
+                                </div>
+                                <button onClick={() => removeMethod(m.id)}
+                                    style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.06)', color: '#EF4444', cursor: 'pointer', fontSize: 11 }}>
+                                    <Trash2 size={12} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Transaction history */}
+                <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, overflow: 'hidden' }}>
+                    <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#F1F5F9' }}>Transaction History</span>
+                    </div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead><tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                            {['Date', 'Description', 'Card', 'Amount', 'Status'].map((h, i) => (
+                                <th key={h} style={{ padding: '9px 16px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#334155', textAlign: i >= 3 ? 'right' : 'left' }}>{h}</th>
+                            ))}
+                        </tr></thead>
+                        <tbody>
+                            {txHistory.length === 0 ? (
+                                <tr><td colSpan={5} style={{ padding: 32, textAlign: 'center', fontSize: 12, color: '#475569' }}>No transactions yet</td></tr>
+                            ) : txHistory.map(tx => (
+                                <tr key={tx.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                    <td style={{ padding: '11px 16px', fontSize: 11, color: '#64748B', fontFamily: "'JetBrains Mono', monospace" }}>
+                                        {new Date(tx.createdAt).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    </td>
+                                    <td style={{ padding: '11px 16px', fontSize: 12, color: '#94A3B8' }}>{tx.description || '—'}</td>
+                                    <td style={{ padding: '11px 16px', fontSize: 11, color: '#64748B', fontFamily: "'JetBrains Mono', monospace' }}>
+                                        {tx.cardBrand && tx.cardLast4 ? `${tx.cardBrand.toUpperCase()} ••${tx.cardLast4}` : '—'}
+                                    </td>
+                                    <td style={{ padding: '11px 16px', textAlign: 'right', fontSize: 12, fontWeight: 700, color: '#F1F5F9', fontFamily: "'JetBrains Mono', monospace" }}>
+                                        {fmtUsd(tx.amount, 2)}
+                                    </td>
+                                    <td style={{ padding: '11px 16px', textAlign: 'right' }}>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: statusColor(tx.status), background: `${statusColor(tx.status)}12`, border: `1px solid ${statusColor(tx.status)}25`, padding: '2px 8px', borderRadius: 999 }}>
+                                            {statusIcon(tx.status)} {tx.status}
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        </Elements>
+    );
+};
 
 const Billing = () => {
     const { user } = useAuth();
@@ -164,6 +475,7 @@ const Billing = () => {
         { key: 'overview',  label: 'Overview'    },
         { key: 'breakdown', label: 'Per Service'  },
         { key: 'invoice',   label: 'This Month'  },
+        { key: 'payment',   label: '💳 Payment'  },
     ];
 
     return (
@@ -406,6 +718,9 @@ const Billing = () => {
                     )}
                 </div>
             )}
+
+            {/* ══ PAYMENT ══ */}
+            {tab === 'payment' && <PaymentTab mtdCost={mtdCost} />}
 
             {/* ══ THIS MONTH ══ */}
             {tab === 'invoice' && (

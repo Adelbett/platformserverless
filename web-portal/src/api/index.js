@@ -88,3 +88,12 @@ export const adminApi = {
     suspendClient:      (id) => api.post(`/admin/clients/${id}/suspend`),
     restoreClient:      (id) => api.post(`/admin/clients/${id}/restore`),
 }
+
+export const paymentApi = {
+    getConfig:       ()         => api.get('/payment/config'),
+    createSetupIntent: ()       => api.post('/payment/setup-intent'),
+    listMethods:     ()         => api.get('/payment/methods'),
+    deleteMethod:    (id)       => api.delete(`/payment/methods/${id}`),
+    pay:             (body)     => api.post('/payment/pay', body),
+    getTransactions: ()         => api.get('/payment/transactions'),
+}

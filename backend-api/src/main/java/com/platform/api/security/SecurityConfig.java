@@ -47,6 +47,7 @@ public class SecurityConfig {
                 .requestMatchers("/swagger-ui/**", "/api-docs/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                 .requestMatchers("/h2-console/**").permitAll()
+                .requestMatchers("/api/payment/webhook").permitAll()
                 // Secured
                 .anyRequest().authenticated()
             )
