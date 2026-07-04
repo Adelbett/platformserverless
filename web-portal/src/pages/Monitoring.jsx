@@ -24,6 +24,7 @@ const statusColor = s => ({
     FAILED:  '#F85149', Failed:  '#F85149',
     SCALING: '#E8A838', Pending: '#E8A838',
     Succeeded: '#4A9EF5',
+    IDLE: '#5A7080', SCALED_TO_ZERO: '#5A7080',
 }[s] || '#5A7080');
 
 // ── Sparkline ──────────────────────────────────────────────────────────────────
@@ -220,7 +221,9 @@ const AppMetricsPanel = ({ appId, dark }) => {
     const [errHistory,  setErrHistory]  = useState([]);
     const [cpuHistory,  setCpuHistory]  = useState([]);
     const [lastMetric,  setLastMetric]  = useState(null);
-    const esRef = useRef(null);
+    const [noData,      setNoData]      = useState(false);
+    const esRef      = useRef(null);
+    const timerRef   = useRef(null);
     const gridColor = dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)';
     const axisColor = dark ? '#374151' : '#94A3B8';
 
@@ -228,13 +231,20 @@ const AppMetricsPanel = ({ appId, dark }) => {
         if (!appId) return;
         const token = localStorage.getItem('token');
         if (esRef.current) esRef.current.close();
+        if (timerRef.current) clearTimeout(timerRef.current);
         setReqHistory([]); setLatHistory([]); setErrHistory([]); setCpuHistory([]);
+        setNoData(false);
+
+        // After 6s without data, assume app is scaled to zero
+        timerRef.current = setTimeout(() => setNoData(true), 6000);
 
         const es = new EventSource(`/api/metrics/apps/${appId}/stream?token=${token}`);
         esRef.current = es;
         es.onmessage = (e) => {
             try {
                 const m = JSON.parse(e.data);
+                clearTimeout(timerRef.current);
+                setNoData(false);
                 setLastMetric(m);
                 const ts = new Date().toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                 const push = (setter, key) => setter(prev => [...prev.slice(-59), { t: ts, value: m[key] ?? 0 }]);
@@ -245,7 +255,7 @@ const AppMetricsPanel = ({ appId, dark }) => {
             } catch {}
         };
         es.onerror = () => es.close();
-        return () => es.close();
+        return () => { es.close(); clearTimeout(timerRef.current); };
     }, [appId]);
 
     const charts = [
@@ -255,14 +265,27 @@ const AppMetricsPanel = ({ appId, dark }) => {
         { title: 'CPU Usage',      data: cpuHistory, dataKey: 'value', color: '#10B981', gradId: 'gCpu', fmt: v => `${v.toFixed(1)}%`,       sub: lastMetric ? `${lastMetric.cpuUsage?.toFixed(1)}%` : '—' },
     ];
 
-    if (reqHistory.length === 0) {
+    if (noData || reqHistory.length === 0) {
         return (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
                 {charts.map(c => (
                     <div key={c.title} className="ns-card" style={{ padding: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 160 }}>
                         <div style={{ textAlign: 'center' }}>
-                            <div style={{ width: 20, height: 20, border: `2px solid ${c.color}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 12px' }} />
-                            <p style={{ fontSize: 12, color: '#64748B', margin: 0 }}>Waiting for {c.title} data…</p>
+                            {noData ? (
+                                <>
+                                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(90,112,128,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                                        <span style={{ fontSize: 18 }}>💤</span>
+                                    </div>
+                                    <p style={{ fontSize: 13, fontWeight: 700, color: '#5A7080', margin: '0 0 4px' }}>{c.title}</p>
+                                    <p style={{ fontSize: 11, color: '#64748B', margin: 0 }}>App scaled to zero — no metrics</p>
+                                    <p style={{ fontSize: 10, color: '#4A5568', margin: '4px 0 0' }}>Metrics appear when app receives traffic</p>
+                                </>
+                            ) : (
+                                <>
+                                    <div style={{ width: 20, height: 20, border: `2px solid ${c.color}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 12px' }} />
+                                    <p style={{ fontSize: 12, color: '#64748B', margin: 0 }}>Connecting to {c.title}…</p>
+                                </>
+                            )}
                         </div>
                     </div>
                 ))}
@@ -359,7 +382,8 @@ const Monitoring = () => {
                     appsApi.list().catch(() => ({ data: [] })),
                     metricsApi.getCluster().catch(() => ({ data: null })),
                 ]);
-                const appList = Array.isArray(appsRes.data) ? appsRes.data : [];
+                const raw = Array.isArray(appsRes.data) ? appsRes.data : [];
+                const appList = raw.filter((a, idx, arr) => arr.findIndex(b => b.id === a.id) === idx);
                 setApps(appList);
                 setCluster(metricsRes.data);
                 if (!selectedApp && appList.length > 0) setSelectedApp(appList[0].id);
