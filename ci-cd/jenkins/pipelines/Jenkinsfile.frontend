@@ -69,6 +69,13 @@ pipeline {
     }
 
     post {
+        always {
+            sh '''
+                find /var/jenkins_home/workspace -maxdepth 1 \
+                    -name "*@script*" -type d \
+                    -exec rm -rf {} + 2>/dev/null || true
+            '''
+        }
         success {
             echo "✅ Frontend déployé avec succès — ${IMAGE_NAME}:${IMAGE_TAG}"
         }
