@@ -21,9 +21,16 @@ pipeline {
 
     stages {
 
-        stage('Fix JNA tmp') {
+        stage('Cleanup') {
             steps {
-                sh 'find /tmp -maxdepth 1 -name "jna-*" -type d -exec rm -rf {} + 2>/dev/null || true'
+                // Remove @script left by previous build (corrupt .git causes next checkout to fail)
+                // Remove stale JNA tmp dirs that Kaniko corrupts during build
+                sh '''
+                    find /var/jenkins_home/workspace -maxdepth 1 -name "*@script*" -type d \
+                        -exec rm -rf {} + 2>/dev/null || true
+                    find /tmp -maxdepth 1 -name "jna-*" -type d \
+                        -exec rm -rf {} + 2>/dev/null || true
+                '''
             }
         }
 
@@ -78,9 +85,6 @@ pipeline {
     }
 
     post {
-        always {
-            sh 'find /var/jenkins_home/workspace -maxdepth 1 -name "*@script*" -type d -exec rm -rf {} + 2>/dev/null || true'
-        }
         success {
             echo "✅ Backend déployé avec succès — ${IMAGE_NAME}:${IMAGE_TAG}"
         }

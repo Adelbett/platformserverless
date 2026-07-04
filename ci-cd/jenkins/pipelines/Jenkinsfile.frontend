@@ -14,9 +14,14 @@ pipeline {
 
     stages {
 
-        stage('Fix JNA tmp') {
+        stage('Cleanup') {
             steps {
-                sh 'find /tmp -maxdepth 1 -name "jna-*" -type d -exec rm -rf {} + 2>/dev/null || true'
+                sh '''
+                    find /var/jenkins_home/workspace -maxdepth 1 -name "*@script*" -type d \
+                        -exec rm -rf {} + 2>/dev/null || true
+                    find /tmp -maxdepth 1 -name "jna-*" -type d \
+                        -exec rm -rf {} + 2>/dev/null || true
+                '''
             }
         }
 
@@ -70,9 +75,6 @@ pipeline {
     }
 
     post {
-        always {
-            sh 'find /var/jenkins_home/workspace -maxdepth 1 -name "*@script*" -type d -exec rm -rf {} + 2>/dev/null || true'
-        }
         success {
             echo "✅ Frontend déployé avec succès — ${IMAGE_NAME}:${IMAGE_TAG}"
         }
