@@ -5,8 +5,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,17 +20,18 @@ public class EventController {
 
     private final EventService eventService;
 
-    /**
-     * Push a custom CloudEvent to the Knative Eventing broker.
-     * Body example: { "type": "DEPLOYMENT_SUCCESS", "appId": "abc123", "data": {} }
-     */
     @PostMapping
-    @PreAuthorize("@permissionService.has(authentication.name, 'MANAGE_EVENTING')")
-    @Operation(summary = "Push a CloudEvent to the Knative Eventing broker")
+    @Operation(summary = "Push a CloudEvent — accepts JWT (Bearer) or API Key (X-Api-Key)")
     public ResponseEntity<Map<String, String>> pushEvent(
             @RequestBody Map<String, Object> payload,
-            @AuthenticationPrincipal Jwt jwt) {
-        String username = jwt != null ? jwt.getClaimAsString("preferred_username") : null;
+            Authentication auth) {
+        // Works for both JWT auth and API key auth
+        String username = null;
+        if (auth != null && auth.getPrincipal() instanceof Jwt jwt) {
+            username = jwt.getClaimAsString("preferred_username");
+        } else if (auth != null) {
+            username = auth.getName(); // userId set by ApiKeyFilter
+        }
         eventService.publish(payload, username);
         return ResponseEntity.accepted().body(Map.of("status", "EVENT_ACCEPTED"));
     }

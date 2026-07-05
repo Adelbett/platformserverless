@@ -30,6 +30,7 @@ public class SecurityConfig {
     private final KeycloakJwtAuthConverter keycloakJwtAuthConverter;
     private final SseTokenFilter sseTokenFilter;
     private final UserSyncFilter userSyncFilter;
+    private final ApiKeyFilter apiKeyFilter;
 
     @Value("${app.cors.allowed-origins}")
     private List<String> allowedOrigins;
@@ -56,6 +57,7 @@ public class SecurityConfig {
                 .jwt(jwt -> jwt.jwtAuthenticationConverter(keycloakJwtAuthConverter))
             )
             .addFilterBefore(sseTokenFilter, BasicAuthenticationFilter.class)
+            .addFilterBefore(apiKeyFilter, BasicAuthenticationFilter.class)
             .addFilterAfter(userSyncFilter, BearerTokenAuthenticationFilter.class);
 
         return http.build();
