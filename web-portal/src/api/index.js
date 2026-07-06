@@ -97,3 +97,10 @@ export const paymentApi = {
     pay:             (body)     => api.post('/payment/pay', body),
     getTransactions: ()         => api.get('/payment/transactions'),
 }
+
+export const invoiceApi = {
+    list:         ()                        => api.get('/invoices'),
+    pay:          (id, paymentMethodId)     => api.post(`/invoices/${id}/pay`, { paymentMethodId }),
+    suspend:      (appId)                   => api.post(`/invoices/apps/${appId}/suspend`),
+    adminOverdue: ()                        => api.get('/invoices/admin/overdue'),
+}

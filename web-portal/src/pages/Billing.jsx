@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { appsApi, kafkaApi, billingApi, paymentApi } from '../api';
+import { appsApi, kafkaApi, billingApi, paymentApi, invoiceApi } from '../api';
 import { useAuth } from '../context/AuthContext';
 import {
     CreditCard, Cpu, MemoryStick,
@@ -132,7 +132,7 @@ const AddCardForm = ({ onSuccess, onCancel }) => {
 };
 
 // ── Pay Invoice Form ───────────────────────────────────────────────────────
-const PayInvoiceForm = ({ amount, methods, onSuccess }) => {
+const PayInvoiceForm = ({ amount, methods, onSuccess, onCancel, onDirectPay, paying: externalPaying }) => {
     const stripe              = useStripe();
     const elements            = useElements();
     const [selectedMethod, setSelectedMethod] = useState(methods[0]?.id || 'new');
@@ -201,22 +201,45 @@ const PayInvoiceForm = ({ amount, methods, onSuccess }) => {
                 </div>
             )}
             {error && <div style={{ display: 'flex', gap: 8, fontSize: 12, color: '#EF4444', alignItems: 'center' }}><XCircle size={13} />{error}</div>}
-            <button type="submit" disabled={paying || !stripe}
-                style={{ padding: '12px', borderRadius: 8, border: 'none', background: '#3B82F6', color: '#fff', fontWeight: 800, cursor: 'pointer', fontSize: 14, opacity: paying ? 0.6 : 1 }}>
-                {paying ? 'Processing…' : `Pay ${fmtUsd(amount, 2)}`}
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+                <button type="submit" disabled={paying || externalPaying || !stripe}
+                    style={{ flex: 1, padding: '12px', borderRadius: 8, border: 'none', background: '#3B82F6', color: '#fff', fontWeight: 800, cursor: 'pointer', fontSize: 14, opacity: (paying || externalPaying) ? 0.6 : 1 }}>
+                    {(paying || externalPaying) ? 'Processing…' : `Pay ${fmtUsd(amount, 2)}`}
+                </button>
+                {onCancel && (
+                    <button type="button" onClick={onCancel}
+                        style={{ padding: '12px 18px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#94A3B8', cursor: 'pointer', fontSize: 13 }}>
+                        Cancel
+                    </button>
+                )}
+            </div>
         </form>
     );
 };
 
 // ── Payment Tab ────────────────────────────────────────────────────────────
+const invoiceStatusMeta = (inv) => {
+    const today    = new Date();
+    const due      = new Date(inv.dueDate);
+    const daysLeft = Math.ceil((due - today) / 86400000);
+    if (inv.status === 'PAID')       return { label: '✅ Paid',       color: '#10B981', bg: 'rgba(16,185,129,0.10)', urgent: false };
+    if (inv.status === 'SUSPENDED')  return { label: '🔴 Suspended',  color: '#EF4444', bg: 'rgba(239,68,68,0.10)',  urgent: true  };
+    if (inv.status === 'OVERDUE' || (inv.status !== 'PAID' && due < today))
+                                     return { label: '🔴 Overdue',    color: '#EF4444', bg: 'rgba(239,68,68,0.10)',  urgent: true  };
+    if (daysLeft <= 3)               return { label: `⚠️ ${daysLeft}d left`, color: '#F59E0B', bg: 'rgba(245,158,11,0.10)', urgent: true };
+    return                                  { label: '✅ On time',    color: '#10B981', bg: 'rgba(16,185,129,0.10)', urgent: false };
+};
+
 const PaymentTab = ({ mtdCost }) => {
     const [stripePromise, setStripePromise] = useState(null);
     const [methods,   setMethods]   = useState([]);
     const [txHistory, setTxHistory] = useState([]);
+    const [invoices,  setInvoices]  = useState([]);
     const [loading,   setLoading]   = useState(true);
     const [showAddCard, setShowAddCard] = useState(false);
-    const [showPayNow,  setShowPayNow]  = useState(false);
+    const [payingId,    setPayingId]    = useState(null); // invoice id being paid
+    const [payError,    setPayError]    = useState('');
+    const [payingInProgress, setPayingInProgress] = useState(false);
 
     useEffect(() => {
         paymentApi.getConfig().then(({ data }) => {
@@ -230,12 +253,14 @@ const PaymentTab = ({ mtdCost }) => {
     const loadData = async () => {
         setLoading(true);
         try {
-            const [mRes, tRes] = await Promise.allSettled([
+            const [mRes, tRes, iRes] = await Promise.allSettled([
                 paymentApi.listMethods(),
                 paymentApi.getTransactions(),
+                invoiceApi.list(),
             ]);
             if (mRes.status === 'fulfilled') setMethods(mRes.value.data || []);
             if (tRes.status === 'fulfilled') setTxHistory(tRes.value.data || []);
+            if (iRes.status === 'fulfilled') setInvoices(iRes.value.data || []);
         } finally { setLoading(false); }
     };
 
@@ -244,12 +269,28 @@ const PaymentTab = ({ mtdCost }) => {
         setMethods(prev => prev.filter(m => m.id !== id));
     };
 
+    const handlePayInvoice = async (inv) => {
+        if (methods.length === 0) { setPayError('Ajoutez d\'abord une carte de paiement.'); return; }
+        setPayingInProgress(true);
+        setPayError('');
+        try {
+            await invoiceApi.pay(inv.id, methods[0].id);
+            await loadData();
+            setPayingId(null);
+        } catch (e) {
+            setPayError(e?.response?.data?.message || 'Paiement échoué.');
+        } finally { setPayingInProgress(false); }
+    };
+
     const statusIcon = (s) => {
         if (s === 'succeeded') return <CheckCircle size={13} style={{ color: '#10B981' }} />;
         if (s === 'failed')    return <XCircle     size={13} style={{ color: '#EF4444' }} />;
         return                        <AlertCircle size={13} style={{ color: '#F59E0B' }} />;
     };
     const statusColor = (s) => s === 'succeeded' ? '#10B981' : s === 'failed' ? '#EF4444' : '#F59E0B';
+
+    const unpaidInvoices = invoices.filter(i => i.status !== 'PAID');
+    const urgentCount    = unpaidInvoices.filter(i => invoiceStatusMeta(i).urgent).length;
 
     if (!stripePromise) return (
         <div style={{ padding: 40, textAlign: 'center', color: '#475569' }}>
@@ -265,30 +306,87 @@ const PaymentTab = ({ mtdCost }) => {
         <Elements stripe={stripePromise}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-                {/* Balance + Pay Now */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                    <div style={{ background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 14, padding: '20px 22px' }}>
-                        <p style={{ fontSize: 10, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 8px', fontFamily: "'JetBrains Mono', monospace" }}>Amount due this month</p>
-                        <p style={{ fontSize: 34, fontWeight: 900, color: '#3B82F6', margin: '0 0 4px', fontFamily: "'Outfit', sans-serif" }}>{fmtUsd(mtdCost, 2)}</p>
-                        <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>{new Date().toLocaleDateString('en', { month: 'long', year: 'numeric' })}</p>
+                {/* Invoices by service */}
+                <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, overflow: 'hidden' }}>
+                    <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <CreditCard size={14} style={{ color: '#3B82F6' }} />
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#F1F5F9' }}>Invoices by Service</span>
+                        {urgentCount > 0 && (
+                            <span style={{ fontSize: 10, fontWeight: 700, color: '#EF4444', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 999, padding: '2px 8px' }}>
+                                {urgentCount} requires action
+                            </span>
+                        )}
                     </div>
-                    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '20px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                        <div>
-                            <p style={{ fontSize: 11, color: '#475569', margin: '0 0 6px' }}>Pay your current invoice instantly with a saved card or a new card.</p>
-                        </div>
-                        <button onClick={() => setShowPayNow(v => !v)}
-                            style={{ padding: '10px 0', borderRadius: 8, border: 'none', background: '#3B82F6', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
-                            {showPayNow ? 'Cancel' : '💳 Pay Now'}
-                        </button>
-                    </div>
-                </div>
 
-                {showPayNow && (
-                    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 14, padding: '20px 22px' }}>
-                        <h4 style={{ fontSize: 13, fontWeight: 700, color: '#F1F5F9', margin: '0 0 16px' }}>Pay Invoice — {fmtUsd(mtdCost, 2)}</h4>
-                        <PayInvoiceForm amount={mtdCost} methods={methods} onSuccess={() => { setShowPayNow(false); loadData(); }} />
-                    </div>
-                )}
+                    {payError && (
+                        <div style={{ margin: '12px 20px', padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.3)', color: '#EF4444', fontSize: 12 }}>
+                            {payError}
+                        </div>
+                    )}
+
+                    {loading ? (
+                        <div style={{ padding: 32, textAlign: 'center', color: '#475569', fontSize: 12 }}>Loading…</div>
+                    ) : invoices.length === 0 ? (
+                        <div style={{ padding: 32, textAlign: 'center', color: '#475569', fontSize: 12 }}>
+                            <CheckCircle size={24} style={{ display: 'block', margin: '0 auto 8px', color: '#10B981' }} />
+                            No invoices yet — they are generated on the 1st of each month.
+                        </div>
+                    ) : (
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead><tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                {['Service', 'Period', 'Due Date', 'Amount', 'Status', ''].map((h, i) => (
+                                    <th key={i} style={{ padding: '9px 16px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#334155', textAlign: i >= 3 ? 'right' : 'left' }}>{h}</th>
+                                ))}
+                            </tr></thead>
+                            <tbody>
+                                {invoices.map(inv => {
+                                    const meta = invoiceStatusMeta(inv);
+                                    const isPaying = payingId === inv.id;
+                                    return (
+                                        <tr key={inv.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', background: meta.urgent ? 'rgba(239,68,68,0.02)' : 'transparent' }}>
+                                            <td style={{ padding: '13px 16px' }}>
+                                                <span style={{ fontSize: 13, fontWeight: 700, color: '#F1F5F9' }}>{inv.appName}</span>
+                                            </td>
+                                            <td style={{ padding: '13px 16px', fontSize: 11, color: '#64748B', fontFamily: "'JetBrains Mono', monospace" }}>
+                                                {inv.periodStart} → {inv.periodEnd}
+                                            </td>
+                                            <td style={{ padding: '13px 16px', fontSize: 11, color: meta.urgent ? '#F59E0B' : '#64748B', fontFamily: "'JetBrains Mono', monospace", fontWeight: meta.urgent ? 700 : 400 }}>
+                                                {inv.dueDate}
+                                            </td>
+                                            <td style={{ padding: '13px 16px', textAlign: 'right', fontSize: 13, fontWeight: 800, color: '#F1F5F9', fontFamily: "'JetBrains Mono', monospace" }}>
+                                                {fmtUsd(inv.amountUsd, 2)}
+                                            </td>
+                                            <td style={{ padding: '13px 16px', textAlign: 'right' }}>
+                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: meta.color, background: meta.bg, border: `1px solid ${meta.color}33`, padding: '3px 10px', borderRadius: 999 }}>
+                                                    {meta.label}
+                                                </span>
+                                            </td>
+                                            <td style={{ padding: '13px 16px', textAlign: 'right' }}>
+                                                {inv.status !== 'PAID' && (
+                                                    isPaying ? (
+                                                        <PayInvoiceForm
+                                                            amount={inv.amountUsd}
+                                                            methods={methods}
+                                                            onSuccess={() => { setPayingId(null); loadData(); }}
+                                                            onCancel={() => setPayingId(null)}
+                                                            onDirectPay={() => handlePayInvoice(inv)}
+                                                            paying={payingInProgress}
+                                                        />
+                                                    ) : (
+                                                        <button onClick={() => { setPayingId(inv.id); setPayError(''); }}
+                                                            style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: '#3B82F6', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 12 }}>
+                                                            💳 Pay
+                                                        </button>
+                                                    )
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
 
                 {/* Saved payment methods */}
                 <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, overflow: 'hidden' }}>

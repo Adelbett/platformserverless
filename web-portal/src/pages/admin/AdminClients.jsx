@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Ban, Play, AlertTriangle, RefreshCw } from 'lucide-react';
-import { adminApi } from '../../api';
+import { Users, Ban, Play, AlertTriangle, RefreshCw, CreditCard } from 'lucide-react';
+import { adminApi, invoiceApi } from '../../api';
 
 const ClientRow = ({ client, onSuspend, onRestore }) => {
     const [loading, setLoading] = useState(false);
@@ -98,8 +98,9 @@ const ClientRow = ({ client, onSuspend, onRestore }) => {
 };
 
 const AdminClients = () => {
-    const [clients, setClients] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [clients,          setClients]          = useState([]);
+    const [overdueInvoices,  setOverdueInvoices]  = useState([]);
+    const [loading,          setLoading]          = useState(true);
 
     const load = async () => {
         setLoading(true);
@@ -111,7 +112,10 @@ const AdminClients = () => {
         }
     };
 
-    useEffect(() => { load(); }, []);
+    useEffect(() => {
+        load();
+        invoiceApi.adminOverdue().then(r => setOverdueInvoices(r.data || [])).catch(() => {});
+    }, []);
 
     const handleSuspend = async (id) => {
         await adminApi.suspendClient(id);
@@ -121,6 +125,11 @@ const AdminClients = () => {
     const handleRestore = async (id) => {
         await adminApi.restoreClient(id);
         setClients(prev => prev.map(c => c.id === id ? { ...c, suspended: false, suspendedApps: 0 } : c));
+    };
+
+    const handleSuspendApp = async (appId, invoiceId) => {
+        await invoiceApi.suspend(appId);
+        setOverdueInvoices(prev => prev.map(i => i.id === invoiceId ? { ...i, status: 'SUSPENDED' } : i));
     };
 
     const suspendedCount = clients.filter(c => c.suspended).length;
@@ -159,6 +168,44 @@ const AdminClients = () => {
                     <RefreshCw size={13} /> Refresh
                 </button>
             </div>
+
+            {/* Overdue invoices banner */}
+            {overdueInvoices.filter(i => i.status !== 'SUSPENDED' && i.status !== 'PAID').length > 0 && (
+                <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 12, overflow: 'hidden', marginBottom: 20 }}>
+                    <div style={{ padding: '12px 18px', borderBottom: '1px solid rgba(239,68,68,0.15)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <CreditCard size={14} color="#EF4444" />
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#FCA5A5' }}>Overdue Invoices — Services at risk</span>
+                    </div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead><tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                            {['Service', 'Client', 'Amount', 'Due Date', 'Status', ''].map((h, i) => (
+                                <th key={i} style={{ padding: '9px 16px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#334155', textAlign: i >= 2 ? 'right' : 'left' }}>{h}</th>
+                            ))}
+                        </tr></thead>
+                        <tbody>
+                            {overdueInvoices.filter(i => i.status !== 'SUSPENDED' && i.status !== 'PAID').map(inv => (
+                                <tr key={inv.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                    <td style={{ padding: '11px 16px', fontSize: 13, fontWeight: 700, color: '#F1F5F9' }}>{inv.appName}</td>
+                                    <td style={{ padding: '11px 16px', fontSize: 11, color: '#64748B' }}>{inv.userId}</td>
+                                    <td style={{ padding: '11px 16px', textAlign: 'right', fontSize: 12, fontWeight: 700, color: '#F1F5F9' }}>${Number(inv.amountUsd).toFixed(2)}</td>
+                                    <td style={{ padding: '11px 16px', textAlign: 'right', fontSize: 11, color: '#EF4444', fontWeight: 700 }}>{inv.dueDate}</td>
+                                    <td style={{ padding: '11px 16px', textAlign: 'right' }}>
+                                        <span style={{ fontSize: 11, fontWeight: 700, color: '#EF4444', background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.3)', padding: '2px 8px', borderRadius: 999 }}>
+                                            🔴 {inv.status}
+                                        </span>
+                                    </td>
+                                    <td style={{ padding: '11px 16px', textAlign: 'right' }}>
+                                        <button onClick={() => handleSuspendApp(inv.appId, inv.id)}
+                                            style={{ padding: '5px 12px', borderRadius: 7, border: '1px solid rgba(239,68,68,0.35)', background: 'rgba(239,68,68,0.08)', color: '#EF4444', cursor: 'pointer', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+                                            <Ban size={11} /> Suspend
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
 
             {/* Warning banner */}
             {suspendedCount > 0 && (

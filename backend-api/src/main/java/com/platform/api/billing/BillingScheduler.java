@@ -10,13 +10,29 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class BillingScheduler {
 
-    private final BillingService billingService;
+    private final BillingService  billingService;
+    private final InvoiceService  invoiceService;
 
-    // Every hour at minute 0 — e.g. 01:00, 02:00, 03:00 ...
+    // Every hour — billing snapshot + budget alerts
     @Scheduled(cron = "0 0 * * * *")
     public void hourlySnapshot() {
         log.info("Running hourly billing snapshot...");
         billingService.takeSnapshot();
         billingService.checkBudgetAlerts();
+    }
+
+    // Every day at 08:00 — send J-3 alerts + suspend overdue services
+    @Scheduled(cron = "0 0 8 * * *")
+    public void dailyInvoiceCheck() {
+        log.info("Running daily invoice check...");
+        invoiceService.sendDueSoonAlerts();
+        invoiceService.suspendOverdueServices();
+    }
+
+    // 1st of each month at 00:05 — generate invoices for last month
+    @Scheduled(cron = "0 5 0 1 * *")
+    public void monthlyInvoiceGeneration() {
+        log.info("Generating monthly invoices...");
+        invoiceService.generateMonthlyInvoices();
     }
 }
