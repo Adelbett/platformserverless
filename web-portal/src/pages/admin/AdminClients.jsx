@@ -77,12 +77,12 @@ const ClientRow = ({ client, onSuspend, onRestore }) => {
                     disabled={loading}
                     style={{
                         display: 'inline-flex', alignItems: 'center', gap: 6,
-                        padding: '7px 14px', borderRadius: 8, border: 'none',
+                        padding: '7px 14px', borderRadius: 8,
+                        border: `1px solid ${client.suspended ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.25)'}`,
                         cursor: loading ? 'not-allowed' : 'pointer',
                         fontWeight: 700, fontSize: 12, opacity: loading ? 0.5 : 1,
                         background: client.suspended ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.12)',
                         color: client.suspended ? '#10B981' : '#EF4444',
-                        border: `1px solid ${client.suspended ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.25)'}`,
                     }}
                 >
                     {loading
