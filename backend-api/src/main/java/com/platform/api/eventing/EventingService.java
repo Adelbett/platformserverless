@@ -3,6 +3,7 @@ package com.platform.api.eventing;
 import com.platform.api.eventing.dto.KafkaSourceDto;
 import com.platform.api.exception.NotFoundException;
 import com.platform.api.exception.UnauthorizedException;
+import com.platform.api.kafka.KafkaTopicRepository;
 import io.fabric8.kubernetes.api.model.GenericKubernetesResource;
 import io.fabric8.kubernetes.api.model.GenericKubernetesResourceBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
@@ -28,6 +29,7 @@ public class EventingService {
     private final KafkaSourceRepository kafkaSourceRepository;
     private final TriggerRepository triggerRepository;
     private final KubernetesClient kubernetesClient;
+    private final KafkaTopicRepository kafkaTopicRepository;
 
     /**
      * Broker URL — set via environment variable or application.yml.
@@ -74,11 +76,13 @@ public class EventingService {
 
     public KafkaSourceDto createKafkaSource(String userId, String kafkaTopicId, String name, String namespace, String config) {
         String consumerGroup = name + "-group";
+        String ns = namespace != null ? namespace : "default";
+
         KafkaSource source = KafkaSource.builder()
                 .kafkaTopicId(kafkaTopicId)
                 .userId(userId)
                 .name(name)
-                .namespace(namespace != null ? namespace : "default")
+                .namespace(ns)
                 .bootstrapServers("my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092")
                 .consumerGroup(consumerGroup)
                 .config(config)
@@ -86,7 +90,58 @@ public class EventingService {
                 .build();
 
         source = kafkaSourceRepository.save(source);
+
+        // Resolve real topic name from DB (kafkaTopicId is a UUID)
+        if (kubernetesEnabled && kafkaTopicId != null) {
+            String topicName = kafkaTopicRepository.findById(kafkaTopicId)
+                    .map(t -> t.getName())
+                    .orElse(kafkaTopicId);
+            createKnativeKafkaSource(name, topicName, consumerGroup, ns);
+        }
+
         return toKafkaSourceDto(source);
+    }
+
+    private void createKnativeKafkaSource(String name, String topicName, String consumerGroup, String appNamespace) {
+        try {
+            GenericKubernetesResource kafkaSource = new GenericKubernetesResourceBuilder()
+                    .withApiVersion("sources.knative.dev/v1beta1")
+                    .withKind("KafkaSource")
+                    .withNewMetadata()
+                        .withName(name)
+                        .withNamespace("default")
+                    .endMetadata()
+                    .addToAdditionalProperties("spec", Map.of(
+                        "bootstrapServers", List.of("my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"),
+                        "topics", List.of(topicName),
+                        "consumerGroup", consumerGroup,
+                        "sink", Map.of(
+                            "ref", Map.of(
+                                "apiVersion", "eventing.knative.dev/v1",
+                                "kind", "Broker",
+                                "name", "default",
+                                "namespace", "default"
+                            )
+                        )
+                    ))
+                    .build();
+
+            try {
+                kubernetesClient.genericKubernetesResources("sources.knative.dev/v1beta1", "KafkaSource")
+                        .inNamespace("default")
+                        .resource(kafkaSource)
+                        .create();
+                log.info("KafkaSource '{}' created → topic={}", name, topicName);
+            } catch (KubernetesClientException e) {
+                if (e.getCode() == 409) {
+                    log.info("KafkaSource '{}' already exists, skipping", name);
+                } else {
+                    throw e;
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to create KafkaSource '{}': {}", name, e.getMessage());
+        }
     }
 
     public List<KafkaSourceDto> listKafkaSources(String userId) {
