@@ -356,7 +356,7 @@ const PaymentTab = ({ mtdCost }) => {
                                         {new Date(tx.createdAt).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}
                                     </td>
                                     <td style={{ padding: '11px 16px', fontSize: 12, color: '#94A3B8' }}>{tx.description || '—'}</td>
-                                    <td style={{ padding: '11px 16px', fontSize: 11, color: '#64748B', fontFamily: "'JetBrains Mono', monospace' }}>
+                                    <td style={{ padding: '11px 16px', fontSize: 11, color: '#64748B', fontFamily: "'JetBrains Mono', monospace" }}>
                                         {tx.cardBrand && tx.cardLast4 ? `${tx.cardBrand.toUpperCase()} ••${tx.cardLast4}` : '—'}
                                     </td>
                                     <td style={{ padding: '11px 16px', textAlign: 'right', fontSize: 12, fontWeight: 700, color: '#F1F5F9', fontFamily: "'JetBrains Mono', monospace" }}>
