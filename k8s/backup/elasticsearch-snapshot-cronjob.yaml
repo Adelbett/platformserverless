@@ -1,0 +1,53 @@
+# Elasticsearch snapshots to an S3 repository. Requires the repository-s3
+# plugin installed on the ES cluster and a snapshot repository registered
+# once (see docs/BACKUP_AND_RESTORE.md) — this CronJob only triggers daily
+# snapshots and prunes old ones through the ES snapshot API itself.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: elasticsearch-snapshot
+  namespace: platform
+spec:
+  schedule: "0 3 * * *"  # 03:00 daily
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: es-snapshot
+              image: curlimages/curl:8.7.1
+              env:
+                - name: ES_HOST
+                  value: "http://elasticsearch.platform.svc.cluster.local:9200"
+                - name: REPO_NAME
+                  value: "platform-backups"
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+                  DATE=$(date +%Y-%m-%d-%H%M)
+                  DOW=$(date +%u)
+                  TIER="daily"
+                  if [ "$DOW" = "7" ]; then TIER="weekly"; fi
+                  SNAPSHOT="${TIER}-${DATE}"
+
+                  echo "Creating snapshot ${SNAPSHOT} in repository ${REPO_NAME}..."
+                  curl -sf -X PUT "${ES_HOST}/_snapshot/${REPO_NAME}/${SNAPSHOT}?wait_for_completion=true" \
+                    -H 'Content-Type: application/json' \
+                    -d '{"indices": "*", "include_global_state": false}'
+
+                  echo "Pruning old ${TIER} snapshots (keep 7 daily / 4 weekly)..."
+                  KEEP=7
+                  if [ "$TIER" = "weekly" ]; then KEEP=4; fi
+                  curl -sf "${ES_HOST}/_snapshot/${REPO_NAME}/${TIER}-*" \
+                    | grep -o "\"snapshot\":\"[^\"]*\"" | cut -d'"' -f4 | sort | head -n -"${KEEP}" \
+                    | while read -r old; do
+                        [ -n "$old" ] && curl -sf -X DELETE "${ES_HOST}/_snapshot/${REPO_NAME}/${old}"
+                      done
+
+                  echo "Done."

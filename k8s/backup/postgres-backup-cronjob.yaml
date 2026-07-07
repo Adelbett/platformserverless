@@ -1,0 +1,81 @@
+# Daily PostgreSQL dump uploaded to S3-compatible storage, with retention:
+# 7 daily backups + 4 weekly (Sunday) backups kept, older ones pruned by
+# this same job. Restore procedure: docs/BACKUP_AND_RESTORE.md.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  namespace: platform
+spec:
+  schedule: "30 2 * * *"  # 02:30 daily
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          volumes:
+            - name: dump
+              emptyDir: {}
+          initContainers:
+            - name: pg-dump
+              image: postgres:15-alpine
+              env:
+                - name: PGHOST
+                  value: "postgres.platform.svc.cluster.local"
+                - name: PGUSER
+                  value: "postgres"
+                - name: PGPASSWORD
+                  value: "postgres"
+                - name: PGDATABASE
+                  value: "platformserverless"
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+                  DATE=$(date +%Y-%m-%d)
+                  pg_dump --no-owner --no-privileges | gzip > "/dump/pg-${PGDATABASE}-${DATE}.sql.gz"
+                  echo "Dump written: /dump/pg-${PGDATABASE}-${DATE}.sql.gz"
+              volumeMounts:
+                - { name: dump, mountPath: /dump }
+          containers:
+            - name: upload-and-prune
+              image: amazon/aws-cli:2.15.0
+              env:
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom: { secretKeyRef: { name: backup-s3-credentials, key: AWS_ACCESS_KEY_ID } }
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom: { secretKeyRef: { name: backup-s3-credentials, key: AWS_SECRET_ACCESS_KEY } }
+                - name: AWS_ENDPOINT_URL
+                  valueFrom: { secretKeyRef: { name: backup-s3-credentials, key: AWS_ENDPOINT_URL } }
+                - name: BACKUP_BUCKET
+                  valueFrom: { secretKeyRef: { name: backup-s3-credentials, key: BACKUP_BUCKET } }
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+                  DOW=$(date +%u)  # 1=Monday .. 7=Sunday
+                  TIER="daily"
+                  if [ "$DOW" = "7" ]; then TIER="weekly"; fi
+
+                  FILE=$(ls /dump/*.sql.gz | head -n1)
+                  DEST="s3://${BACKUP_BUCKET}/postgres/${TIER}/$(basename "$FILE")"
+                  echo "Uploading to ${DEST}"
+                  aws --endpoint-url "${AWS_ENDPOINT_URL}" s3 cp "$FILE" "${DEST}"
+
+                  echo "Pruning old backups (daily: keep 7, weekly: keep 4)..."
+                  prune() {
+                    tier=$1; keep=$2
+                    aws --endpoint-url "${AWS_ENDPOINT_URL}" s3 ls "s3://${BACKUP_BUCKET}/postgres/${tier}/" \
+                      | awk '{print $4}' | sort | head -n -"${keep}" | while read -r old; do
+                        [ -n "$old" ] && aws --endpoint-url "${AWS_ENDPOINT_URL}" s3 rm "s3://${BACKUP_BUCKET}/postgres/${tier}/${old}"
+                      done
+                  }
+                  prune daily 7
+                  prune weekly 4
+                  echo "Done."
+              volumeMounts:
+                - { name: dump, mountPath: /dump }
