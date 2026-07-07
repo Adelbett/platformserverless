@@ -80,23 +80,46 @@ volume de séries temporielles généré — ajustable si besoin.
 
 ---
 
-## Prochaines étapes (P1 → P3, non traitées dans cette session)
+## P1.5 — Fix statut Ready Knative + erreurs masquées frontend ✅ livré
 
-Comme convenu, le reste est planifié pour les sessions suivantes, dans l'ordre :
+**Commit** : `fix(admin): correct Knative Ready status and stop hiding API errors (P1.5)`
+
+### Problème
+`getKnativeServices()` considérait un service "ready" dès que `status.conditions` existait, sans
+vérifier la valeur réelle. Un service coincé en échec (ex : `RoutesReady=True`, `Ready=False`)
+s'affichait comme sain. Côté frontend, `ClusterManagement.jsx` et `Monitoring.jsx` avalaient toute
+erreur d'appel API (`.catch(() => ({ data: [] }))`) et l'affichaient comme un état vide/normal — une
+vraie panne cluster était indiscernable d'un simple "pas encore de données".
+
+### Ce qui a été corrigé
+
+| Fichier | Changement |
+|---|---|
+| `backend-api/.../admin/AdminController.java` | Extraction de la logique dans `resolveReadyStatus(Object statusObj)` (record `ReadyStatus(ready, url, message)`) — parcourt réellement `conditions[]` à la recherche de `type="Ready"` et lit son `status` (`True`/`False`/`Unknown`) et son `message`. Fini le raccourci "conditions non-null ⇒ ready" |
+| `backend-api/src/test/.../AdminControllerReadyStatusTest.java` | 4 tests : ready=True, ready=False malgré d'autres conditions présentes (cas de régression du bug original), aucune condition Ready trouvée, status absent |
+| `web-portal/src/pages/admin/ClusterManagement.jsx` | Chaque appel (`getStats`/`getNodes`/`getNamespaces`) capture désormais son échec individuellement et affiche un bandeau rouge avec le libellé de l'appel + le message d'erreur (HTTP xxx ou erreur réseau), au lieu de rendre silencieusement une liste vide. Bouton "Refresh" ajouté |
+| `web-portal/src/pages/Monitoring.jsx` | Même traitement pour les 10 appels admin (`getClusterOverview`, `getAllApps`, `getNodes`, `getPods`, `getKnativeServices`, etc.) — bandeau listant précisément quels appels ont échoué. Icône Ready Knative distingue maintenant `False` (rouge) de `Unknown` (ambre), avec le message d'erreur en tooltip |
+
+### Comment le vérifier
+```bash
+cd backend-api
+mvn "-Dtest=AdminControllerReadyStatusTest,AdminAuditLogServiceTest" test   # 6/6 tests, BUILD SUCCESS
+```
+Côté UI : couper temporairement l'accès au cluster (ou arrêter le backend) → "Cluster Management" et
+"Monitoring" affichent désormais un bandeau d'erreur explicite au lieu d'un tableau vide silencieux.
+
+---
+
+## Prochaines étapes (P1.3, P2, P3 — non traitées dans cette session)
+
+RBAC multi-rôles (P1.4) écarté à la demande de l'utilisateur — pas de granularité de sous-rôles sous
+ADMIN pour l'instant.
 
 1. **P1.3 — Quotas & limites par tenant** (`ResourceQuota`/`LimitRange` K8s générés par plan)
-2. **P1.4 — RBAC multi-rôles** — ⚠️ **point à trancher avant de commencer** : les rôles réellement
-   présents dans le code sont `ADMIN` / `CLIENT_ADMIN` / `MEMBER` (`UserRole.java`,
-   `Sidebar.jsx` `allowedRoles`), pas `CLIENT_MEMBER` / `CLIENT_ADMIN` / `PLATFORM_ADMIN` comme
-   indiqué dans la demande. Il faudra soit renommer `ADMIN` → `PLATFORM_ADMIN` et `MEMBER` →
-   `CLIENT_MEMBER` (migration de données + tous les `@PreAuthorize`/`allowedRoles` à mettre à jour),
-   soit garder les noms actuels et n'ajouter que la nouvelle granularité (super-admin / support /
-   lecture seule) par-dessus. À confirmer avant d'implémenter pour éviter une migration inutile.
-3. **P1.5 — Fix statut Ready Knative + erreurs masquées frontend**
-4. **P2.6 — Status page publique + incidents**
-5. **P2.7 — Rollback de déploiement**
-6. **P2.8 — Sauvegarde automatisée + DR** (S3-compatible générique, décidé)
-7. **P3.9 — Anomaly detection coûts/trafic**
-8. **P3.10 — Assistant admin en langage naturel**
+2. **P2.6 — Status page publique + incidents**
+3. **P2.7 — Rollback de déploiement**
+4. **P2.8 — Sauvegarde automatisée + DR** (S3-compatible générique, décidé)
+5. **P3.9 — Anomaly detection coûts/trafic**
+6. **P3.10 — Assistant admin en langage naturel**
 
-Aucune régression constatée sur le module billing ni sur le module eventing — non touchés par ces deux livraisons.
+Aucune régression constatée sur le module billing ni sur le module eventing — non touchés par ces trois livraisons.
