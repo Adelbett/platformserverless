@@ -191,13 +191,43 @@ le service est scalé horizontalement.
 
 ---
 
-## Prochaines étapes (P2.8, P3 — non traitées dans cette session)
+## P2.8 — Sauvegarde automatisée + DR ✅ livré
+
+**Commit** : `feat(ops): add automated PostgreSQL/Elasticsearch backups and DR runbook (P2.8)`
+
+### Problème
+Aucun mécanisme de sauvegarde pour PostgreSQL ni Elasticsearch — une perte de cluster ou de volume
+aurait été irréversible.
+
+### Ce qui a été ajouté
+
+| Fichier | Rôle |
+|---|---|
+| `k8s/backup/postgres-backup-cronjob.yaml` | CronJob quotidien (02h30) : `initContainer` `postgres:15-alpine` fait le `pg_dump` sur un volume partagé, puis un conteneur `amazon/aws-cli` uploade le dump gzippé vers le bucket S3-compatible et purge les anciennes sauvegardes (7 quotidiens + 4 hebdomadaires, tagués par jour de la semaine) |
+| `k8s/backup/elasticsearch-snapshot-cronjob.yaml` | CronJob quotidien (03h00) : déclenche un snapshot natif ES vers un repository S3 déjà enregistré, purge les anciens snapshots avec la même politique de rétention |
+| `k8s/backup/backup-secret.example.yaml` | Template de secret K8s pour les identifiants S3 — **jamais rempli et committé tel quel** |
+| `docs/BACKUP_AND_RESTORE.md` | Mise en place (bucket, secret, enregistrement du repository ES), procédure de restauration pas-à-pas pour les deux stores, rappel de tester la procédure chaque trimestre |
+
+### Décision produit appliquée
+Provider **S3-compatible générique** (`AWS_ENDPOINT_URL` configurable) — pas figé sur AWS, fonctionne
+avec MinIO/OVH/Scaleway/etc., conformément à la décision prise en amont du chantier.
+
+### Comment le vérifier
+```bash
+kubectl apply --dry-run=client -f k8s/backup/postgres-backup-cronjob.yaml        # validé OK
+kubectl apply --dry-run=client -f k8s/backup/elasticsearch-snapshot-cronjob.yaml # validé OK
+kubectl apply --dry-run=client -f k8s/backup/backup-secret.example.yaml         # validé OK
+```
+Aucun code Java/JS modifié par cet item — uniquement des manifests K8s et de la documentation.
+
+---
+
+## Prochaines étapes (P3 — non traitées dans cette session)
 
 RBAC multi-rôles (P1.4) écarté à la demande de l'utilisateur — pas de granularité de sous-rôles sous
 ADMIN pour l'instant.
 
-1. **P2.8 — Sauvegarde automatisée + DR** (S3-compatible générique, décidé)
-2. **P3.9 — Anomaly detection coûts/trafic**
-3. **P3.10 — Assistant admin en langage naturel**
+1. **P3.9 — Anomaly detection coûts/trafic**
+2. **P3.10 — Assistant admin en langage naturel**
 
-Aucune régression constatée sur le module billing ni sur le module eventing.
+Aucune régression constatée sur le module billing ni sur le module eventing sur l'ensemble de P0/P1/P2.
