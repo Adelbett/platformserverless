@@ -145,15 +145,59 @@ confirme "Saved and synced to cluster."
 
 ---
 
-## Prochaines étapes (P2, P3 — non traitées dans cette session)
+## P2.7 — Rollback de déploiement ✅ déjà implémenté (vérifié, aucun changement nécessaire)
+
+En explorant le code avant de coder, j'ai trouvé que ce chantier existait déjà intégralement :
+- `KnativeService.listRevisions()` / `rollbackToRevision()` — lit les Revisions Knative et repointe la
+  `Route` vers une révision antérieure.
+- `AppController` : `GET /api/apps/{id}/revisions`, `POST /api/apps/{id}/rollback/{revisionName}`.
+- `AppService.rollback()` trace l'action dans `DeploymentLog` (journal de déploiement existant).
+- `web-portal/src/pages/AppDetails.jsx` : composant `RevisionHistory` + `RollbackModal` avec
+  confirmation avant rollback.
+
+Aucun changement n'était nécessaire — item validé tel quel.
+
+---
+
+## P2.6 — Status page publique + incidents ✅ livré
+
+**Commit** : `feat(status): add public status page and incident history (P2.6)`
+
+### Ce qui a été ajouté
+
+| Fichier | Rôle |
+|---|---|
+| `backend-api/.../status/StatusService.java` | Vérifie DB (`SELECT 1`), cluster K8s (`namespaces().list()`), calcule l'uptime 24h par `avg_over_time(up{job="backend-api"}[24h]) * 100` via Prometheus (branché en P0.2 — la métrique `up` existe pour toute cible scrappée, aucune métrique custom nécessaire) |
+| `backend-api/.../status/StatusController.java` | `GET /api/status` (statut global + par composant), `GET /api/status/incidents` — **publics, non authentifiés** |
+| `backend-api/.../status/AdminIncidentController.java` | `POST`/`PUT`/`DELETE /api/admin/incidents` — `hasRole('ADMIN')`, incidents saisis manuellement pour l'instant (pas encore reliés à Alertmanager) |
+| `backend-api/.../status/StatusRateLimitFilter.java` | Rate limit basique en mémoire (30 req/min/IP) sur `/api/status/**` — seule surface non authentifiée de l'API, donc protégée même sans WAF/CDN devant |
+| `backend-api/.../security/SecurityConfig.java` | `GET /api/status/**` ajouté à la whitelist ; filtre de rate limit branché avant `BasicAuthenticationFilter` |
+| `backend-api/src/test/.../StatusRateLimitFilterTest.java` | 3 tests : sous la limite, au-dessus (429), endpoint hors `/api/status` non affecté |
+| `web-portal/src/pages/StatusPage.jsx` | Page publique autonome (`/status`, hors authentification) — statut global, uptime par composant, historique d'incidents |
+| `web-portal/src/pages/admin/AdminIncidents.jsx` | Formulaire de création + gestion du statut des incidents affichés publiquement |
+
+### Comment le vérifier
+```bash
+cd backend-api
+mvn test   # 15/15 tests, BUILD SUCCESS (aucune régression)
+```
+Ouvrir `/status` sans être connecté → statut + incidents visibles. Depuis l'admin, "Incidents" →
+créer un incident → il apparaît immédiatement sur `/status`.
+
+### Limite connue
+Le rate limiter est en mémoire, par instance — il ne protège pas contre un abus distribué sur
+plusieurs pods. Suffisant pour une seule instance ; à remplacer par une solution partagée (Redis) si
+le service est scalé horizontalement.
+
+---
+
+## Prochaines étapes (P2.8, P3 — non traitées dans cette session)
 
 RBAC multi-rôles (P1.4) écarté à la demande de l'utilisateur — pas de granularité de sous-rôles sous
 ADMIN pour l'instant.
 
-1. **P2.6 — Status page publique + incidents**
-2. **P2.7 — Rollback de déploiement**
-3. **P2.8 — Sauvegarde automatisée + DR** (S3-compatible générique, décidé)
-4. **P3.9 — Anomaly detection coûts/trafic**
-5. **P3.10 — Assistant admin en langage naturel**
+1. **P2.8 — Sauvegarde automatisée + DR** (S3-compatible générique, décidé)
+2. **P3.9 — Anomaly detection coûts/trafic**
+3. **P3.10 — Assistant admin en langage naturel**
 
-Aucune régression constatée sur le module billing ni sur le module eventing — non touchés par ces trois livraisons.
+Aucune régression constatée sur le module billing ni sur le module eventing.
