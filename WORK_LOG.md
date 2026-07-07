@@ -110,16 +110,50 @@ Côté UI : couper temporairement l'accès au cluster (ou arrêter le backend) �
 
 ---
 
-## Prochaines étapes (P1.3, P2, P3 — non traitées dans cette session)
+## P1.3 — Quotas & limites par tenant ✅ livré
+
+**Commit** : `feat(admin): add per-tenant CPU/memory/app quotas (P1.3)`
+
+### Problème
+Aucune limite de ressources par tenant : un client pouvait déployer un nombre illimité d'apps sans
+plafond CPU/mémoire au niveau du cluster.
+
+### Décision produit (tranchée avec l'utilisateur)
+Il n'existe **aucun système de plans/abonnements** dans le code — la facturation est à l'usage par
+app (`BillingSnapshot`/`AppInvoice`), pas par palier. Les quotas sont donc **fixés manuellement par
+client par l'admin**, pas dérivés d'un plan.
+
+### Ce qui a été ajouté
+
+| Fichier | Rôle |
+|---|---|
+| `backend-api/.../quota/TenantQuota.java` | Entité JPA (`tenant_quotas`) — `maxCpu`/`maxMemory` (format K8s `"2000m"`/`"4Gi"`, même convention que `App.cpuRequest`), `maxApps` |
+| `backend-api/.../quota/QuotaService.java` | `getQuota` (retourne les défauts — 2 CPU/4Gi/10 apps — si jamais configuré) ; `updateQuota` (persiste + synchronise un `ResourceQuota` K8s dans le namespace du tenant, best-effort : un échec de sync ne fait pas rollback de la BDD) ; `assertCanCreateApp` (409 `ConflictException` si quota d'apps atteint) |
+| `backend-api/.../app/AppService.java` | `createApp()` appelle `assertCanCreateApp()` avant tout déploiement — un dépassement de quota est un 409 explicite, jamais un 500 générique |
+| `backend-api/.../admin/AdminController.java` | `GET`/`PUT /api/admin/clients/{userId}/quota`, tracé dans l'audit log (`UPDATE_QUOTA`) |
+| `backend-api/src/test/.../QuotaServiceTest.java` | 6 tests : défauts, sous quota, quota atteint, apps `DELETED` non comptées, mise à jour persistée, 404 si client inconnu |
+| `web-portal/src/pages/admin/AdminClients.jsx` | Bouton "Quota" par ligne client → panneau expandable (CPU/mémoire/max apps + usage actuel), sauvegarde avec confirmation visuelle |
+
+### Comment le vérifier
+```bash
+cd backend-api
+mvn -Dtest=QuotaServiceTest test   # 6/6 tests, BUILD SUCCESS
+cd ../web-portal && npx vite build --mode production   # build frontend OK
+```
+Dans l'UI admin : "Clients" → bouton "Quota" sur une ligne → modifier et sauvegarder → le panneau
+confirme "Saved and synced to cluster."
+
+---
+
+## Prochaines étapes (P2, P3 — non traitées dans cette session)
 
 RBAC multi-rôles (P1.4) écarté à la demande de l'utilisateur — pas de granularité de sous-rôles sous
 ADMIN pour l'instant.
 
-1. **P1.3 — Quotas & limites par tenant** (`ResourceQuota`/`LimitRange` K8s générés par plan)
-2. **P2.6 — Status page publique + incidents**
-3. **P2.7 — Rollback de déploiement**
-4. **P2.8 — Sauvegarde automatisée + DR** (S3-compatible générique, décidé)
-5. **P3.9 — Anomaly detection coûts/trafic**
-6. **P3.10 — Assistant admin en langage naturel**
+1. **P2.6 — Status page publique + incidents**
+2. **P2.7 — Rollback de déploiement**
+3. **P2.8 — Sauvegarde automatisée + DR** (S3-compatible générique, décidé)
+4. **P3.9 — Anomaly detection coûts/trafic**
+5. **P3.10 — Assistant admin en langage naturel**
 
 Aucune régression constatée sur le module billing ni sur le module eventing — non touchés par ces trois livraisons.
