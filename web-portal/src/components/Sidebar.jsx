@@ -4,7 +4,7 @@ import {
     LayoutDashboard, Box, Rocket, Activity, Zap,
     Globe, Users, CreditCard, Settings,
     LogOut, ChevronLeft, ChevronRight, Hexagon,
-    Server, BarChart2, Terminal, DollarSign, UserPlus, Ban
+    Server, BarChart2, Terminal, DollarSign, UserPlus, Ban, ScrollText
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -43,6 +43,7 @@ const NAV_SECTIONS = [
             { path: '/admin/clients',   label: 'Clients',    icon: Ban,        adminOnly: true },
             { path: '/admin/cluster',   label: 'Cluster',    icon: Server,     adminOnly: true },
             { path: '/admin/billing',   label: 'Revenue',    icon: DollarSign, adminOnly: true },
+            { path: '/admin/audit-log', label: 'Audit Log',  icon: ScrollText, adminOnly: true },
         ],
     },
 ];

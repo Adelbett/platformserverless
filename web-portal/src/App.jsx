@@ -21,6 +21,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import ClusterManagement from './pages/admin/ClusterManagement';
 import AdminBilling from './pages/admin/AdminBilling';
 import AdminClients from './pages/admin/AdminClients';
+import AdminAuditLog from './pages/admin/AdminAuditLog';
 
 const ProtectedRoute = ({ children }) => {
     const { user, loading } = useAuth();
@@ -101,6 +102,9 @@ const AppRoutes = () => {
                 } />
                 <Route path="/admin/clients" element={
                     <AdminRoute><AdminClients /></AdminRoute>
+                } />
+                <Route path="/admin/audit-log" element={
+                    <AdminRoute><AdminAuditLog /></AdminRoute>
                 } />
             </Route>
 

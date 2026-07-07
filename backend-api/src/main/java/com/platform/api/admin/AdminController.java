@@ -5,6 +5,8 @@ import com.platform.api.app.AppRepository;
 import com.platform.api.app.AppService;
 import com.platform.api.app.KnativeService;
 import com.platform.api.app.dto.AppResponse;
+import com.platform.api.audit.AdminAction;
+import com.platform.api.audit.AdminAuditLogService;
 import com.platform.api.eventing.KafkaSourceRepository;
 import com.platform.api.eventing.TriggerRepository;
 import com.platform.api.kafka.KafkaTopic;
@@ -21,10 +23,12 @@ import io.fabric8.kubernetes.client.KubernetesClient;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -49,6 +53,7 @@ public class AdminController {
     private final KafkaSourceRepository   kafkaSourceRepository;
     private final TriggerRepository       triggerRepository;
     private final UserContextService      userContextService;
+    private final AdminAuditLogService    auditLogService;
 
     // ── Platform stats ────────────────────────────────────────────────
 
@@ -88,10 +93,12 @@ public class AdminController {
 
     @DeleteMapping("/apps/{id}")
     @Operation(summary = "Force-delete any application")
-    public ResponseEntity<Void> forceDeleteApp(@PathVariable String id) {
+    public ResponseEntity<Void> forceDeleteApp(@PathVariable String id, Authentication auth, HttpServletRequest request) {
         appRepository.findById(id).ifPresent(app -> {
             try { knativeService.delete(app.getServiceName(), app.getNamespace()); } catch (Exception ignored) {}
             appRepository.delete(app);
+            auditLogService.record(actorId(auth), actorName(auth), AdminAction.FORCE_DELETE_APP,
+                    "APP", id, app, null, null, clientIp(request));
         });
         return ResponseEntity.noContent().build();
     }
@@ -106,8 +113,11 @@ public class AdminController {
 
     @DeleteMapping("/kafka/topics/{id}")
     @Operation(summary = "Force-delete any Kafka topic")
-    public ResponseEntity<Void> forceDeleteTopic(@PathVariable String id) {
+    public ResponseEntity<Void> forceDeleteTopic(@PathVariable String id, Authentication auth, HttpServletRequest request) {
+        KafkaTopic topic = kafkaTopicRepository.findById(id).orElse(null);
         kafkaTopicRepository.deleteById(id);
+        auditLogService.record(actorId(auth), actorName(auth), AdminAction.FORCE_DELETE_TOPIC,
+                "KAFKA_TOPIC", id, topic, null, null, clientIp(request));
         return ResponseEntity.noContent().build();
     }
 
@@ -297,9 +307,10 @@ public class AdminController {
 
     @PostMapping("/apps/{id}/suspend")
     @Operation(summary = "Suspend a specific app (scale to zero, 503 on traffic)")
-    public ResponseEntity<Map<String, Object>> suspendApp(@PathVariable String id) {
+    public ResponseEntity<Map<String, Object>> suspendApp(@PathVariable String id, Authentication auth, HttpServletRequest request) {
         App app = appRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("App not found: " + id));
+        String previousStatus = app.getStatus();
 
         try {
             knativeService.scaleService(app.getServiceName(), app.getNamespace(), 0, 0);
@@ -309,14 +320,18 @@ public class AdminController {
         app.setStatus("SUSPENDED");
         appRepository.save(app);
 
+        auditLogService.record(actorId(auth), actorName(auth), AdminAction.SUSPEND_APP,
+                "APP", id, Map.of("status", previousStatus), Map.of("status", "SUSPENDED"), null, clientIp(request));
+
         return ResponseEntity.ok(Map.of("id", id, "status", "SUSPENDED"));
     }
 
     @PostMapping("/apps/{id}/restore")
     @Operation(summary = "Restore a suspended app to its original replica settings")
-    public ResponseEntity<Map<String, Object>> restoreApp(@PathVariable String id) {
+    public ResponseEntity<Map<String, Object>> restoreApp(@PathVariable String id, Authentication auth, HttpServletRequest request) {
         App app = appRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("App not found: " + id));
+        String previousStatus = app.getStatus();
 
         int min = app.getMinReplicas() != null ? app.getMinReplicas() : 0;
         int max = app.getMaxReplicas() != null ? app.getMaxReplicas() : 10;
@@ -329,6 +344,9 @@ public class AdminController {
         app.setStatus("RUNNING");
         appRepository.save(app);
 
+        auditLogService.record(actorId(auth), actorName(auth), AdminAction.RESTORE_APP,
+                "APP", id, Map.of("status", previousStatus), Map.of("status", "RUNNING"), null, clientIp(request));
+
         return ResponseEntity.ok(Map.of("id", id, "status", "RUNNING"));
     }
 
@@ -336,7 +354,9 @@ public class AdminController {
 
     @PostMapping("/clients/{userId}/suspend")
     @Operation(summary = "Suspend all services for a client (non-payment, abuse, etc.)")
-    public ResponseEntity<Map<String, Object>> suspendClient(@PathVariable String userId) {
+    public ResponseEntity<Map<String, Object>> suspendClient(@PathVariable String userId,
+                                                              @RequestParam(required = false) String reason,
+                                                              Authentication auth, HttpServletRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found: " + userId));
 
@@ -357,12 +377,16 @@ public class AdminController {
         user.setSuspended(true);
         userRepository.save(user);
 
+        auditLogService.record(actorId(auth), actorName(auth), AdminAction.SUSPEND_CLIENT,
+                "CLIENT", userId, Map.of("suspended", false), Map.of("suspended", true, "appsAffected", apps.size()),
+                reason, clientIp(request));
+
         return ResponseEntity.ok(Map.of("userId", userId, "suspended", true, "appsAffected", apps.size()));
     }
 
     @PostMapping("/clients/{userId}/restore")
     @Operation(summary = "Restore all services for a previously suspended client")
-    public ResponseEntity<Map<String, Object>> restoreClient(@PathVariable String userId) {
+    public ResponseEntity<Map<String, Object>> restoreClient(@PathVariable String userId, Authentication auth, HttpServletRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found: " + userId));
 
@@ -384,6 +408,10 @@ public class AdminController {
 
         user.setSuspended(false);
         userRepository.save(user);
+
+        auditLogService.record(actorId(auth), actorName(auth), AdminAction.RESTORE_CLIENT,
+                "CLIENT", userId, Map.of("suspended", true), Map.of("suspended", false, "appsRestored", apps.size()),
+                null, clientIp(request));
 
         return ResponseEntity.ok(Map.of("userId", userId, "suspended", false, "appsRestored", apps.size()));
     }
@@ -415,7 +443,43 @@ public class AdminController {
         return ResponseEntity.ok(clients);
     }
 
+    // ── Audit log ───────────────────────────────────────────────────────
+
+    @GetMapping("/audit-log")
+    @Operation(summary = "Paginated, filterable admin action audit trail")
+    public ResponseEntity<org.springframework.data.domain.Page<com.platform.api.audit.dto.AdminAuditLogResponse>> getAuditLog(
+            @RequestParam(required = false) String actorUserId,
+            @RequestParam(required = false) String targetId,
+            @RequestParam(required = false) com.platform.api.audit.AdminAction action,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime from,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime to,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        var pageable = org.springframework.data.domain.PageRequest.of(page, size,
+                org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"));
+        var result = auditLogService.search(actorUserId, targetId, action, from, to, pageable)
+                .map(com.platform.api.audit.dto.AdminAuditLogResponse::from);
+        return ResponseEntity.ok(result);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────
+
+    private String actorId(Authentication auth) {
+        return auth != null ? auth.getName() : "unknown";
+    }
+
+    private String actorName(Authentication auth) {
+        return auth != null ? auth.getName() : "unknown";
+    }
+
+    private String clientIp(HttpServletRequest request) {
+        if (request == null) return null;
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
+    }
 
     private Map<String, Object> podInfo(Pod pod) {
         Map<String, Object> info = new LinkedHashMap<>();

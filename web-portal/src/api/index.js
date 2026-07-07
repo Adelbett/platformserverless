@@ -85,8 +85,9 @@ export const adminApi = {
     getAllTriggers:      ()   => api.get('/admin/eventing/triggers'),
     getClusterOverview: ()   => api.get('/admin/cluster/overview'),
     getClients:         ()   => api.get('/admin/clients'),
-    suspendClient:      (id) => api.post(`/admin/clients/${id}/suspend`),
+    suspendClient:      (id, reason) => api.post(`/admin/clients/${id}/suspend`, null, { params: reason ? { reason } : {} }),
     restoreClient:      (id) => api.post(`/admin/clients/${id}/restore`),
+    getAuditLog:        (params) => api.get('/admin/audit-log', { params }),
 }
 
 export const paymentApi = {
