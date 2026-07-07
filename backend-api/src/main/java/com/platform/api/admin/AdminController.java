@@ -199,15 +199,10 @@ public class AdminController {
                                         info.put("namespace", ns);
                                         info.put("tenant",    ns.replaceFirst("^user-", ""));
                                         Object statusObj = ksvc.get("status");
-                                        String ready = "Unknown";
-                                        String url   = "";
-                                        if (statusObj instanceof Map<?, ?> statusMap) {
-                                            ready = statusMap.get("conditions") != null ? "True" : "Unknown";
-                                            Object urlObj = statusMap.get("url");
-                                            url = urlObj != null ? urlObj.toString() : "";
-                                        }
-                                        info.put("ready", ready);
-                                        info.put("url",   url);
+                                        ReadyStatus readyStatus = resolveReadyStatus(statusObj);
+                                        info.put("ready", readyStatus.ready());
+                                        info.put("url", readyStatus.url());
+                                        info.put("statusMessage", readyStatus.message());
                                         return info;
                                     });
                         } catch (Exception ex) {
@@ -460,6 +455,39 @@ public class AdminController {
         var result = auditLogService.search(actorUserId, targetId, action, from, to, pageable)
                 .map(com.platform.api.audit.dto.AdminAuditLogResponse::from);
         return ResponseEntity.ok(result);
+    }
+
+    // ── Knative status parsing ─────────────────────────────────────────
+
+    /** Parsed "Ready" condition of a Knative Service — "True", "False", or "Unknown". */
+    record ReadyStatus(String ready, String url, String message) {}
+
+    /**
+     * Reads the Knative Service's status.conditions to find the "Ready"
+     * condition and its actual status — a service can have conditions
+     * without being ready (e.g. RoutesReady=True, Ready=False), so presence
+     * of "conditions" alone must never be treated as ready.
+     */
+    static ReadyStatus resolveReadyStatus(Object statusObj) {
+        if (!(statusObj instanceof Map<?, ?> statusMap)) {
+            return new ReadyStatus("Unknown", "", null);
+        }
+        String url = statusMap.get("url") != null ? statusMap.get("url").toString() : "";
+
+        Object conditionsObj = statusMap.get("conditions");
+        if (conditionsObj instanceof List<?> conditions) {
+            for (Object c : conditions) {
+                if (c instanceof Map<?, ?> condition && "Ready".equals(condition.get("type"))) {
+                    Object statusValue = condition.get("status");
+                    String ready = "True".equals(statusValue) ? "True"
+                            : "False".equals(statusValue) ? "False"
+                            : "Unknown";
+                    Object msg = condition.get("message");
+                    return new ReadyStatus(ready, url, msg != null ? msg.toString() : null);
+                }
+            }
+        }
+        return new ReadyStatus("Unknown", url, null);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────

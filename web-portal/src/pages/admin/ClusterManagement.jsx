@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react';
 import { adminApi } from '../../api';
-import { Server, Cpu, MemoryStick, Box, Users, Zap, Globe } from 'lucide-react';
+import { Server, Cpu, MemoryStick, Box, Users, Zap, Globe, AlertTriangle, RefreshCw } from 'lucide-react';
+
+// Wraps a call so a failure surfaces as a labeled error instead of being
+// swallowed and rendered as if the data were simply empty.
+const describeFailure = (label, err) => ({
+    label,
+    message: err.response?.status
+        ? `HTTP ${err.response.status} — ${err.response.data?.detail || err.response.data?.title || err.message}`
+        : `Network error — ${err.message}`,
+});
 
 const StatCard = ({ label, value, icon: Icon, color = '#00D4FF' }) => (
     <div style={{
@@ -63,18 +72,26 @@ const ClusterManagement = () => {
     const [nodes,      setNodes]      = useState([]);
     const [namespaces, setNamespaces] = useState([]);
     const [loading,    setLoading]    = useState(true);
+    const [errors,     setErrors]     = useState([]);
 
-    useEffect(() => {
+    const load = () => {
+        setLoading(true);
+        setErrors([]);
+        const failures = [];
+
         Promise.all([
-            adminApi.getStats().catch(() => ({ data: null })),
-            adminApi.getNodes().catch(() => ({ data: [] })),
-            adminApi.getNamespaces().catch(() => ({ data: [] })),
+            adminApi.getStats().catch(err => { failures.push(describeFailure('Platform stats', err)); return { data: null }; }),
+            adminApi.getNodes().catch(err => { failures.push(describeFailure('Kubernetes nodes', err)); return { data: [] }; }),
+            adminApi.getNamespaces().catch(err => { failures.push(describeFailure('Tenant namespaces', err)); return { data: [] }; }),
         ]).then(([s, n, ns]) => {
             setStats(s.data);
             setNodes(Array.isArray(n.data) ? n.data : []);
             setNamespaces(Array.isArray(ns.data) ? ns.data : []);
+            setErrors(failures);
         }).finally(() => setLoading(false));
-    }, []);
+    };
+
+    useEffect(() => { load(); }, []);
 
     if (loading) return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -86,12 +103,39 @@ const ClusterManagement = () => {
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingBottom: 32 }}>
-            <div>
-                <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 700, color: '#DDE6F0', margin: 0 }}>
-                    Cluster Management
-                </h1>
-                <p style={{ color: '#5A7080', fontSize: 14, marginTop: 4 }}>Infrastructure overview — nodes, namespaces, tenants</p>
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+                <div>
+                    <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 700, color: '#DDE6F0', margin: 0 }}>
+                        Cluster Management
+                    </h1>
+                    <p style={{ color: '#5A7080', fontSize: 14, marginTop: 4 }}>Infrastructure overview — nodes, namespaces, tenants</p>
+                </div>
+                <button onClick={load} style={{
+                    display: 'flex', alignItems: 'center', gap: 7,
+                    padding: '9px 16px', borderRadius: 9,
+                    border: '1px solid #1F2B3A', background: 'transparent',
+                    color: '#5A7080', cursor: 'pointer', fontSize: 12,
+                }}>
+                    <RefreshCw size={13} /> Refresh
+                </button>
             </div>
+
+            {errors.length > 0 && (
+                <div style={{
+                    display: 'flex', flexDirection: 'column', gap: 8,
+                    background: 'rgba(248,81,73,0.08)', border: '1px solid rgba(248,81,73,0.25)',
+                    borderRadius: 10, padding: '14px 18px',
+                }}>
+                    {errors.map((e, i) => (
+                        <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                            <AlertTriangle size={15} color="#F85149" style={{ flexShrink: 0, marginTop: 1 }} />
+                            <p style={{ fontSize: 13, color: '#FCA5A5', margin: 0 }}>
+                                <strong>{e.label} unavailable.</strong> {e.message}
+                            </p>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             {/* Platform stats */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>

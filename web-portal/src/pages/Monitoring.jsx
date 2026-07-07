@@ -336,6 +336,7 @@ const Monitoring = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [activeTab,  setActiveTab]  = useState('pods');
     const [selectedApp, setSelectedApp] = useState(null);
+    const [loadErrors,  setLoadErrors]  = useState([]);
 
     const [apps,         setApps]         = useState([]);
     const [cluster,      setCluster]      = useState(null);
@@ -352,21 +353,27 @@ const Monitoring = () => {
     const axisColor = dark ? '#374151' : '#94A3B8';
 
     const loadData = async () => {
+        const failures = [];
+        const fail = (label) => (err) => {
+            failures.push(`${label}: ${err.response?.status ? `HTTP ${err.response.status}` : err.message}`);
+            return { data: null };
+        };
         try {
             if (isAdmin) {
                 const [ovRes, appsRes, metricsRes, nodesRes, podsRes, knRes, brokersRes, topicsRes, srcRes, trgRes] =
                     await Promise.all([
-                        adminApi.getClusterOverview().catch(() => ({ data: null })),
-                        adminApi.getAllApps().catch(() => ({ data: [] })),
-                        metricsApi.getCluster().catch(() => ({ data: null })),
-                        adminApi.getNodes().catch(() => ({ data: [] })),
-                        adminApi.getPods().catch(() => ({ data: [] })),
-                        adminApi.getKnativeServices().catch(() => ({ data: [] })),
-                        adminApi.getKafkaBrokers().catch(() => ({ data: [] })),
-                        adminApi.getAllTopics().catch(() => ({ data: [] })),
-                        adminApi.getAllSources().catch(() => ({ data: [] })),
-                        adminApi.getAllTriggers().catch(() => ({ data: [] })),
+                        adminApi.getClusterOverview().catch(fail('Cluster overview')),
+                        adminApi.getAllApps().catch(fail('Applications')),
+                        metricsApi.getCluster().catch(fail('Cluster metrics')),
+                        adminApi.getNodes().catch(fail('Nodes')),
+                        adminApi.getPods().catch(fail('Pods')),
+                        adminApi.getKnativeServices().catch(fail('Knative services')),
+                        adminApi.getKafkaBrokers().catch(fail('Kafka brokers')),
+                        adminApi.getAllTopics().catch(fail('Kafka topics')),
+                        adminApi.getAllSources().catch(fail('KafkaSources')),
+                        adminApi.getAllTriggers().catch(fail('Triggers')),
                     ]);
+                setLoadErrors(failures);
                 setOverview(ovRes.data);
                 setApps(Array.isArray(appsRes.data) ? appsRes.data : []);
                 setCluster(metricsRes.data);
@@ -468,6 +475,21 @@ const Monitoring = () => {
                     {!isAdmin && <button className="btn-primary" onClick={() => navigate('/apps/new')}>Deploy Service</button>}
                 </div>
             </div>
+
+            {loadErrors.length > 0 && (
+                <div style={{
+                    display: 'flex', flexDirection: 'column', gap: 6,
+                    background: 'rgba(248,81,73,0.08)', border: '1px solid rgba(248,81,73,0.25)',
+                    borderRadius: 10, padding: '12px 16px',
+                }}>
+                    {loadErrors.map((msg, i) => (
+                        <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <AlertCircle size={13} color="#F85149" />
+                            <span style={{ fontSize: 12, color: '#FCA5A5' }}>{msg} — unavailable, showing partial data.</span>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             {/* KPI Row */}
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isAdmin ? 4 : 4}, 1fr)`, gap: 16 }}>
@@ -733,7 +755,13 @@ const Monitoring = () => {
                                                     <td style={{ padding: '10px 16px', fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 700 }} className="text-primary">{s.name}</td>
                                                     <td style={{ padding: '10px 16px', fontSize: 11, color: '#A371F7', fontFamily: "'JetBrains Mono', monospace" }}>{s.namespace}</td>
                                                     <td style={{ padding: '10px 16px', fontSize: 12 }} className="text-secondary">{s.tenant}</td>
-                                                    <td style={{ padding: '10px 16px' }}>{s.ready === 'True' ? <CheckCircle size={14} style={{ color: '#3FB950' }} /> : <AlertCircle size={14} style={{ color: '#E8A838' }} />}</td>
+                                                    <td style={{ padding: '10px 16px' }} title={s.statusMessage || undefined}>
+                                                        {s.ready === 'True'
+                                                            ? <CheckCircle size={14} style={{ color: '#3FB950' }} />
+                                                            : s.ready === 'False'
+                                                                ? <XCircle size={14} style={{ color: '#F85149' }} />
+                                                                : <AlertCircle size={14} style={{ color: '#E8A838' }} />}
+                                                    </td>
                                                     <td style={{ padding: '10px 16px', fontSize: 11, color: '#4A9EF5', fontFamily: "'JetBrains Mono', monospace", maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.url || '—'}</td>
                                                 </tr>
                                             ))}
