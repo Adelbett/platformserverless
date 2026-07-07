@@ -101,10 +101,10 @@ const AdminDashboard = () => {
             {/* Quick actions */}
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                 {[
-                    { label: 'Manage Users',    path: '/admin/users',   color: '#4A9EF5' },
-                    { label: 'All Applications',path: '/apps',          color: '#00D4FF' },
-                    { label: 'Cluster Info',    path: '/admin/cluster', color: '#A371F7' },
-                    { label: 'All Logs',        path: '/logs',          color: '#E8A838' },
+                    { label: 'Cluster Info', path: '/cluster',   color: '#A371F7' },
+                    { label: 'Clients',      path: '/clients',   color: '#4A9EF5' },
+                    { label: 'Revenue',      path: '/billing',   color: '#00D4FF' },
+                    { label: 'Audit Log',    path: '/audit-log', color: '#E8A838' },
                 ].map(({ label, path, color }) => (
                     <button key={path} onClick={() => navigate(path)} style={{
                         padding: '10px 20px', borderRadius: 8, border: `1px solid ${color}30`,

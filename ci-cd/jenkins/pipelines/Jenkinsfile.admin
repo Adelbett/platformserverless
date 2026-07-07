@@ -1,0 +1,85 @@
+pipeline {
+    agent any
+
+    options {
+        durabilityHint('PERFORMANCE_OPTIMIZED')
+    }
+
+    environment {
+        IMAGE_NAME        = 'adelbettaieb/platform-admin'
+        IMAGE_TAG         = "v${BUILD_NUMBER}"
+        NAMESPACE         = 'platform'
+        JAVA_TOOL_OPTIONS = '-Djna.tmpdir=/var/jenkins_home/.jna-tmp'
+    }
+
+    stages {
+
+        stage('Cleanup') {
+            steps {
+                sh '''
+                    find /var/jenkins_home/workspace -maxdepth 1 -name "*@script*" -type d \
+                        -exec rm -rf {} + 2>/dev/null || true
+                    find /tmp -maxdepth 1 -name "jna-*" -type d \
+                        -exec rm -rf {} + 2>/dev/null || true
+                '''
+            }
+        }
+
+        stage('Checkout') {
+            steps {
+                git branch: 'main',
+                    credentialsId: 'github-credentials',
+                    url: 'https://github.com/Adelbett/platformserverless.git'
+            }
+        }
+
+        stage('Install & Build') {
+            steps {
+                dir('admin-console') {
+                    sh '''
+                        rm -rf node_modules package-lock.json
+                        npm install
+                        npm run build
+                    '''
+                }
+            }
+        }
+
+        stage('Docker Build & Push + Deploy') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-credentials',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh '''
+                        mkdir -p /kaniko/.docker
+                        printf '{"auths":{"https://index.docker.io/v1/":{"auth":"%s"}}}' \
+                            $(printf '%s:%s' "$DOCKER_USER" "$DOCKER_PASS" | base64 -w0) \
+                            > /kaniko/.docker/config.json
+
+                        DOCKER_CONFIG=/kaniko/.docker /kaniko/executor \
+                            --context=dir://$(pwd)/admin-console \
+                            --dockerfile=$(pwd)/ci-cd/docker/admin-kaniko.Dockerfile \
+                            --destination=$IMAGE_NAME:$IMAGE_TAG \
+                            --destination=$IMAGE_NAME:latest
+
+                        kubectl set image deployment/platform-admin \
+                            platform-admin=$IMAGE_NAME:$IMAGE_TAG \
+                            -n platform
+                        kubectl rollout status deployment/platform-admin -n platform
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Admin console déployée avec succès — ${IMAGE_NAME}:${IMAGE_TAG}"
+        }
+        failure {
+            echo "❌ Pipeline échoué — vérifier les logs"
+        }
+    }
+}

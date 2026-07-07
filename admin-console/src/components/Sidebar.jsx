@@ -1,73 +1,29 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    LayoutDashboard, Box, Rocket, Activity, Zap,
-    Globe, Users, CreditCard, Settings,
     LogOut, ChevronLeft, ChevronRight, Hexagon,
-    Terminal, UserPlus, ExternalLink
+    Server, BarChart2, DollarSign, Ban, ScrollText, Radio
 } from 'lucide-react';
-
-// Admin-only pages (cluster, clients, revenue, audit log, incidents) now
-// live in the separate admin-console app — see README.md at the repo root.
-const ADMIN_CONSOLE_URL = import.meta.env.VITE_ADMIN_CONSOLE_URL || 'http://localhost:3001';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
-// roles that can see each nav item
-// allowedRoles: undefined = all authenticated, or array of roles
+// admin-console has a single audience (ADMIN role) — no client/member tiers
+// to gate against, unlike web-portal's Sidebar.
 const NAV_SECTIONS = [
     {
-        label: 'Platform',
-        items: [
-            { path: '/dashboard',  label: 'Dashboard',    icon: LayoutDashboard, clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
-            { path: '/apps',       label: 'Applications', icon: Box,                               allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
-            { path: '/apps/new',   label: 'Deploy',       icon: Rocket,          clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
-            { path: '/monitoring', label: 'Monitoring',   icon: Activity,        clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
-            { path: '/logs',       label: 'Logs',         icon: Terminal,        clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
-        ],
-    },
-    {
-        label: 'Configure',
-        items: [
-            { path: '/kafka',    label: 'Kafka Topics', icon: Zap,        clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
-            { path: '/eventing', label: 'Eventing',     icon: Globe,      clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
-            { path: '/billing',  label: 'Billing',      icon: CreditCard, clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
-            { path: '/team',     label: 'Team',         icon: UserPlus,   clientOnly: true, allowedRoles: ['CLIENT_ADMIN'] },
-            { path: '/settings', label: 'Settings',     icon: Settings,                    allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
-        ],
-    },
-    {
         label: 'Admin',
-        adminSection: true,
         items: [
-            { path: '/monitoring',  label: 'Monitoring', icon: Activity, adminOnly: true },
-            { path: '/logs',        label: 'Logs',       icon: Terminal, adminOnly: true },
-            { path: '/admin/users', label: 'Users',      icon: Users,    adminOnly: true },
+            { path: '/dashboard',  label: 'Overview',   icon: BarChart2 },
+            { path: '/cluster',    label: 'Cluster',    icon: Server },
+            { path: '/clients',    label: 'Clients',    icon: Ban },
+            { path: '/billing',    label: 'Revenue',    icon: DollarSign },
+            { path: '/audit-log',  label: 'Audit Log',  icon: ScrollText },
+            { path: '/incidents',  label: 'Incidents',  icon: Radio },
         ],
     },
 ];
 
-// Cluster / Clients / Revenue / Audit Log / Incidents moved to admin-console
-// (separate app, internal-only). Rendered as a plain external link, not a
-// NavLink, since it's a different origin.
-const AdminConsoleLink = ({ collapsed }) => (
-    <a
-        href={ADMIN_CONSOLE_URL}
-        target="_blank"
-        rel="noreferrer"
-        className="nav-item"
-        title={collapsed ? 'Admin Console' : undefined}
-        style={collapsed ? { justifyContent: 'center', padding: '9px 0', width: 40, margin: '1px auto' } : undefined}
-    >
-        <ExternalLink size={17} style={{ flexShrink: 0 }} />
-        {!collapsed && <span>Admin Console</span>}
-    </a>
-);
-
-const NavItem = ({ item, collapsed, user }) => {
-    if (item.adminOnly && user?.role !== 'ADMIN') return null;
-    if (item.clientOnly && user?.role === 'ADMIN') return null;
-    if (item.allowedRoles && !item.allowedRoles.includes(user?.role)) return null;
+const NavItem = ({ item, collapsed }) => {
     const Icon = item.icon;
 
     return (
@@ -130,9 +86,9 @@ const Sidebar = ({ collapsed, onToggle }) => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                     <div style={{
                         width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-                        background: 'linear-gradient(135deg, #00D4FF, #0066FF)',
+                        background: 'linear-gradient(135deg, #EF4444, #991B1B)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        boxShadow: '0 0 16px rgba(0,212,255,0.3)',
+                        boxShadow: '0 0 16px rgba(239,68,68,0.3)',
                     }}>
                         <Hexagon size={15} color="white" fill="white" />
                     </div>
@@ -149,8 +105,8 @@ const Sidebar = ({ collapsed, onToggle }) => {
                                 <p style={{ fontSize: 13, fontWeight: 900, letterSpacing: '0.06em', margin: 0, lineHeight: 1, fontFamily: "'Outfit', sans-serif", color: dark ? '#F9FAFB' : '#0F172A' }}>
                                     NEXTSTEP
                                 </p>
-                                <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', margin: '3px 0 0', color: '#00D4FF', textTransform: 'uppercase' }}>
-                                    Serverless OS
+                                <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', margin: '3px 0 0', color: '#EF4444', textTransform: 'uppercase' }}>
+                                    Admin Console
                                 </p>
                             </motion.div>
                         )}
@@ -161,12 +117,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
             {/* Navigation */}
             <nav style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '8px 10px' }}>
                 {NAV_SECTIONS.map(section => {
-                    if (section.adminSection && user?.role !== 'ADMIN') return null;
-                    const visible = section.items.filter(i =>
-                        (!i.adminOnly || user?.role === 'ADMIN') &&
-                        (!i.clientOnly || user?.role !== 'ADMIN')
-                    );
-                    if (visible.length === 0) return null;
+                    const visible = section.items;
                     return (
                         <div key={section.label}>
                             <AnimatePresence initial={false}>
@@ -184,9 +135,8 @@ const Sidebar = ({ collapsed, onToggle }) => {
                                 )}
                             </AnimatePresence>
                             {visible.map(item => (
-                                <NavItem key={item.path} item={item} collapsed={collapsed} user={user} />
+                                <NavItem key={item.path} item={item} collapsed={collapsed} />
                             ))}
-                            {section.adminSection && <AdminConsoleLink collapsed={collapsed} />}
                         </div>
                     );
                 })}
