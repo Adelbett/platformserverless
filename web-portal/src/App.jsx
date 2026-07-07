@@ -22,6 +22,8 @@ import ClusterManagement from './pages/admin/ClusterManagement';
 import AdminBilling from './pages/admin/AdminBilling';
 import AdminClients from './pages/admin/AdminClients';
 import AdminAuditLog from './pages/admin/AdminAuditLog';
+import AdminIncidents from './pages/admin/AdminIncidents';
+import StatusPage from './pages/StatusPage';
 
 const ProtectedRoute = ({ children }) => {
     const { user, loading } = useAuth();
@@ -63,6 +65,7 @@ const AppRoutes = () => {
     return (
         <Routes>
             <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/status" element={<StatusPage />} />
 
             <Route path="/login" element={
                 <PublicRoute><Login /></PublicRoute>
@@ -105,6 +108,9 @@ const AppRoutes = () => {
                 } />
                 <Route path="/admin/audit-log" element={
                     <AdminRoute><AdminAuditLog /></AdminRoute>
+                } />
+                <Route path="/admin/incidents" element={
+                    <AdminRoute><AdminIncidents /></AdminRoute>
                 } />
             </Route>
 

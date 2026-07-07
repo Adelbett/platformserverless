@@ -15,6 +15,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
+import com.platform.api.status.StatusRateLimitFilter;
 
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -31,6 +32,7 @@ public class SecurityConfig {
     private final SseTokenFilter sseTokenFilter;
     private final UserSyncFilter userSyncFilter;
     private final ApiKeyFilter apiKeyFilter;
+    private final StatusRateLimitFilter statusRateLimitFilter;
 
     @Value("${app.cors.allowed-origins}")
     private List<String> allowedOrigins;
@@ -49,6 +51,7 @@ public class SecurityConfig {
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                 .requestMatchers("/h2-console/**").permitAll()
                 .requestMatchers("/api/payment/webhook").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/status/**").permitAll()
                 // Secured
                 .anyRequest().authenticated()
             )
@@ -58,6 +61,7 @@ public class SecurityConfig {
             )
             .addFilterBefore(sseTokenFilter, BasicAuthenticationFilter.class)
             .addFilterBefore(apiKeyFilter, BasicAuthenticationFilter.class)
+            .addFilterBefore(statusRateLimitFilter, BasicAuthenticationFilter.class)
             .addFilterAfter(userSyncFilter, BearerTokenAuthenticationFilter.class);
 
         return http.build();

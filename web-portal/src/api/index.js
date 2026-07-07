@@ -90,6 +90,14 @@ export const adminApi = {
     getAuditLog:        (params) => api.get('/admin/audit-log', { params }),
     getQuota:           (userId) => api.get(`/admin/clients/${userId}/quota`),
     updateQuota:        (userId, quota) => api.put(`/admin/clients/${userId}/quota`, quota),
+    createIncident:     (incident) => api.post('/admin/incidents', incident),
+    updateIncident:     (id, incident) => api.put(`/admin/incidents/${id}`, incident),
+    deleteIncident:     (id) => api.delete(`/admin/incidents/${id}`),
+}
+
+export const statusApi = {
+    getStatus:    () => api.get('/status'),
+    getIncidents: () => api.get('/status/incidents'),
 }
 
 export const paymentApi = {
