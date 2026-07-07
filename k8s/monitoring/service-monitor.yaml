@@ -1,0 +1,22 @@
+# Requires the Prometheus Operator (kube-prometheus-stack) to be installed
+# in the cluster. If it is not, use k8s/monitoring/scrape-config.yaml
+# (a plain scrape config snippet for a self-managed Prometheus) instead —
+# do not run both against the same target.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: platform-api
+  namespace: platform
+  labels:
+    release: prometheus
+spec:
+  namespaceSelector:
+    matchNames:
+      - platform
+  selector:
+    matchLabels:
+      app: platform-api
+  endpoints:
+    - port: http
+      path: /actuator/prometheus
+      interval: 15s

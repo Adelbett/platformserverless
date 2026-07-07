@@ -1,6 +1,8 @@
 package com.platform.api.audit;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -17,6 +19,7 @@ public class AdminAuditLogService {
 
     private final AdminAuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;
+    private final MeterRegistry meterRegistry;
 
     /**
      * Records an admin action. Never throws — a failure to persist the audit
@@ -39,6 +42,11 @@ public class AdminAuditLogService {
                     .ipAddress(ipAddress)
                     .build();
             auditLogRepository.save(entry);
+            Counter.builder("admin_audit_actions_total")
+                    .description("Admin actions recorded in the audit trail")
+                    .tag("action", action.name())
+                    .register(meterRegistry)
+                    .increment();
         } catch (Exception e) {
             log.error("Failed to record admin audit log [action={}, target={}:{}, actor={}]: {}",
                     action, targetType, targetId, actorUsername, e.getMessage(), e);

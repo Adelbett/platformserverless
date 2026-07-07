@@ -1,6 +1,7 @@
 package com.platform.api.audit;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -25,10 +26,14 @@ class AdminAuditLogServiceTest {
 
     @Test
     void record_persistsEntryWithSerializedPayloads() {
-        service = new AdminAuditLogService(auditLogRepository, objectMapper);
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        service = new AdminAuditLogService(auditLogRepository, objectMapper, meterRegistry);
 
         service.record("u1", "adel", AdminAction.SUSPEND_CLIENT, "CLIENT", "client-42",
                 Map.of("suspended", false), Map.of("suspended", true), "non-payment", "10.0.0.1");
+
+        assertThat(meterRegistry.get("admin_audit_actions_total").tag("action", "SUSPEND_CLIENT").counter().count())
+                .isEqualTo(1.0);
 
         ArgumentCaptor<AdminAuditLog> captor = ArgumentCaptor.forClass(AdminAuditLog.class);
         verify(auditLogRepository, times(1)).save(captor.capture());
@@ -47,7 +52,7 @@ class AdminAuditLogServiceTest {
 
     @Test
     void record_neverThrowsWhenRepositoryFails() {
-        service = new AdminAuditLogService(auditLogRepository, objectMapper);
+        service = new AdminAuditLogService(auditLogRepository, objectMapper, new SimpleMeterRegistry());
         when(auditLogRepository.save(any())).thenThrow(new RuntimeException("DB down"));
 
         assertThatCode(() -> service.record("u1", "adel", AdminAction.FORCE_DELETE_APP,

@@ -1,0 +1,26 @@
+# Alertmanager routing to a generic webhook (Slack incoming-webhook URL,
+# or any endpoint that accepts Alertmanager's webhook payload).
+#
+# Alertmanager config does not support environment variable substitution,
+# so the webhook URL must be templated in before applying — e.g.:
+#   envsubst < alertmanager-config.yaml | kubectl apply -f -
+# with ALERT_WEBHOOK_URL exported in your shell, or via Kustomize/Helm
+# in a real deployment pipeline. Never commit a real URL to this file.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-platform-config
+  namespace: monitoring
+data:
+  alertmanager.yml: |
+    route:
+      receiver: platform-webhook
+      group_by: ["alertname", "namespace"]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+    receivers:
+      - name: platform-webhook
+        webhook_configs:
+          - url: "$ALERT_WEBHOOK_URL"
+            send_resolved: true

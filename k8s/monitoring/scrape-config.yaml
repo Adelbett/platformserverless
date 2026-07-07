@@ -1,0 +1,17 @@
+# Fallback for a self-managed Prometheus (no Prometheus Operator / CRDs).
+# Merge this scrape job into your Prometheus ConfigMap instead of applying
+# k8s/monitoring/service-monitor.yaml.
+scrape_configs:
+  - job_name: "platform-api"
+    metrics_path: "/actuator/prometheus"
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names: ["platform"]
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        regex: platform-api
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_container_port_number]
+        regex: "8082"
+        action: keep

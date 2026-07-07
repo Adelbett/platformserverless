@@ -1,0 +1,105 @@
+{
+  "title": "PlatformServerless — Tenant Overview",
+  "uid": "platform-tenant-overview",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "namespace",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(kube_namespace_labels{namespace=~\"user-.*\"}, namespace)",
+        "refresh": 2
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "HTTP request rate (backend-api)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "sum(rate(http_server_requests_seconds_count{application=\"backend-api\"}[5m])) by (uri, status)"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "5xx error rate (backend-api)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "sum(rate(http_server_requests_seconds_count{application=\"backend-api\",status=~\"5..\"}[5m]))"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "p50 / p95 / p99 latency (backend-api)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        { "datasource": "Prometheus", "expr": "histogram_quantile(0.50, sum(rate(http_server_requests_seconds_bucket{application=\"backend-api\"}[5m])) by (le))", "legendFormat": "p50" },
+        { "datasource": "Prometheus", "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{application=\"backend-api\"}[5m])) by (le))", "legendFormat": "p95" },
+        { "datasource": "Prometheus", "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{application=\"backend-api\"}[5m])) by (le))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "CPU usage — tenant namespace ($namespace)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"$namespace\"}[5m])) by (pod)"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Memory usage — tenant namespace ($namespace)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "sum(container_memory_working_set_bytes{namespace=\"$namespace\"}) by (pod)"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Pod restarts — tenant namespace ($namespace)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"$namespace\"}[15m])) by (pod)"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Admin actions (suspend/restore/force-delete) — rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "sum(rate(admin_audit_actions_total{application=\"backend-api\"}[15m])) by (action)"
+        }
+      ]
+    }
+  ]
+}

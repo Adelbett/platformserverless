@@ -1,0 +1,34 @@
+# Requires the Prometheus Operator. For a self-managed Prometheus, copy the
+# `groups:` block into a rule file referenced by prometheus.yml's rule_files.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: platform-api-alerts
+  namespace: platform
+  labels:
+    release: prometheus
+spec:
+  groups:
+    - name: platform-api.rules
+      rules:
+        - alert: PlatformApiHighErrorRate
+          expr: >
+            sum(rate(http_server_requests_seconds_count{application="backend-api",status=~"5.."}[5m]))
+            /
+            sum(rate(http_server_requests_seconds_count{application="backend-api"}[5m]))
+            > 0.05
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "backend-api 5xx rate above 5%"
+            description: "More than 5% of requests to backend-api have returned a 5xx status over the last 5 minutes."
+
+        - alert: PlatformApiPodCrashLooping
+          expr: increase(kube_pod_container_status_restarts_total{namespace="platform"}[15m]) > 3
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Pod {{ $labels.pod }} is crash-looping"
+            description: "Container {{ $labels.container }} in pod {{ $labels.pod }} (namespace platform) has restarted more than 3 times in 15 minutes."
