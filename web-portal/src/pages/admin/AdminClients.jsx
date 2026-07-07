@@ -1,10 +1,102 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Ban, Play, AlertTriangle, RefreshCw, CreditCard } from 'lucide-react';
+import { Users, Ban, Play, AlertTriangle, RefreshCw, CreditCard, Gauge, ChevronDown, ChevronUp } from 'lucide-react';
 import { adminApi, invoiceApi } from '../../api';
+
+const quotaInputStyle = {
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 7,
+    color: '#F1F5F9',
+    fontSize: 12,
+    padding: '6px 10px',
+    fontFamily: "'JetBrains Mono', monospace",
+    width: 100,
+};
+
+const QuotaPanel = ({ client }) => {
+    const [quota, setQuota] = useState(null);
+    const [form, setForm] = useState({ maxCpu: '', maxMemory: '', maxApps: '' });
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState(null);
+    const [saved, setSaved] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        adminApi.getQuota(client.id)
+            .then(res => {
+                if (cancelled) return;
+                setQuota(res.data);
+                setForm({ maxCpu: res.data.maxCpu, maxMemory: res.data.maxMemory, maxApps: res.data.maxApps });
+            })
+            .catch(err => !cancelled && setError(err.response?.status ? `HTTP ${err.response.status}` : 'Network error'))
+            .finally(() => !cancelled && setLoading(false));
+        return () => { cancelled = true; };
+    }, [client.id]);
+
+    const save = async () => {
+        setSaving(true);
+        setError(null);
+        setSaved(false);
+        try {
+            const res = await adminApi.updateQuota(client.id, {
+                maxCpu: form.maxCpu,
+                maxMemory: form.maxMemory,
+                maxApps: Number(form.maxApps),
+            });
+            setQuota(res.data);
+            setSaved(true);
+        } catch (err) {
+            setError(err.response?.data?.detail || (err.response?.status ? `HTTP ${err.response.status}` : 'Network error'));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <tr style={{ background: 'rgba(255,255,255,0.015)' }}>
+            <td colSpan={6} style={{ padding: '16px 20px 20px' }}>
+                {loading ? (
+                    <span style={{ fontSize: 12, color: '#475569' }}>Loading quota…</span>
+                ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <label style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#475569' }}>Max CPU</label>
+                            <input value={form.maxCpu} onChange={e => setForm(f => ({ ...f, maxCpu: e.target.value }))} placeholder="2000m" style={quotaInputStyle} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <label style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#475569' }}>Max Memory</label>
+                            <input value={form.maxMemory} onChange={e => setForm(f => ({ ...f, maxMemory: e.target.value }))} placeholder="4Gi" style={quotaInputStyle} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <label style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#475569' }}>Max Apps</label>
+                            <input type="number" min={0} value={form.maxApps} onChange={e => setForm(f => ({ ...f, maxApps: e.target.value }))} style={{ ...quotaInputStyle, width: 70 }} />
+                        </div>
+                        {quota && (
+                            <span style={{ fontSize: 11, color: '#64748B' }}>
+                                Currently using <strong style={{ color: '#94A3B8' }}>{quota.currentApps}</strong> app{quota.currentApps !== 1 ? 's' : ''}
+                            </span>
+                        )}
+                        <button onClick={save} disabled={saving} style={{
+                            padding: '7px 16px', borderRadius: 8, border: '1px solid rgba(59,130,246,0.35)',
+                            background: 'rgba(59,130,246,0.12)', color: '#3B82F6', cursor: saving ? 'not-allowed' : 'pointer',
+                            fontSize: 12, fontWeight: 700, opacity: saving ? 0.5 : 1,
+                        }}>
+                            {saving ? 'Saving…' : 'Save quota'}
+                        </button>
+                        {saved && <span style={{ fontSize: 11, color: '#10B981' }}>Saved and synced to cluster.</span>}
+                        {error && <span style={{ fontSize: 11, color: '#EF4444' }}>{error}</span>}
+                    </div>
+                )}
+            </td>
+        </tr>
+    );
+};
 
 const ClientRow = ({ client, onSuspend, onRestore }) => {
     const [loading, setLoading] = useState(false);
+    const [quotaOpen, setQuotaOpen] = useState(false);
 
     const handleToggle = async () => {
         if (loading) return;
@@ -24,10 +116,11 @@ const ClientRow = ({ client, onSuspend, onRestore }) => {
     };
 
     return (
+        <>
         <motion.tr
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+            style={{ borderBottom: quotaOpen ? 'none' : '1px solid rgba(255,255,255,0.04)' }}
             onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.025)'}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
         >
@@ -72,28 +165,45 @@ const ClientRow = ({ client, onSuspend, onRestore }) => {
                 {client.createdAt ? new Date(client.createdAt).toLocaleDateString() : '—'}
             </td>
             <td style={{ padding: '14px 20px', textAlign: 'right' }}>
-                <button
-                    onClick={handleToggle}
-                    disabled={loading}
-                    style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 6,
-                        padding: '7px 14px', borderRadius: 8,
-                        border: `1px solid ${client.suspended ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.25)'}`,
-                        cursor: loading ? 'not-allowed' : 'pointer',
-                        fontWeight: 700, fontSize: 12, opacity: loading ? 0.5 : 1,
-                        background: client.suspended ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.12)',
-                        color: client.suspended ? '#10B981' : '#EF4444',
-                    }}
-                >
-                    {loading
-                        ? <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} />
-                        : client.suspended
-                            ? <><Play size={13} /> Restore</>
-                            : <><Ban size={13} /> Suspend</>
-                    }
-                </button>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                    <button
+                        onClick={() => setQuotaOpen(o => !o)}
+                        style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 6,
+                            padding: '7px 12px', borderRadius: 8,
+                            border: '1px solid rgba(148,163,184,0.25)',
+                            cursor: 'pointer', fontWeight: 700, fontSize: 12,
+                            background: quotaOpen ? 'rgba(148,163,184,0.15)' : 'transparent',
+                            color: '#94A3B8',
+                        }}
+                    >
+                        <Gauge size={13} /> Quota {quotaOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                    </button>
+                    <button
+                        onClick={handleToggle}
+                        disabled={loading}
+                        style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 6,
+                            padding: '7px 14px', borderRadius: 8,
+                            border: `1px solid ${client.suspended ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.25)'}`,
+                            cursor: loading ? 'not-allowed' : 'pointer',
+                            fontWeight: 700, fontSize: 12, opacity: loading ? 0.5 : 1,
+                            background: client.suspended ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.12)',
+                            color: client.suspended ? '#10B981' : '#EF4444',
+                        }}
+                    >
+                        {loading
+                            ? <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} />
+                            : client.suspended
+                                ? <><Play size={13} /> Restore</>
+                                : <><Ban size={13} /> Suspend</>
+                        }
+                    </button>
+                </div>
             </td>
         </motion.tr>
+        {quotaOpen && <QuotaPanel client={client} />}
+        </>
     );
 };
 

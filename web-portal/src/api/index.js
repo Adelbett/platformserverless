@@ -88,6 +88,8 @@ export const adminApi = {
     suspendClient:      (id, reason) => api.post(`/admin/clients/${id}/suspend`, null, { params: reason ? { reason } : {} }),
     restoreClient:      (id) => api.post(`/admin/clients/${id}/restore`),
     getAuditLog:        (params) => api.get('/admin/audit-log', { params }),
+    getQuota:           (userId) => api.get(`/admin/clients/${userId}/quota`),
+    updateQuota:        (userId, quota) => api.put(`/admin/clients/${userId}/quota`, quota),
 }
 
 export const paymentApi = {

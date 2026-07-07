@@ -9,6 +9,7 @@ import com.platform.api.exception.NotFoundException;
 import com.platform.api.logs.DeploymentLog;
 import com.platform.api.logs.DeploymentLogRepository;
 import com.platform.api.logs.LogSseService;
+import com.platform.api.quota.QuotaService;
 import com.platform.api.user.UserContextService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,7 @@ public class AppService {
     private final KafkaSourceRepository kafkaSourceRepository;
     private final TriggerRepository triggerRepository;
     private final UserContextService userContextService;
+    private final QuotaService quotaService;
 
     // ── Create & Deploy ──────────────────────────────────────────────
 
@@ -42,6 +44,8 @@ public class AppService {
         UserContextService.UserContext ctx = userContextService.resolve(username);
         String effectiveUserId = ctx.effectiveUserId();
         String namespace       = ctx.namespace();
+
+        quotaService.assertCanCreateApp(effectiveUserId);
 
         String serviceName = generateServiceName(req.getImageName(), effectiveUserId);
 

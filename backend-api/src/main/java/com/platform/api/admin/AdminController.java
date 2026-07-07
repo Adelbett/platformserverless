@@ -13,6 +13,9 @@ import com.platform.api.kafka.KafkaTopic;
 import com.platform.api.kafka.KafkaTopicRepository;
 import com.platform.api.logs.DeploymentLog;
 import com.platform.api.logs.DeploymentLogRepository;
+import com.platform.api.quota.QuotaService;
+import com.platform.api.quota.dto.TenantQuotaResponse;
+import com.platform.api.quota.dto.UpdateQuotaRequest;
 import com.platform.api.user.User;
 import com.platform.api.user.UserRepository;
 import com.platform.api.user.UserContextService;
@@ -54,6 +57,7 @@ public class AdminController {
     private final TriggerRepository       triggerRepository;
     private final UserContextService      userContextService;
     private final AdminAuditLogService    auditLogService;
+    private final QuotaService            quotaService;
 
     // ── Platform stats ────────────────────────────────────────────────
 
@@ -409,6 +413,28 @@ public class AdminController {
                 null, clientIp(request));
 
         return ResponseEntity.ok(Map.of("userId", userId, "suspended", false, "appsRestored", apps.size()));
+    }
+
+    // ── Tenant quotas ─────────────────────────────────────────────────
+
+    @GetMapping("/clients/{userId}/quota")
+    @Operation(summary = "Get a client's resource quota (CPU, memory, max apps)")
+    public ResponseEntity<TenantQuotaResponse> getQuota(@PathVariable String userId) {
+        return ResponseEntity.ok(quotaService.getQuota(userId));
+    }
+
+    @PutMapping("/clients/{userId}/quota")
+    @Operation(summary = "Update a client's resource quota and sync it to the cluster")
+    public ResponseEntity<TenantQuotaResponse> updateQuota(@PathVariable String userId,
+                                                            @jakarta.validation.Valid @RequestBody UpdateQuotaRequest req,
+                                                            Authentication auth, HttpServletRequest request) {
+        TenantQuotaResponse before = quotaService.getQuota(userId);
+        TenantQuotaResponse after = quotaService.updateQuota(userId, req);
+
+        auditLogService.record(actorId(auth), actorName(auth), AdminAction.UPDATE_QUOTA,
+                "CLIENT", userId, before, after, null, clientIp(request));
+
+        return ResponseEntity.ok(after);
     }
 
     // ── List all clients (for admin client management page) ───────────
