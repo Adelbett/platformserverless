@@ -245,6 +245,59 @@ public class AdminController {
         }
     }
 
+    // ── Kubernetes events (warnings, OOMKilled, CrashLoopBackOff, ...) ─
+
+    @GetMapping("/cluster/events")
+    @Operation(summary = "Recent Warning events across all namespaces (OOMKilled, ImagePullBackOff, CrashLoopBackOff, ...)")
+    public ResponseEntity<List<Map<String, Object>>> getClusterEvents() {
+        try {
+            List<Map<String, Object>> events = kubernetesClient.v1().events().inAnyNamespace().list().getItems()
+                    .stream()
+                    .filter(e -> "Warning".equals(e.getType()))
+                    .sorted(Comparator.comparing(
+                            (io.fabric8.kubernetes.api.model.Event e) ->
+                                    e.getLastTimestamp() != null ? e.getLastTimestamp() : e.getEventTime() != null ? e.getEventTime().getTime() : ""
+                    ).reversed())
+                    .limit(200)
+                    .map(this::eventInfo)
+                    .collect(Collectors.toList());
+            return ResponseEntity.ok(events);
+        } catch (Exception e) {
+            log.warn("Could not fetch cluster events: {}", e.getMessage());
+            return ResponseEntity.ok(List.of());
+        }
+    }
+
+    // ── Critical system components (Knative, Kourier, Kafka) ──────────
+
+    @GetMapping("/cluster/system-components")
+    @Operation(summary = "Health of critical system namespaces (knative-serving, knative-eventing, kourier-system, kafka)")
+    public ResponseEntity<List<Map<String, Object>>> getSystemComponents() {
+        List<String> systemNamespaces = List.of("knative-serving", "knative-eventing", "kourier-system", "kafka");
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (String ns : systemNamespaces) {
+            Map<String, Object> info = new LinkedHashMap<>();
+            info.put("namespace", ns);
+            try {
+                List<Pod> pods = kubernetesClient.pods().inNamespace(ns).list().getItems();
+                long total = pods.size();
+                long ready = pods.stream().filter(this::isPodReady).count();
+                info.put("totalPods", total);
+                info.put("readyPods", ready);
+                info.put("status", total == 0 ? "UNKNOWN" : ready == total ? "HEALTHY" : "DEGRADED");
+                info.put("pods", pods.stream().map(this::podInfo).collect(Collectors.toList()));
+            } catch (Exception e) {
+                log.warn("Could not check system namespace '{}': {}", ns, e.getMessage());
+                info.put("totalPods", 0);
+                info.put("readyPods", 0);
+                info.put("status", "UNKNOWN");
+                info.put("pods", List.of());
+            }
+            result.add(info);
+        }
+        return ResponseEntity.ok(result);
+    }
+
     // ── Eventing — all sources & triggers ────────────────────────────
 
     @GetMapping("/eventing/sources")
@@ -535,16 +588,32 @@ public class AdminController {
         return request.getRemoteAddr();
     }
 
+    private boolean isPodReady(Pod pod) {
+        var conditions = pod.getStatus().getConditions();
+        return conditions != null && conditions.stream()
+                .anyMatch(c -> "Ready".equals(c.getType()) && "True".equals(c.getStatus()));
+    }
+
+    private Map<String, Object> eventInfo(io.fabric8.kubernetes.api.model.Event event) {
+        Map<String, Object> info = new LinkedHashMap<>();
+        info.put("namespace",      event.getMetadata().getNamespace());
+        info.put("reason",         event.getReason());
+        info.put("message",        event.getMessage());
+        info.put("involvedObject", event.getInvolvedObject() != null ? event.getInvolvedObject().getName() : "");
+        info.put("kind",           event.getInvolvedObject() != null ? event.getInvolvedObject().getKind() : "");
+        info.put("count",          event.getCount() != null ? event.getCount() : 1);
+        info.put("lastSeen",       event.getLastTimestamp() != null ? event.getLastTimestamp()
+                : event.getEventTime() != null ? event.getEventTime().getTime() : null);
+        return info;
+    }
+
     private Map<String, Object> podInfo(Pod pod) {
         Map<String, Object> info = new LinkedHashMap<>();
         info.put("name",      pod.getMetadata().getName());
         info.put("namespace", pod.getMetadata().getNamespace());
         info.put("phase",     pod.getStatus().getPhase() != null ? pod.getStatus().getPhase() : "Unknown");
         info.put("nodeName",  pod.getSpec().getNodeName() != null ? pod.getSpec().getNodeName() : "");
-        var conditions = pod.getStatus().getConditions();
-        boolean ready = conditions != null && conditions.stream()
-                .anyMatch(c -> "Ready".equals(c.getType()) && "True".equals(c.getStatus()));
-        info.put("ready", ready);
+        info.put("ready", isPodReady(pod));
         int restarts = pod.getStatus().getContainerStatuses() != null
                 ? pod.getStatus().getContainerStatuses().stream()
                     .mapToInt(cs -> cs.getRestartCount() != null ? cs.getRestartCount() : 0).sum()

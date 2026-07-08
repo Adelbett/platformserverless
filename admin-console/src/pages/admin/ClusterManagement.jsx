@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { adminApi } from '../../api';
-import { Server, Cpu, MemoryStick, Box, Users, Zap, Globe, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Server, Cpu, MemoryStick, Box, Users, Zap, Globe, AlertTriangle, RefreshCw, ShieldAlert, Radio } from 'lucide-react';
 
 // Wraps a call so a failure surfaces as a labeled error instead of being
 // swallowed and rendered as if the data were simply empty.
@@ -67,10 +67,62 @@ const NodeCard = ({ node }) => {
     );
 };
 
+const componentStatusColor = (status) => ({
+    HEALTHY: '#3FB950',
+    DEGRADED: '#E8A838',
+    UNKNOWN: '#5A7080',
+}[status] || '#5A7080');
+
+const SystemComponentCard = ({ component }) => {
+    const color = componentStatusColor(component.status);
+    return (
+        <div style={{
+            background: '#0D1117', border: `1px solid ${color}30`,
+            borderRadius: 12, padding: '16px 20px',
+        }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, fontWeight: 700, color: '#DDE6F0' }}>{component.namespace}</span>
+                <span style={{
+                    fontSize: 10, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace",
+                    padding: '3px 10px', borderRadius: 20, color, background: `${color}18`, border: `1px solid ${color}30`,
+                }}>
+                    {component.status}
+                </span>
+            </div>
+            <div style={{ fontSize: 12, color: '#5A7080' }}>
+                {component.readyPods}/{component.totalPods} pods ready
+            </div>
+        </div>
+    );
+};
+
+const EventRow = ({ event }) => (
+    <tr style={{ borderBottom: '1px solid rgba(31,43,58,0.5)' }}>
+        <td style={{ padding: '10px 20px', fontSize: 11, color: '#5A7080', whiteSpace: 'nowrap' }}>
+            {event.lastSeen ? new Date(event.lastSeen).toLocaleString() : '—'}
+        </td>
+        <td style={{ padding: '10px 20px' }}>
+            <span style={{
+                fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                color: '#F85149', background: 'rgba(248,81,73,0.1)', border: '1px solid rgba(248,81,73,0.2)',
+                fontFamily: "'JetBrains Mono', monospace",
+            }}>{event.reason}</span>
+        </td>
+        <td style={{ padding: '10px 20px', fontSize: 12, color: '#A371F7', fontFamily: "'JetBrains Mono', monospace" }}>
+            {event.kind}/{event.involvedObject}
+        </td>
+        <td style={{ padding: '10px 20px', fontSize: 11, color: '#5A7080' }}>{event.namespace}</td>
+        <td style={{ padding: '10px 20px', fontSize: 12, color: '#DDE6F0', maxWidth: 420 }}>{event.message}</td>
+        <td style={{ padding: '10px 20px', fontSize: 11, color: '#5A7080', textAlign: 'right' }}>×{event.count}</td>
+    </tr>
+);
+
 const ClusterManagement = () => {
     const [stats,      setStats]      = useState(null);
     const [nodes,      setNodes]      = useState([]);
     const [namespaces, setNamespaces] = useState([]);
+    const [systemComponents, setSystemComponents] = useState([]);
+    const [events,     setEvents]     = useState([]);
     const [loading,    setLoading]    = useState(true);
     const [errors,     setErrors]     = useState([]);
 
@@ -83,10 +135,14 @@ const ClusterManagement = () => {
             adminApi.getStats().catch(err => { failures.push(describeFailure('Platform stats', err)); return { data: null }; }),
             adminApi.getNodes().catch(err => { failures.push(describeFailure('Kubernetes nodes', err)); return { data: [] }; }),
             adminApi.getNamespaces().catch(err => { failures.push(describeFailure('Tenant namespaces', err)); return { data: [] }; }),
-        ]).then(([s, n, ns]) => {
+            adminApi.getSystemComponents().catch(err => { failures.push(describeFailure('System components', err)); return { data: [] }; }),
+            adminApi.getClusterEvents().catch(err => { failures.push(describeFailure('Cluster events', err)); return { data: [] }; }),
+        ]).then(([s, n, ns, sc, ev]) => {
             setStats(s.data);
             setNodes(Array.isArray(n.data) ? n.data : []);
             setNamespaces(Array.isArray(ns.data) ? ns.data : []);
+            setSystemComponents(Array.isArray(sc.data) ? sc.data : []);
+            setEvents(Array.isArray(ev.data) ? ev.data : []);
             setErrors(failures);
         }).finally(() => setLoading(false));
     };
@@ -144,6 +200,49 @@ const ClusterManagement = () => {
                 <StatCard label="Running Apps"      value={stats?.runningApps}      icon={Box}    color="#3FB950" />
                 <StatCard label="Kafka Topics"      value={stats?.totalTopics}      icon={Zap}    color="#E8A838" />
                 <StatCard label="Active Namespaces" value={stats?.activeNamespaces} icon={Globe}  color="#A371F7" />
+            </div>
+
+            {/* Critical system components */}
+            <div>
+                <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 700, color: '#DDE6F0', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <ShieldAlert size={16} style={{ color: '#5A7080' }} /> Critical System Components
+                </h2>
+                <p style={{ color: '#5A7080', fontSize: 12, marginBottom: 14 }}>
+                    knative-serving, knative-eventing, kourier-system, kafka — if any of these go down, every tenant is affected
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 }}>
+                    {systemComponents.map((c, i) => <SystemComponentCard key={i} component={c} />)}
+                </div>
+            </div>
+
+            {/* Recent cluster warning events */}
+            <div>
+                <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 700, color: '#DDE6F0', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Radio size={16} style={{ color: '#5A7080' }} /> Recent Warning Events ({events.length})
+                </h2>
+                <p style={{ color: '#5A7080', fontSize: 12, marginBottom: 14 }}>
+                    OOMKilled, ImagePullBackOff, CrashLoopBackOff, and other Warning events across all namespaces
+                </p>
+                <div style={{ background: '#0D1117', border: '1px solid #1F2B3A', borderRadius: 12, overflow: 'hidden' }}>
+                    {events.length === 0 ? (
+                        <div style={{ color: '#5A7080', fontSize: 13, padding: 24, textAlign: 'center' }}>No warning events — cluster is quiet</div>
+                    ) : (
+                        <div style={{ maxHeight: 420, overflowY: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '1px solid #1F2B3A' }}>
+                                        {['Last Seen', 'Reason', 'Object', 'Namespace', 'Message', 'Count'].map(h => (
+                                            <th key={h} style={{ padding: '10px 20px', textAlign: h === 'Count' ? 'right' : 'left', fontSize: 10, fontWeight: 700, color: '#5A7080', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em' }}>{h}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {events.map((e, i) => <EventRow key={i} event={e} />)}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Nodes */}
