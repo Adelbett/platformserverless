@@ -1,8 +1,9 @@
-# Internal-only admin console. Deliberately NOT type: LoadBalancer (would
-# expose it on the public MetalLB pool, 10.9.21.231) and NOT routed through
-# Kourier/Knative — this is a plain Deployment/Service pair reachable only
-# from inside the cluster (kubectl port-forward, or a future internal
-# VPN/ingress once the client/admin network split lands).
+# Admin console, exposed via NodePort (fixed port 30081 on every cluster
+# node) rather than the public MetalLB LoadBalancer pool used by
+# platform-web — reachable at http://<any-node-ip>:30081, still cluster
+# -network-only, not a public internet-facing IP. Chosen over ClusterIP for
+# ease of access during this phase; revisit when a real internal VPN/ingress
+# is in place for a tighter boundary.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -31,9 +32,10 @@ metadata:
   name: platform-admin
   namespace: platform
 spec:
-  type: ClusterIP
+  type: NodePort
   selector:
     app: platform-admin
   ports:
   - port: 80
     targetPort: 80
+    nodePort: 30081
