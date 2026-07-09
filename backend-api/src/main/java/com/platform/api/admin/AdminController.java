@@ -139,14 +139,20 @@ public class AdminController {
 
     @GetMapping("/cluster/nodes")
     @Operation(summary = "Kubernetes node status and resource usage")
-    public ResponseEntity<List<Map<String, Object>>> getNodes() {
+    public ResponseEntity<?> getNodes() {
         try {
             List<Map<String, Object>> nodes = kubernetesClient.nodes().list().getItems()
                     .stream().map(this::nodeInfo).collect(Collectors.toList());
             return ResponseEntity.ok(nodes);
         } catch (Exception e) {
-            log.warn("Could not fetch nodes: {}", e.getMessage());
-            return ResponseEntity.ok(List.of());
+            // "nodes" is cluster-scoped and needs its own RBAC grant separate from
+            // namespace-scoped resources — a 403 here is easy to mistake for "0
+            // nodes" if swallowed into an empty 200, so surface it as a real error
+            // instead (see k8s/backend/rbac.yaml for the likely fix).
+            log.error("Could not fetch cluster nodes: {}", e.getMessage(), e);
+            return ResponseEntity.status(502).body(Map.of(
+                    "detail", "Could not list cluster nodes: " + e.getMessage()
+            ));
         }
     }
 

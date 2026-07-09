@@ -1,0 +1,36 @@
+# Grants platform-api read access to cluster-scoped resources it already
+# queries (nodes, events) but had no explicit RBAC for — this is almost
+# certainly why /api/admin/cluster/nodes silently returns an empty list
+# instead of the 3 real nodes: the API call fails with 403, and
+# AdminController.getNodes() swallows the exception and returns 200 + [].
+#
+# Namespace-scoped resources (pods, namespaces themselves) already work,
+# which means the ServiceAccount has *some* broad permissions — but "nodes"
+# specifically requires its own RBAC rule since it's a distinct resource
+# type at the cluster scope.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: platform-api-cluster-reader
+rules:
+  - apiGroups: [""]
+    resources: ["nodes", "events"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: platform-api-cluster-reader
+subjects:
+  # platform-api runs under the namespace's "default" ServiceAccount (no
+  # dedicated one was ever created) — this grants the permission to every
+  # pod in "platform" using "default", not just platform-api specifically.
+  # Acceptable for now (read-only, low-risk resources); a follow-up could
+  # give platform-api its own ServiceAccount for a tighter blast radius.
+  - kind: ServiceAccount
+    name: default
+    namespace: platform
+roleRef:
+  kind: ClusterRole
+  name: platform-api-cluster-reader
+  apiGroup: rbac.authorization.k8s.io

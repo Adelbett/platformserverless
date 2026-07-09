@@ -32,7 +32,7 @@ spec:
         - name: KEYCLOAK_URL
           value: "http://keycloak.platform.svc.cluster.local:8080"
         - name: APP_PROMETHEUS_URL
-          value: "http://prometheus.monitoring.svc.cluster.local:9090"
+          value: "http://monitoring-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090"
         - name: APP_KAFKA_BOOTSTRAP_SERVERS
           value: "my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
         - name: APP_KAFKA_ENABLED

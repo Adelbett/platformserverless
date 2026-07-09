@@ -44,7 +44,7 @@ app:
     bootstrap-servers: ${APP_KAFKA_BOOTSTRAP_SERVERS:my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092}
 
   prometheus:
-    url: ${APP_PROMETHEUS_URL:http://prometheus.monitoring.svc.cluster.local:9090}
+    url: ${APP_PROMETHEUS_URL:http://monitoring-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090}
 
   cors:
     allowed-origins: "*"
