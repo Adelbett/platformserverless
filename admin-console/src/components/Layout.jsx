@@ -9,7 +9,8 @@ import Sidebar from './Sidebar';
 
 const routeTitles = {
     '/dashboard':  { title: 'Overview',   sub: 'Global platform health and utilization' },
-    '/cluster':    { title: 'Cluster',    sub: 'Nodes, namespaces, pods, Knative, Kafka' },
+    '/cluster':    { title: 'Cluster',    sub: 'Nodes, namespaces, pods, Knative, Kafka, logs' },
+    '/users':      { title: 'Users',      sub: 'Global platform roles across all tenants' },
     '/clients':    { title: 'Clients',    sub: 'Suspend, restore, and set quotas per tenant' },
     '/billing':    { title: 'Revenue',    sub: 'Platform-wide billing and invoices' },
     '/audit-log':  { title: 'Audit Log',  sub: 'Every suspend, restore, and force-delete action' },

@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     LogOut, ChevronLeft, ChevronRight, Hexagon,
-    Server, BarChart2, DollarSign, Ban, ScrollText, Radio, TrendingUp
+    Server, BarChart2, DollarSign, Ban, ScrollText, Radio, TrendingUp, Users
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -15,6 +15,7 @@ const NAV_SECTIONS = [
         items: [
             { path: '/dashboard',  label: 'Overview',   icon: BarChart2 },
             { path: '/cluster',    label: 'Cluster',    icon: Server },
+            { path: '/users',      label: 'Users',      icon: Users },
             { path: '/clients',    label: 'Clients',    icon: Ban },
             { path: '/billing',    label: 'Revenue',    icon: DollarSign },
             { path: '/audit-log',  label: 'Audit Log',  icon: ScrollText },

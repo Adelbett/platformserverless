@@ -1,21 +1,19 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Shield, UserCheck, RefreshCw, Users as UsersIcon, AlertCircle } from 'lucide-react';
-import { usersApi } from '../api';
-import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
+import { usersApi } from '../../api';
+import { useAuth } from '../../context/AuthContext';
 
-// ── Role config ────────────────────────────────────────────────────────────────
 // Global platform roles only. Per-member feature permissions (deploy, billing,
-// Kafka, etc.) are managed by each CLIENT_ADMIN on their own team — see /team.
+// Kafka, etc.) remain managed by each CLIENT_ADMIN on their own team in
+// web-portal — out of scope for this console, which only edits the global role.
 
 const ROLES = ['ADMIN', 'CLIENT_ADMIN', 'MEMBER'];
 
 const ROLE_META = {
-    ADMIN:        { color: '#EF4444', bg: 'rgba(239,68,68,0.12)',  icon: Shield,    desc: 'Full platform access'        },
-    CLIENT_ADMIN: { color: '#3B82F6', bg: 'rgba(59,130,246,0.12)', icon: UserCheck, desc: 'Manages their own team'      },
-    MEMBER:       { color: '#00D4FF', bg: 'rgba(0,212,255,0.10)',  icon: UserCheck, desc: 'Deploys within their team'   },
+    ADMIN:        { color: '#EF4444', bg: 'rgba(239,68,68,0.12)',  icon: Shield,    desc: 'Full platform access'      },
+    CLIENT_ADMIN: { color: '#3B82F6', bg: 'rgba(59,130,246,0.12)', icon: UserCheck, desc: 'Manages their own team'    },
+    MEMBER:       { color: '#00D4FF', bg: 'rgba(0,212,255,0.10)',  icon: UserCheck, desc: 'Deploys within their team' },
 };
 
 const RoleBadge = ({ role }) => {
@@ -33,21 +31,12 @@ const RoleBadge = ({ role }) => {
     );
 };
 
-// ── Main page ──────────────────────────────────────────────────────────────────
-
-const Users = () => {
-    const navigate              = useNavigate();
+const AdminUsers = () => {
     const { user: me }          = useAuth();
-    const { dark }              = useTheme();
     const [users, setUsers]     = useState([]);
     const [loading, setLoading] = useState(true);
     const [saving,  setSaving]  = useState(null);
     const [error,   setError]   = useState(null);
-
-    // Redirect non-admins
-    useEffect(() => {
-        if (me && me.role !== 'ADMIN') navigate('/dashboard');
-    }, [me, navigate]);
 
     const load = async () => {
         setLoading(true);
@@ -82,20 +71,24 @@ const Users = () => {
     }, {});
 
     return (
-        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingBottom: 32 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingBottom: 32 }}>
 
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                    <h2 style={{ fontSize: 22, fontWeight: 900, fontFamily: "'Outfit', sans-serif", margin: 0 }} className="text-primary">
-                        Team & Access
-                    </h2>
-                    <p style={{ fontSize: 12, margin: '4px 0 0' }} className="text-secondary">
-                        Global platform roles — ADMIN only. Per-member feature permissions are managed on the Team page by each CLIENT_ADMIN.
+                    <p style={{ fontSize: 10, fontFamily: "'JetBrains Mono', monospace", letterSpacing: '0.18em', textTransform: 'uppercase', color: '#EF4444', margin: '0 0 5px' }}>Admin Console</p>
+                    <h1 style={{ fontSize: 26, fontWeight: 900, fontFamily: "'Outfit', sans-serif", color: '#F1F5F9', margin: 0 }}>Users</h1>
+                    <p style={{ fontSize: 12, color: '#475569', margin: '4px 0 0' }}>
+                        Global platform roles across all tenants — ADMIN, CLIENT_ADMIN, MEMBER
                     </p>
                 </div>
-                <button className="btn-ghost" onClick={load} disabled={loading} style={{ fontSize: 12 }}>
-                    <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} /> Refresh
+                <button onClick={load} disabled={loading} style={{
+                    display: 'flex', alignItems: 'center', gap: 7,
+                    padding: '9px 16px', borderRadius: 9,
+                    border: '1px solid rgba(255,255,255,0.08)', background: 'transparent',
+                    color: '#64748B', cursor: loading ? 'not-allowed' : 'pointer', fontSize: 12,
+                }}>
+                    <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} /> Refresh
                 </button>
             </div>
 
@@ -104,12 +97,15 @@ const Users = () => {
                 {ROLES.map(role => {
                     const m = ROLE_META[role];
                     return (
-                        <div key={role} className="ns-card" style={{ padding: '18px 20px', borderLeft: `3px solid ${m.color}` }}>
+                        <div key={role} style={{
+                            background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)',
+                            borderRadius: 12, padding: '18px 20px', borderLeft: `3px solid ${m.color}`,
+                        }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                                 <m.icon size={16} style={{ color: m.color }} />
                                 <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", color: m.color }}>{role}</span>
                             </div>
-                            <p style={{ fontSize: 30, fontWeight: 900, fontFamily: "'Outfit', sans-serif", margin: '0 0 4px' }} className="text-primary">{counts[role] ?? 0}</p>
+                            <p style={{ fontSize: 30, fontWeight: 900, fontFamily: "'Outfit', sans-serif", margin: '0 0 4px', color: '#F1F5F9' }}>{counts[role] ?? 0}</p>
                             <p style={{ fontSize: 11, margin: 0, color: '#9CA3AF' }}>{m.desc}</p>
                         </div>
                     );
@@ -117,9 +113,9 @@ const Users = () => {
             </div>
 
             {/* Users table */}
-            <div className="ns-card" style={{ overflow: 'hidden' }}>
-                <div style={{ padding: '16px 24px', borderBottom: '1px solid rgba(0,0,0,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <h3 style={{ fontSize: 14, fontWeight: 800, fontFamily: "'Outfit', sans-serif", margin: 0 }} className="text-primary">
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, overflow: 'hidden' }}>
+                <div style={{ padding: '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <h3 style={{ fontSize: 14, fontWeight: 800, fontFamily: "'Outfit', sans-serif", margin: 0, color: '#F1F5F9' }}>
                         All Users <span style={{ fontSize: 12, fontWeight: 500, color: '#9CA3AF', marginLeft: 8 }}>{users.length} total</span>
                     </h3>
                 </div>
@@ -133,10 +129,7 @@ const Users = () => {
                     <div style={{ padding: 48, textAlign: 'center' }}>
                         <AlertCircle size={32} style={{ color: '#EF4444', margin: '0 auto 14px', display: 'block' }} />
                         <p style={{ color: '#EF4444', fontSize: 13, fontWeight: 700, margin: '0 0 6px' }}>{error}</p>
-                        <p style={{ color: '#6B7280', fontSize: 12, margin: '0 0 16px' }}>
-                            Make sure your JWT token contains the ADMIN role and the backend is reachable.
-                        </p>
-                        <button onClick={load} className="btn-ghost" style={{ fontSize: 12, margin: '0 auto' }}>
+                        <button onClick={load} style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '0 auto', padding: '7px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: '#9CA3AF', cursor: 'pointer', fontSize: 12 }}>
                             <RefreshCw size={13} /> Retry
                         </button>
                     </div>
@@ -144,9 +137,7 @@ const Users = () => {
                     <div style={{ padding: 56, textAlign: 'center' }}>
                         <UsersIcon size={36} style={{ color: '#374151', margin: '0 auto 14px', display: 'block' }} />
                         <p style={{ color: '#9CA3AF', fontSize: 14, fontWeight: 700, margin: '0 0 6px' }}>No users registered yet</p>
-                        <p style={{ color: '#6B7280', fontSize: 12, margin: 0 }}>
-                            Users appear here after they sign up and log in for the first time.
-                        </p>
+                        <p style={{ color: '#6B7280', fontSize: 12, margin: 0 }}>Users appear here after they sign up and log in for the first time.</p>
                     </div>
                 ) : (
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -157,7 +148,7 @@ const Users = () => {
                                         textAlign: 'left', padding: '10px 20px',
                                         fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase',
                                         letterSpacing: '0.07em', color: '#64748B',
-                                        borderBottom: '1px solid rgba(0,0,0,0.07)',
+                                        borderBottom: '1px solid rgba(255,255,255,0.06)',
                                     }}>{h}</th>
                                 ))}
                             </tr>
@@ -169,50 +160,31 @@ const Users = () => {
                                     initial={{ opacity: 0, y: 6 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: i * 0.04 }}
-                                    style={{ transition: 'background 150ms' }}
-                                    onMouseEnter={e => e.currentTarget.style.background = dark ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.02)'}
+                                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.025)'}
                                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                                 >
-                                    {/* Avatar + username */}
-                                    <td style={{ padding: '13px 20px', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
+                                    <td style={{ padding: '13px 20px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                             <div style={{
                                                 width: 32, height: 32, borderRadius: 8, flexShrink: 0,
                                                 background: 'linear-gradient(135deg, #00D4FF, #0066FF)',
                                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                fontSize: 11, fontWeight: 800, color: 'white',
-                                                fontFamily: "'Outfit', sans-serif",
+                                                fontSize: 11, fontWeight: 800, color: 'white', fontFamily: "'Outfit', sans-serif",
                                             }}>
                                                 {(u.username || 'U').slice(0, 2).toUpperCase()}
                                             </div>
-                                            <div>
-                                                <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }} className="text-primary">
-                                                    {u.username}
-                                                    {u.id === me?.id && (
-                                                        <span style={{ fontSize: 9, marginLeft: 6, color: '#9CA3AF', fontFamily: "'JetBrains Mono', monospace" }}>you</span>
-                                                    )}
-                                                </p>
-                                            </div>
+                                            <p style={{ fontSize: 13, fontWeight: 700, margin: 0, color: '#F1F5F9' }}>
+                                                {u.username}
+                                                {u.id === me?.id && <span style={{ fontSize: 9, marginLeft: 6, color: '#9CA3AF', fontFamily: "'JetBrains Mono', monospace" }}>you</span>}
+                                            </p>
                                         </div>
                                     </td>
-
-                                    {/* Email */}
-                                    <td style={{ padding: '13px 20px', borderBottom: '1px solid rgba(0,0,0,0.04)', fontSize: 12, color: '#9CA3AF', fontFamily: "'JetBrains Mono', monospace" }}>
-                                        {u.email}
-                                    </td>
-
-                                    {/* Current role badge */}
-                                    <td style={{ padding: '13px 20px', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
-                                        <RoleBadge role={u.role || 'MEMBER'} />
-                                    </td>
-
-                                    {/* Joined date */}
-                                    <td style={{ padding: '13px 20px', borderBottom: '1px solid rgba(0,0,0,0.04)', fontSize: 12, color: '#9CA3AF' }}>
+                                    <td style={{ padding: '13px 20px', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 12, color: '#9CA3AF', fontFamily: "'JetBrains Mono', monospace" }}>{u.email}</td>
+                                    <td style={{ padding: '13px 20px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}><RoleBadge role={u.role || 'MEMBER'} /></td>
+                                    <td style={{ padding: '13px 20px', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 12, color: '#9CA3AF' }}>
                                         {u.createdAt ? new Date(u.createdAt).toLocaleDateString('en', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
                                     </td>
-
-                                    {/* Role selector */}
-                                    <td style={{ padding: '13px 20px', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
+                                    <td style={{ padding: '13px 20px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                                         {u.id === me?.id ? (
                                             <span style={{ fontSize: 11, color: '#6B7280', fontStyle: 'italic' }}>— your account</span>
                                         ) : saving === u.id ? (
@@ -225,7 +197,7 @@ const Users = () => {
                                                     padding: '5px 10px', borderRadius: 7, fontSize: 12, fontWeight: 700,
                                                     fontFamily: "'JetBrains Mono', monospace",
                                                     border: `1px solid ${ROLE_META[u.role || 'MEMBER']?.color || '#9CA3AF'}40`,
-                                                    background: dark ? '#1F2937' : '#F8FAFC',
+                                                    background: '#1F2937',
                                                     color: ROLE_META[u.role || 'MEMBER']?.color || '#9CA3AF',
                                                     cursor: 'pointer',
                                                 }}
@@ -244,4 +216,4 @@ const Users = () => {
     );
 };
 
-export default Users;
+export default AdminUsers;

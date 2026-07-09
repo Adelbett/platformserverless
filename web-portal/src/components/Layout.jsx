@@ -16,7 +16,6 @@ const routeTitles = {
     '/logs':       { title: 'Secrets & Config',sub: 'Environment & secret management' },
     '/monitoring': { title: 'Monitoring',      sub: 'Real-time cluster metrics' },
     '/settings':   { title: 'Settings',        sub: 'Platform configuration' },
-    '/users':      { title: 'Team & Access',   sub: 'Manage users and permissions' },
     '/billing':    { title: 'Billing',         sub: 'Usage & subscription details' },
 };
 

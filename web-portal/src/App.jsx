@@ -13,7 +13,6 @@ import KafkaTopics from './pages/KafkaTopics';
 import Eventing from './pages/Eventing';
 import LogsView from './pages/LogsView';
 import Monitoring from './pages/Monitoring';
-import Users from './pages/Users';
 import Settings from './pages/Settings';
 import Billing from './pages/Billing';
 import Team from './pages/Team';
@@ -30,14 +29,6 @@ const PublicRoute = ({ children }) => {
     const { user, loading } = useAuth();
     if (loading) return null;
     if (user) return <Navigate to="/dashboard" replace />;
-    return children;
-};
-
-const AdminRoute = ({ children }) => {
-    const { user, loading } = useAuth();
-    if (loading) return null;
-    if (!user) return <Navigate to="/login" replace />;
-    if (user.role !== 'ADMIN') return <Navigate to="/dashboard" replace />;
     return children;
 };
 
@@ -77,13 +68,9 @@ const AppRoutes = () => {
                     <ClientAdminRoute><Team /></ClientAdminRoute>
                 } />
                 <Route path="/settings" element={<Settings />} />
-                <Route path="/users" element={<Users />} />
-                {/* Global user administration stays here — Users.jsx is shared
-                    between the client "Team & Access" view and this admin
-                    view; the fully separate admin pages live in admin-console/ */}
-                <Route path="/admin/users" element={
-                    <AdminRoute><Users /></AdminRoute>
-                } />
+                {/* Global user/role administration (formerly /users and
+                    /admin/users) moved entirely to admin-console — see
+                    README.md. web-portal has no admin surface left. */}
             </Route>
 
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

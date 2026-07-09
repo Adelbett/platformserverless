@@ -11,6 +11,7 @@ import AdminClients from './pages/admin/AdminClients';
 import AdminAuditLog from './pages/admin/AdminAuditLog';
 import AdminIncidents from './pages/admin/AdminIncidents';
 import AdminAnomalies from './pages/admin/AdminAnomalies';
+import AdminUsers from './pages/admin/AdminUsers';
 
 const PublicRoute = ({ children }) => {
     const { user, loading } = useAuth();
@@ -47,6 +48,7 @@ const AppRoutes = () => {
                 <Route path="/audit-log" element={<AdminAuditLog />} />
                 <Route path="/incidents" element={<AdminIncidents />} />
                 <Route path="/anomalies" element={<AdminAnomalies />} />
+                <Route path="/users" element={<AdminUsers />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

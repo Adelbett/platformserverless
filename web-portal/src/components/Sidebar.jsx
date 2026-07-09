@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     LayoutDashboard, Box, Rocket, Activity, Zap,
-    Globe, Users, CreditCard, Settings,
+    Globe, CreditCard, Settings,
     LogOut, ChevronLeft, ChevronRight, Hexagon,
     Terminal, UserPlus, ExternalLink
 } from 'lucide-react';
@@ -39,11 +39,7 @@ const NAV_SECTIONS = [
     {
         label: 'Admin',
         adminSection: true,
-        items: [
-            { path: '/monitoring',  label: 'Monitoring', icon: Activity, adminOnly: true },
-            { path: '/logs',        label: 'Logs',       icon: Terminal, adminOnly: true },
-            { path: '/admin/users', label: 'Users',      icon: Users,    adminOnly: true },
-        ],
+        items: [],
     },
 ];
 
@@ -166,7 +162,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
                         (!i.adminOnly || user?.role === 'ADMIN') &&
                         (!i.clientOnly || user?.role !== 'ADMIN')
                     );
-                    if (visible.length === 0) return null;
+                    if (visible.length === 0 && !section.adminSection) return null;
                     return (
                         <div key={section.label}>
                             <AnimatePresence initial={false}>
