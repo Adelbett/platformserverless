@@ -83,7 +83,6 @@ export const adminApi = {
     getPods:            ()   => api.get('/admin/cluster/pods'),
     getKnativeServices: ()   => api.get('/admin/cluster/knative/services'),
     getKafkaBrokers:    ()   => api.get('/admin/cluster/kafka/brokers'),
-    getKafkaLagHistory: (topic, hours = 168) => api.get('/admin/cluster/kafka/lag-history', { params: { topic, hours } }),
     getAllSources:       ()   => api.get('/admin/eventing/sources'),
     getAllTriggers:      ()   => api.get('/admin/eventing/triggers'),
     getClusterOverview: ()   => api.get('/admin/cluster/overview'),
