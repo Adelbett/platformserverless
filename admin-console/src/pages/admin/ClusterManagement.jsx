@@ -4,6 +4,7 @@ import {
     Server, Box, Users, Zap, Globe, AlertTriangle, RefreshCw, ShieldAlert, Radio,
     Database, GitBranch, CheckCircle, XCircle, AlertCircle, Ban, Play, Trash2, Activity,
 } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const LOG_LEVEL_COLOR = { INFO: '#4A9EF5', WARN: '#E8A838', ERROR: '#F85149' };
 
@@ -222,6 +223,9 @@ const ClusterManagement = () => {
     const [logs,              setLogs]             = useState([]);
     const [logsLoaded,        setLogsLoaded]       = useState(false);
     const [logsError,         setLogsError]        = useState(null);
+    const [lagTopic,          setLagTopic]         = useState('');
+    const [lagHistory,        setLagHistory]       = useState([]);
+    const [lagLoading,        setLagLoading]       = useState(false);
 
     // namespace/status filters (client-side, shared pattern across tabs)
     const [podNsFilter,     setPodNsFilter]     = useState('');
@@ -292,6 +296,16 @@ const ClusterManagement = () => {
     useEffect(() => {
         if (activeTab === 'logs' && !logsLoaded) loadLogs();
     }, [activeTab, logsLoaded]);
+
+    // Kafka lag history: loaded on demand for the selected topic (7-day retention on the backend).
+    useEffect(() => {
+        if (activeTab !== 'kafka' || !lagTopic) { setLagHistory([]); return; }
+        setLagLoading(true);
+        adminApi.getKafkaLagHistory(lagTopic, 168)
+            .then(res => setLagHistory(Array.isArray(res.data) ? res.data : []))
+            .catch(() => setLagHistory([]))
+            .finally(() => setLagLoading(false));
+    }, [activeTab, lagTopic]);
 
     // ── App actions (reuse the exact endpoints that already trigger the
     // AdminAuditLog SUSPEND_APP/RESTORE_APP/FORCE_DELETE_APP entries) ──
@@ -636,9 +650,44 @@ const ClusterManagement = () => {
                                 </tbody>
                             </table>
                         </div>
-                        <p style={{ fontSize: 11, color: '#5A7080', margin: 0 }}>
-                            Consumer group lag is not shown — no backend endpoint computes it yet.
-                        </p>
+                        <SectionHeader icon={Activity} title="Consumer Lag History (7 days, 5-min snapshots)" color="#F85149" />
+                        <div style={{ background: '#0D1117', border: '1px solid #1F2B3A', borderRadius: 12, padding: 18 }}>
+                            <select
+                                value={lagTopic}
+                                onChange={e => setLagTopic(e.target.value)}
+                                style={{
+                                    marginBottom: 14, padding: '8px 12px', borderRadius: 8, fontSize: 12,
+                                    background: '#161B22', border: '1px solid #1F2B3A', color: '#DDE6F0',
+                                }}
+                            >
+                                <option value="">Select a topic…</option>
+                                {topics.map(t => <option key={t.id || t.name} value={t.name}>{t.name}</option>)}
+                            </select>
+                            {!lagTopic ? (
+                                <div style={{ color: '#5A7080', fontSize: 13, padding: 20, textAlign: 'center' }}>
+                                    Select a topic to see its consumer lag trend.
+                                </div>
+                            ) : lagLoading ? (
+                                <div style={{ color: '#5A7080', fontSize: 13, padding: 20, textAlign: 'center' }}>Loading…</div>
+                            ) : lagHistory.length === 0 ? (
+                                <div style={{ color: '#5A7080', fontSize: 13, padding: 20, textAlign: 'center' }}>
+                                    No lag history yet for this topic — snapshots are captured every 5 minutes, check back shortly.
+                                </div>
+                            ) : (
+                                <ResponsiveContainer width="100%" height={260}>
+                                    <LineChart data={lagHistory.map(p => ({
+                                        ...p,
+                                        time: new Date(p.capturedAt).toLocaleString(),
+                                    }))}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#1F2B3A" />
+                                        <XAxis dataKey="time" tick={{ fontSize: 10, fill: '#5A7080' }} minTickGap={40} />
+                                        <YAxis tick={{ fontSize: 10, fill: '#5A7080' }} />
+                                        <Tooltip contentStyle={{ background: '#161B22', border: '1px solid #1F2B3A', fontSize: 12 }} />
+                                        <Line type="monotone" dataKey="lag" stroke="#F85149" dot={false} strokeWidth={2} />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            )}
+                        </div>
                     </div>
                 )}
 

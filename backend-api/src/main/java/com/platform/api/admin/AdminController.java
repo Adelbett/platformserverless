@@ -11,6 +11,7 @@ import com.platform.api.eventing.KafkaSourceRepository;
 import com.platform.api.eventing.TriggerRepository;
 import com.platform.api.kafka.KafkaTopic;
 import com.platform.api.kafka.KafkaTopicRepository;
+import com.platform.api.kafka.lag.KafkaLagHistoryService;
 import com.platform.api.logs.DeploymentLog;
 import com.platform.api.logs.DeploymentLogRepository;
 import com.platform.api.metrics.MetricsService;
@@ -60,6 +61,7 @@ public class AdminController {
     private final AdminAuditLogService    auditLogService;
     private final QuotaService            quotaService;
     private final MetricsService          metricsService;
+    private final KafkaLagHistoryService  lagHistoryService;
 
     // ── Platform stats ────────────────────────────────────────────────
 
@@ -252,6 +254,26 @@ public class AdminController {
             log.warn("Could not fetch Kafka brokers: {}", e.getMessage());
             return ResponseEntity.ok(List.of());
         }
+    }
+
+    @GetMapping("/cluster/kafka/lag-history")
+    @Operation(summary = "Historical Kafka consumer-group lag (5-minute snapshots, 7-day retention)")
+    public ResponseEntity<List<Map<String, Object>>> getKafkaLagHistory(
+            @RequestParam(required = false) String topic,
+            @RequestParam(defaultValue = "168") long hours) {
+        var since = java.time.LocalDateTime.now().minusHours(hours);
+        var snapshots = (topic != null)
+                ? lagHistoryService.getHistory(topic, since)
+                : lagHistoryService.getAllHistory(since);
+        List<Map<String, Object>> result = snapshots.stream()
+                .map(s -> Map.<String, Object>of(
+                        "topicName",     s.getTopicName(),
+                        "consumerGroup", s.getConsumerGroup(),
+                        "lag",           s.getLag(),
+                        "capturedAt",    s.getCapturedAt().toString()
+                ))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(result);
     }
 
     // ── Kubernetes events (warnings, OOMKilled, CrashLoopBackOff, ...) ─
