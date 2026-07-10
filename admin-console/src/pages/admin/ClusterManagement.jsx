@@ -212,6 +212,7 @@ const ClusterManagement = () => {
     const [namespaces,        setNamespaces]       = useState([]);
     const [systemComponents,  setSystemComponents] = useState([]);
     const [events,            setEvents]           = useState([]);
+    const [alerts,            setAlerts]           = useState([]);
     const [pods,              setPods]             = useState([]);
     const [apps,              setApps]             = useState([]);
     const [knSvcs,            setKnSvcs]           = useState([]);
@@ -245,6 +246,7 @@ const ClusterManagement = () => {
             adminApi.getNamespaces().catch(fail('Tenant namespaces')),
             adminApi.getSystemComponents().catch(fail('System components')),
             adminApi.getClusterEvents().catch(fail('Cluster events')),
+            adminApi.getActiveAlerts().catch(fail('Active alerts')),
             adminApi.getPods().catch(fail('Pods')),
             adminApi.getAllApps().catch(fail('Applications')),
             adminApi.getKnativeServices().catch(fail('Knative services')),
@@ -252,13 +254,14 @@ const ClusterManagement = () => {
             adminApi.getAllTopics().catch(fail('Kafka topics')),
             adminApi.getAllSources().catch(fail('KafkaSources')),
             adminApi.getAllTriggers().catch(fail('Triggers')),
-        ]).then(([s, cl, n, ns, sc, ev, pd, ap, kn, kb, tp, src, trg]) => {
+        ]).then(([s, cl, n, ns, sc, ev, al, pd, ap, kn, kb, tp, src, trg]) => {
             setStats(s.data);
             setCluster(cl.data);
             setNodes(Array.isArray(n.data) ? n.data : []);
             setNamespaces(Array.isArray(ns.data) ? ns.data : []);
             setSystemComponents(Array.isArray(sc.data) ? sc.data : []);
             setEvents(Array.isArray(ev.data) ? ev.data : []);
+            setAlerts(Array.isArray(al.data) ? al.data : []);
             setPods(Array.isArray(pd.data) ? pd.data : []);
             setApps(Array.isArray(ap.data) ? ap.data : []);
             setKnSvcs(Array.isArray(kn.data) ? kn.data : []);
@@ -389,6 +392,48 @@ const ClusterManagement = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 }}>
                     {systemComponents.map((c, i) => <SystemComponentCard key={i} component={c} />)}
                 </div>
+            </div>
+
+            {/* Active Alertmanager alerts */}
+            <div>
+                <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 700, color: '#DDE6F0', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <ShieldAlert size={16} style={{ color: '#5A7080' }} /> Active Alerts ({alerts.length})
+                </h2>
+                <p style={{ color: '#5A7080', fontSize: 12, marginBottom: 14 }}>
+                    Live from Alertmanager — rules defined in k8s/monitoring/alert-rules.yaml
+                </p>
+                {alerts.length === 0 ? (
+                    <div style={{ color: '#5A7080', fontSize: 13, padding: 20, background: '#0D1117', borderRadius: 12, border: '1px solid #1F2B3A', marginBottom: 24 }}>
+                        No active alerts
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
+                        {alerts.map((a, i) => {
+                            const sevColor = { critical: '#F85149', warning: '#E8A838', none: '#5A7080' }[a.severity] || '#4A9EF5';
+                            return (
+                                <div key={i} style={{
+                                    background: '#0D1117', border: `1px solid ${sevColor}30`, borderRadius: 10,
+                                    padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 12,
+                                }}>
+                                    <span style={{
+                                        fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                                        background: `${sevColor}15`, color: sevColor, border: `1px solid ${sevColor}30`,
+                                        fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', flexShrink: 0, marginTop: 2,
+                                    }}>{a.severity}</span>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ fontSize: 13, fontWeight: 700, color: '#DDE6F0' }}>
+                                            {a.alertName} {a.namespace ? <span style={{ color: '#5A7080', fontWeight: 400 }}>· {a.namespace}</span> : null}
+                                        </div>
+                                        <div style={{ fontSize: 12, color: '#5A7080', marginTop: 2 }}>{a.summary || a.description}</div>
+                                    </div>
+                                    <div style={{ fontSize: 11, color: '#5A7080', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                                        since {a.startsAt ? new Date(a.startsAt).toLocaleString() : '—'}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
 
             {/* Recent warning events */}

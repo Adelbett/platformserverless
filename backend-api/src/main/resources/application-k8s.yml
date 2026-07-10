@@ -46,6 +46,9 @@ app:
   prometheus:
     url: ${APP_PROMETHEUS_URL:http://monitoring-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090}
 
+  alertmanager:
+    url: ${APP_ALERTMANAGER_URL:http://monitoring-stack-kube-prom-alertmanager.monitoring.svc.cluster.local:9093}
+
   cors:
     allowed-origins: "*"
 

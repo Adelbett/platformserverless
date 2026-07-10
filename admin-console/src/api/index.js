@@ -79,6 +79,7 @@ export const adminApi = {
     getNodes:           ()   => api.get('/admin/cluster/nodes'),
     getNamespaces:      ()   => api.get('/admin/cluster/namespaces'),
     getClusterEvents:   ()   => api.get('/admin/cluster/events'),
+    getActiveAlerts:    ()   => api.get('/admin/cluster/alerts'),
     getSystemComponents: ()  => api.get('/admin/cluster/system-components'),
     getPods:            ()   => api.get('/admin/cluster/pods'),
     getKnativeServices: ()   => api.get('/admin/cluster/knative/services'),

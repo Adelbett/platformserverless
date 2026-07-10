@@ -13,6 +13,7 @@ import com.platform.api.kafka.KafkaTopic;
 import com.platform.api.kafka.KafkaTopicRepository;
 import com.platform.api.logs.DeploymentLog;
 import com.platform.api.logs.DeploymentLogRepository;
+import com.platform.api.metrics.AlertmanagerService;
 import com.platform.api.metrics.MetricsService;
 import com.platform.api.quota.QuotaService;
 import com.platform.api.quota.dto.TenantQuotaResponse;
@@ -60,6 +61,7 @@ public class AdminController {
     private final AdminAuditLogService    auditLogService;
     private final QuotaService            quotaService;
     private final MetricsService          metricsService;
+    private final AlertmanagerService     alertmanagerService;
 
     // ── Platform stats ────────────────────────────────────────────────
 
@@ -252,6 +254,12 @@ public class AdminController {
             log.warn("Could not fetch Kafka brokers: {}", e.getMessage());
             return ResponseEntity.ok(List.of());
         }
+    }
+
+    @GetMapping("/cluster/alerts")
+    @Operation(summary = "Currently active Alertmanager alerts")
+    public ResponseEntity<List<Map<String, Object>>> getActiveAlerts() {
+        return ResponseEntity.ok(alertmanagerService.getActiveAlerts());
     }
 
     // ── Kubernetes events (warnings, OOMKilled, CrashLoopBackOff, ...) ─
