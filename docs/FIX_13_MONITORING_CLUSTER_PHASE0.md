@@ -74,3 +74,19 @@ Le pattern "catch silencieux → retourne 0" existe aussi dans `MetricsService.s
 ## Prochaine étape
 
 Présenter le plan détaillé fichier-par-fichier des phases 1 à 11 du brief monitoring (nœuds CPU/RAM/disque, cold-start Knative, lag Kafka historique, req/sec via Kourier/Prometheus, alertes Alertmanager actives, tendances historiques, usage par tenant, stockage/PVC, posture sécurité, coût, export d'audit enrichi), et attendre confirmation avant d'implémenter quoi que ce soit.
+
+---
+
+## Phase 1 — Nœuds CPU/RAM/disque : TERMINÉE et confirmée en prod
+
+**Problème technique découvert** : `node-exporter` labellise ses métriques par IP de scrape (`instance="10.9.21.223:9100"`), pas par nom de nœud K8s. Jointure faite via `node_uname_info{instance, nodename}`.
+
+**Fichiers modifiés** :
+- `backend-api/src/main/java/com/platform/api/metrics/MetricsService.java` — nouvelle méthode `getNodeResourceMetrics()` + helpers `instanceToNodeName()`, `vectorByLabel()`, `queryVector()`. Requêtes PromQL utilisées :
+  - CPU : `avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m]))`
+  - RAM : `node_memory_MemTotal_bytes` / `node_memory_MemAvailable_bytes`
+  - Disque : `node_filesystem_size_bytes{mountpoint="/"}` / `node_filesystem_avail_bytes{mountpoint="/"}`
+- `backend-api/src/main/java/com/platform/api/admin/AdminController.java` — `getNodes()` injecte `MetricsService`, fusionne l'usage réel (`cpuUsagePercent`, `memoryUsedBytes`/`memoryTotalBytes`, `diskUsedBytes`/`diskTotalBytes`) dans `nodeInfo()`.
+- `admin-console/src/pages/admin/ClusterManagement.jsx` — `NodeCard` affiche 3 barres de progression (CPU, Memory, Disk) par nœud, avec code couleur (vert < 75%, orange 75-90%, rouge ≥ 90%).
+
+**Vérifié en prod** : les 3 barres s'affichent avec succès sur vm01/vm02/vm03.
