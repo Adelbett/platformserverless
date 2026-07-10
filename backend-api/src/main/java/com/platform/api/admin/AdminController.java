@@ -13,6 +13,7 @@ import com.platform.api.kafka.KafkaTopic;
 import com.platform.api.kafka.KafkaTopicRepository;
 import com.platform.api.logs.DeploymentLog;
 import com.platform.api.logs.DeploymentLogRepository;
+import com.platform.api.metrics.MetricsService;
 import com.platform.api.quota.QuotaService;
 import com.platform.api.quota.dto.TenantQuotaResponse;
 import com.platform.api.quota.dto.UpdateQuotaRequest;
@@ -58,6 +59,7 @@ public class AdminController {
     private final UserContextService      userContextService;
     private final AdminAuditLogService    auditLogService;
     private final QuotaService            quotaService;
+    private final MetricsService          metricsService;
 
     // ── Platform stats ────────────────────────────────────────────────
 
@@ -141,8 +143,9 @@ public class AdminController {
     @Operation(summary = "Kubernetes node status and resource usage")
     public ResponseEntity<?> getNodes() {
         try {
+            Map<String, Map<String, Object>> resourceUsage = metricsService.getNodeResourceMetrics();
             List<Map<String, Object>> nodes = kubernetesClient.nodes().list().getItems()
-                    .stream().map(this::nodeInfo).collect(Collectors.toList());
+                    .stream().map(n -> nodeInfo(n, resourceUsage)).collect(Collectors.toList());
             return ResponseEntity.ok(nodes);
         } catch (Exception e) {
             // "nodes" is cluster-scoped and needs its own RBAC grant separate from
@@ -632,9 +635,10 @@ public class AdminController {
         return info;
     }
 
-    private Map<String, Object> nodeInfo(Node node) {
+    private Map<String, Object> nodeInfo(Node node, Map<String, Map<String, Object>> resourceUsage) {
         Map<String, Object> info = new LinkedHashMap<>();
-        info.put("name",   node.getMetadata().getName());
+        String name = node.getMetadata().getName();
+        info.put("name",   name);
         info.put("status", node.getStatus().getConditions().stream()
                 .filter(c -> "Ready".equals(c.getType()))
                 .findFirst().map(c -> "True".equals(c.getStatus()) ? "Ready" : "NotReady")
@@ -644,6 +648,13 @@ public class AdminController {
         info.put("memory", capacity != null ? capacity.getOrDefault("memory", new io.fabric8.kubernetes.api.model.Quantity("0")).toString() : "0");
         var labels = node.getMetadata().getLabels();
         info.put("role",   labels != null && labels.containsKey("node-role.kubernetes.io/control-plane") ? "control-plane" : "worker");
+
+        Map<String, Object> usage = resourceUsage.get(name);
+        info.put("cpuUsagePercent",  usage != null ? usage.get("cpuUsagePercent")  : null);
+        info.put("memoryTotalBytes", usage != null ? usage.get("memoryTotalBytes") : null);
+        info.put("memoryUsedBytes",  usage != null ? usage.get("memoryUsedBytes")  : null);
+        info.put("diskTotalBytes",   usage != null ? usage.get("diskTotalBytes")   : null);
+        info.put("diskUsedBytes",    usage != null ? usage.get("diskUsedBytes")    : null);
         return info;
     }
 

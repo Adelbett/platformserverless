@@ -155,7 +155,109 @@ public class MetricsService {
         );
     }
 
+    /**
+     * Per-node CPU/RAM/disk usage, keyed by Kubernetes node name (e.g. "vm01").
+     * node-exporter labels its series by scrape IP ("instance"), not node name,
+     * so we join through node_uname_info{instance, nodename} in Java rather than
+     * relying on a fragile PromQL group_left join.
+     */
+    public Map<String, Map<String, Object>> getNodeResourceMetrics() {
+        Map<String, String> instanceToNode = instanceToNodeName();
+
+        Map<String, Double> cpuIdleRatio = vectorByLabel(
+            "avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))", "instance");
+        Map<String, Double> memTotal = vectorByLabel("node_memory_MemTotal_bytes", "instance");
+        Map<String, Double> memAvail = vectorByLabel("node_memory_MemAvailable_bytes", "instance");
+        Map<String, Double> diskTotal = vectorByLabel(
+            "node_filesystem_size_bytes{mountpoint=\"/\"}", "instance");
+        Map<String, Double> diskAvail = vectorByLabel(
+            "node_filesystem_avail_bytes{mountpoint=\"/\"}", "instance");
+
+        Map<String, Map<String, Object>> byNode = new java.util.HashMap<>();
+        for (var entry : instanceToNode.entrySet()) {
+            String instance = entry.getKey();
+            String nodeName = entry.getValue();
+
+            Double idle = cpuIdleRatio.get(instance);
+            Double mTotal = memTotal.get(instance);
+            Double mAvail = memAvail.get(instance);
+            Double dTotal = diskTotal.get(instance);
+            Double dAvail = diskAvail.get(instance);
+
+            Map<String, Object> stats = new java.util.HashMap<>();
+            stats.put("cpuUsagePercent", idle != null ? Math.round((1.0 - idle) * 100.0 * 10) / 10.0 : null);
+            stats.put("memoryTotalBytes", mTotal);
+            stats.put("memoryUsedBytes", (mTotal != null && mAvail != null) ? mTotal - mAvail : null);
+            stats.put("diskTotalBytes", dTotal);
+            stats.put("diskUsedBytes", (dTotal != null && dAvail != null) ? dTotal - dAvail : null);
+            byNode.put(nodeName, stats);
+        }
+        return byNode;
+    }
+
     // ── Prometheus helpers ──────────────────────────────────────────────────────
+
+    /** Maps node-exporter's scrape "instance" (IP:port) to the Kubernetes node name. */
+    @SuppressWarnings("unchecked")
+    private Map<String, String> instanceToNodeName() {
+        Map<String, String> result = new java.util.HashMap<>();
+        for (Map<String, Object> series : queryVector("node_uname_info")) {
+            Map<String, Object> metric = (Map<String, Object>) series.get("metric");
+            if (metric == null) continue;
+            Object instance = metric.get("instance");
+            Object nodename = metric.get("nodename");
+            if (instance != null && nodename != null) {
+                result.put(instance.toString(), nodename.toString());
+            }
+        }
+        return result;
+    }
+
+    /** Runs an instant PromQL query and returns each series' value keyed by the given label. */
+    private Map<String, Double> vectorByLabel(String query, String label) {
+        Map<String, Double> result = new java.util.HashMap<>();
+        for (Map<String, Object> series : queryVector(query)) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> metric = (Map<String, Object>) series.get("metric");
+            if (metric == null || metric.get(label) == null) continue;
+            List<?> valueArr = (List<?>) series.get("value");
+            if (valueArr == null || valueArr.size() < 2) continue;
+            try {
+                double v = Double.parseDouble(valueArr.get(1).toString());
+                if (!Double.isNaN(v) && !Double.isInfinite(v)) {
+                    result.put(metric.get(label).toString(), v);
+                }
+            } catch (NumberFormatException ignored) { /* skip malformed sample */ }
+        }
+        return result;
+    }
+
+    /** Executes an instant PromQL query and returns the raw result series (metric + value). */
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> queryVector(String query) {
+        try {
+            String encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8);
+            URI uri = URI.create(prometheusUrl + "/api/v1/query?query=" + encodedQuery);
+
+            Map<String, Object> result = webClientBuilder
+                    .baseUrl(prometheusUrl)
+                    .build()
+                    .get()
+                    .uri(uri)
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .block();
+
+            if (result == null || !"success".equals(result.get("status"))) return List.of();
+            Map<String, Object> data = (Map<String, Object>) result.get("data");
+            if (data == null) return List.of();
+            List<Map<String, Object>> resultList = (List<Map<String, Object>>) data.get("result");
+            return resultList != null ? resultList : List.of();
+        } catch (Exception e) {
+            log.warn("Prometheus vector query failed '{}': {}", query, e.getMessage());
+            return List.of();
+        }
+    }
 
     /**
      * Executes an instant PromQL query and returns the first result as a double.

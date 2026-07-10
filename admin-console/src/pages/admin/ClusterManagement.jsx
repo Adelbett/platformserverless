@@ -10,6 +10,34 @@ const LOG_LEVEL_COLOR = { INFO: '#4A9EF5', WARN: '#E8A838', ERROR: '#F85149' };
 // ── helpers ──────────────────────────────────────────────────────────────
 const fmtReq = v => v == null ? '—' : v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v.toFixed(1);
 const fmtPct = v => v == null ? '—' : `${(v * 100).toFixed(2)}%`;
+const fmtBytes = v => {
+    if (v == null) return '—';
+    const gib = v / (1024 ** 3);
+    return gib >= 1 ? `${gib.toFixed(1)} GiB` : `${(v / (1024 ** 2)).toFixed(0)} MiB`;
+};
+
+const usageColor = pct => pct == null ? '#5A7080' : pct >= 90 ? '#F85149' : pct >= 75 ? '#E8A838' : '#3FB950';
+
+const ResourceBar = ({ label, usedBytes, totalBytes, percent }) => {
+    const pct = percent != null ? percent : (totalBytes ? (usedBytes / totalBytes) * 100 : null);
+    return (
+        <div style={{ width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#5A7080', marginBottom: 4 }}>
+                <span>{label}</span>
+                <span>
+                    {pct == null ? '—' : `${pct.toFixed(0)}%`}
+                    {totalBytes != null && usedBytes != null ? ` (${fmtBytes(usedBytes)} / ${fmtBytes(totalBytes)})` : ''}
+                </span>
+            </div>
+            <div style={{ height: 6, borderRadius: 3, background: '#1F2B3A', overflow: 'hidden' }}>
+                <div style={{
+                    height: '100%', width: `${Math.min(100, Math.max(0, pct || 0))}%`,
+                    background: usageColor(pct), borderRadius: 3, transition: 'width 0.3s',
+                }} />
+            </div>
+        </div>
+    );
+};
 
 const statusColor = s => ({
     RUNNING: '#3FB950', Running: '#3FB950',
@@ -99,10 +127,15 @@ const NodeCard = ({ node }) => {
                 </div>
                 <StatusPill status={node.status} />
             </div>
-            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
                 <div style={{ fontSize: 12, color: '#5A7080' }}><span style={{ color: '#4A9EF5' }}>Role:</span> {node.role}</div>
-                <div style={{ fontSize: 12, color: '#5A7080' }}><span style={{ color: '#4A9EF5' }}>CPU:</span> {node.cpu}</div>
-                <div style={{ fontSize: 12, color: '#5A7080' }}><span style={{ color: '#4A9EF5' }}>Memory:</span> {node.memory}</div>
+                <div style={{ fontSize: 12, color: '#5A7080' }}><span style={{ color: '#4A9EF5' }}>CPU cores:</span> {node.cpu}</div>
+                <div style={{ fontSize: 12, color: '#5A7080' }}><span style={{ color: '#4A9EF5' }}>Memory cap:</span> {node.memory}</div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <ResourceBar label="CPU usage" percent={node.cpuUsagePercent} />
+                <ResourceBar label="Memory" usedBytes={node.memoryUsedBytes} totalBytes={node.memoryTotalBytes} />
+                <ResourceBar label="Disk (/)" usedBytes={node.diskUsedBytes} totalBytes={node.diskTotalBytes} />
             </div>
         </div>
     );
