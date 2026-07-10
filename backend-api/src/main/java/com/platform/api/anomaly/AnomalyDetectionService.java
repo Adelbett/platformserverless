@@ -94,9 +94,9 @@ public class AnomalyDetectionService {
             if (svc == null || ns == null) continue;
 
             double rate5m = scalarOr0(
-                    "sum(rate(activator_request_count{service_name=\"" + svc + "\",namespace_name=\"" + ns + "\"}[5m]))");
+                    "sum(rate(revision_request_count{service_name=\"" + svc + "\",namespace_name=\"" + ns + "\"}[5m]))");
             double rate1h = scalarOr0(
-                    "sum(rate(activator_request_count{service_name=\"" + svc + "\",namespace_name=\"" + ns + "\"}[1h]))");
+                    "sum(rate(revision_request_count{service_name=\"" + svc + "\",namespace_name=\"" + ns + "\"}[1h]))");
 
             if (rate1h < MIN_MEANINGFUL_REQ_RATE) continue;
             if (rate5m <= rate1h * TRAFFIC_SPIKE_MULTIPLIER) continue;
