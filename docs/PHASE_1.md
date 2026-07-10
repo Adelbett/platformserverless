@@ -1,6 +1,6 @@
-# FIX 14 — Phase 1 : Nœuds CPU/RAM/disque
+# Phase 1 : Nœuds CPU/RAM/disque
 
-Phase 1 du brief "Monitoring enrichi admin-console" (voir [FIX_13_MONITORING_CLUSTER_PHASE0.md](FIX_13_MONITORING_CLUSTER_PHASE0.md) pour le contexte général et l'état de Phase 0).
+Phase 1 du brief "Monitoring enrichi admin-console" (voir [PHASE_0.md](PHASE_0.md) pour le contexte général et l'état de Phase 0).
 
 ## Statut : TERMINÉE et confirmée en prod
 

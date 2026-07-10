@@ -75,4 +75,4 @@ Le pattern "catch silencieux → retourne 0" existe aussi dans `MetricsService.s
 
 Chaque phase suivante du brief (1 à 11) a son propre fichier `.md` de rapport dans `docs/`, référencé ici au fur et à mesure :
 
-- Phase 1 — Nœuds CPU/RAM/disque : [FIX_14_PHASE1_NODES_CPU_RAM_DISK.md](FIX_14_PHASE1_NODES_CPU_RAM_DISK.md) — TERMINÉE, confirmée en prod.
+- Phase 1 — Nœuds CPU/RAM/disque : [PHASE_1.md](PHASE_1.md) — TERMINÉE, confirmée en prod.
