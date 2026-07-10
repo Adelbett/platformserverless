@@ -1,0 +1,39 @@
+# Scrapes Knative's queue-proxy sidecar for per-request metrics
+# (revision_request_count, revision_request_latencies, etc.) across every
+# tenant namespace. Without this, Prometheus never collects any request-level
+# metric for user apps, so "Req/Sec" in admin-console is always 0 — this was
+# confirmed live: `up{namespace=~"user-.*"}` returned no series at all before
+# this PodMonitor exists, meaning Prometheus never even attempted to scrape
+# those pods.
+#
+# Confirmed on the live cluster:
+#   - queue-proxy exposes its metrics on containerPort 9091, port name
+#     "http-usermetric" (see queue-proxy container ports on any Knative
+#     revision pod, e.g. in namespace user-user).
+#   - The Prometheus CR (kube-prometheus-stack, release "monitoring-stack")
+#     has podMonitorNamespaceSelector: {} (watches PodMonitors in ANY
+#     namespace) but podMonitorSelector: {matchLabels: {release:
+#     monitoring-stack}} — so this PodMonitor MUST carry that label or
+#     Prometheus will silently ignore it.
+#
+# Pod selection: matches on the "serving.knative.dev/revision" label, which
+# Knative sets on every revision pod in every namespace (not tied to the 4
+# tenant namespaces that exist today — new tenants are covered automatically).
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: knative-queue-proxy
+  namespace: monitoring
+  labels:
+    release: monitoring-stack
+spec:
+  namespaceSelector:
+    any: true
+  selector:
+    matchExpressions:
+      - key: serving.knative.dev/revision
+        operator: Exists
+  podMetricsEndpoints:
+    - port: http-usermetric
+      path: /metrics
+      interval: 15s
