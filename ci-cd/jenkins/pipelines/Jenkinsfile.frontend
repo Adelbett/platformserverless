@@ -21,6 +21,7 @@ pipeline {
                         -exec rm -rf {} + 2>/dev/null || true
                     find /tmp -maxdepth 1 -name "jna-*" -type d \
                         -exec rm -rf {} + 2>/dev/null || true
+                    mkdir -p /var/jenkins_home/.jna-tmp
                 '''
             }
         }

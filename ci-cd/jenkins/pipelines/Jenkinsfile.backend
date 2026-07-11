@@ -25,11 +25,16 @@ pipeline {
             steps {
                 // Remove @script left by previous build (corrupt .git causes next checkout to fail)
                 // Remove stale JNA tmp dirs that Kaniko corrupts during build
+                // Ensure the persistent JNA tmpdir (JAVA_TOOL_OPTIONS below) actually
+                // exists — mvn forks its own JVM and also honors jna.tmpdir, but if the
+                // directory is missing JNA silently falls back to /tmp, which Kaniko
+                // then corrupts, killing Jenkins's own spawn helper.
                 sh '''
                     find /var/jenkins_home/workspace -maxdepth 1 -name "*@script*" -type d \
                         -exec rm -rf {} + 2>/dev/null || true
                     find /tmp -maxdepth 1 -name "jna-*" -type d \
                         -exec rm -rf {} + 2>/dev/null || true
+                    mkdir -p /var/jenkins_home/.jna-tmp
                 '''
             }
         }
