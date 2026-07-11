@@ -9,8 +9,6 @@ import ClusterManagement from './pages/admin/ClusterManagement';
 import AdminBilling from './pages/admin/AdminBilling';
 import AdminClients from './pages/admin/AdminClients';
 import AdminAuditLog from './pages/admin/AdminAuditLog';
-import AdminIncidents from './pages/admin/AdminIncidents';
-import AdminAnomalies from './pages/admin/AdminAnomalies';
 import AdminUsers from './pages/admin/AdminUsers';
 
 const PublicRoute = ({ children }) => {
@@ -46,8 +44,6 @@ const AppRoutes = () => {
                 <Route path="/billing" element={<AdminBilling />} />
                 <Route path="/clients" element={<AdminClients />} />
                 <Route path="/audit-log" element={<AdminAuditLog />} />
-                <Route path="/incidents" element={<AdminIncidents />} />
-                <Route path="/anomalies" element={<AdminAnomalies />} />
                 <Route path="/users" element={<AdminUsers />} />
             </Route>
 

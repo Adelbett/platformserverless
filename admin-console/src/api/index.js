@@ -95,11 +95,6 @@ export const adminApi = {
     exportAuditLog:     (params) => api.get('/admin/audit-log/export', { params, responseType: 'blob' }),
     getQuota:           (userId) => api.get(`/admin/clients/${userId}/quota`),
     updateQuota:        (userId, quota) => api.put(`/admin/clients/${userId}/quota`, quota),
-    createIncident:     (incident) => api.post('/admin/incidents', incident),
-    updateIncident:     (id, incident) => api.put(`/admin/incidents/${id}`, incident),
-    deleteIncident:     (id) => api.delete(`/admin/incidents/${id}`),
-    getAnomalies:       (params) => api.get('/admin/anomalies', { params }),
-    acknowledgeAnomaly: (id) => api.post(`/admin/anomalies/${id}/acknowledge`),
 }
 
 export const statusApi = {

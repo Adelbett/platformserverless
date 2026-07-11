@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     LogOut, ChevronLeft, ChevronRight, Hexagon,
-    Server, BarChart2, DollarSign, Ban, ScrollText, Radio, TrendingUp, Users
+    Server, BarChart2, DollarSign, Ban, ScrollText, Users
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -19,8 +19,6 @@ const NAV_SECTIONS = [
             { path: '/clients',    label: 'Clients',    icon: Ban },
             { path: '/billing',    label: 'Revenue',    icon: DollarSign },
             { path: '/audit-log',  label: 'Audit Log',  icon: ScrollText },
-            { path: '/incidents',  label: 'Incidents',  icon: Radio },
-            { path: '/anomalies',  label: 'Anomalies',  icon: TrendingUp },
         ],
     },
 ];

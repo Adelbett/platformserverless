@@ -14,8 +14,6 @@ const routeTitles = {
     '/clients':    { title: 'Clients',    sub: 'Suspend, restore, and set quotas per tenant' },
     '/billing':    { title: 'Revenue',    sub: 'Platform-wide billing and invoices' },
     '/audit-log':  { title: 'Audit Log',  sub: 'Every suspend, restore, and force-delete action' },
-    '/incidents':  { title: 'Incidents',  sub: 'Shown on the public status page' },
-    '/anomalies':  { title: 'Anomalies',  sub: 'Cost and traffic spikes detected automatically' },
 };
 
 const ADMIN_BANNER_HEIGHT = 32;
