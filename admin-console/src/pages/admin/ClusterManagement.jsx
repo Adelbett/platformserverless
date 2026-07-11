@@ -483,7 +483,7 @@ const ClusterManagement = () => {
                     ) : (
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead><tr style={{ borderBottom: '1px solid #1F2B3A' }}>
-                                {['Namespace', 'Tenant', 'Apps', 'Status'].map(h => (
+                                {['Namespace', 'Tenant', 'Apps', 'CPU', 'Memory', 'Req/sec', 'Status'].map(h => (
                                     <th key={h} style={{ padding: '12px 20px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#5A7080', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em' }}>{h}</th>
                                 ))}
                             </tr></thead>
@@ -493,6 +493,9 @@ const ClusterManagement = () => {
                                         <td style={{ padding: '12px 20px', fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: '#4A9EF5' }}>{ns.name}</td>
                                         <td style={{ padding: '12px 20px', fontSize: 13, color: '#DDE6F0' }}>{ns.tenant}</td>
                                         <td style={{ padding: '12px 20px', fontSize: 13, color: '#DDE6F0' }}>{ns.appCount}</td>
+                                        <td style={{ padding: '12px 20px', fontSize: 13, color: '#DDE6F0' }}>{ns.cpuCores != null ? `${ns.cpuCores.toFixed(2)} cores` : '—'}</td>
+                                        <td style={{ padding: '12px 20px', fontSize: 13, color: '#DDE6F0' }}>{fmtBytes(ns.memoryBytes)}</td>
+                                        <td style={{ padding: '12px 20px', fontSize: 13, color: '#DDE6F0' }}>{fmtReq(ns.reqPerSec)}</td>
                                         <td style={{ padding: '12px 20px' }}>
                                             <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, color: '#3FB950', background: 'rgba(63,185,80,0.1)', border: '1px solid rgba(63,185,80,0.2)', fontFamily: "'JetBrains Mono', monospace" }}>{ns.status}</span>
                                         </td>

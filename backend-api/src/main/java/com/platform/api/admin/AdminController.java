@@ -165,10 +165,11 @@ public class AdminController {
     @Operation(summary = "All active tenant namespaces")
     public ResponseEntity<List<Map<String, Object>>> getNamespaces() {
         try {
+            Map<String, Map<String, Object>> resourceUsage = metricsService.getTenantResourceMetrics();
             List<Map<String, Object>> ns = kubernetesClient.namespaces().list().getItems()
                     .stream()
                     .filter(n -> n.getMetadata().getName().startsWith("user-"))
-                    .map(this::namespaceInfo)
+                    .map(n -> namespaceInfo(n, resourceUsage))
                     .collect(Collectors.toList());
             return ResponseEntity.ok(ns);
         } catch (Exception e) {
@@ -666,7 +667,7 @@ public class AdminController {
         return info;
     }
 
-    private Map<String, Object> namespaceInfo(Namespace ns) {
+    private Map<String, Object> namespaceInfo(Namespace ns, Map<String, Map<String, Object>> resourceUsage) {
         String name   = ns.getMetadata().getName();
         String tenant = name.replaceFirst("^user-", "");
         long appCount = appRepository.findAll().stream()
@@ -676,6 +677,11 @@ public class AdminController {
         info.put("tenant",   tenant);
         info.put("appCount", appCount);
         info.put("status",   ns.getStatus() != null ? ns.getStatus().getPhase() : "Active");
+
+        Map<String, Object> usage = resourceUsage.get(name);
+        info.put("cpuCores",    usage != null ? usage.get("cpuCores")    : null);
+        info.put("memoryBytes", usage != null ? usage.get("memoryBytes") : null);
+        info.put("reqPerSec",   usage != null ? usage.get("reqPerSec")   : null);
         return info;
     }
 

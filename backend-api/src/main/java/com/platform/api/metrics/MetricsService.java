@@ -156,6 +156,35 @@ public class MetricsService {
     }
 
     /**
+     * Per-tenant CPU/RAM/req-per-sec usage, keyed by namespace (e.g. "user-adel").
+     * Reuses the same metrics as getClusterMetrics()/getNodeResourceMetrics(), just
+     * grouped by namespace instead of summed cluster-wide.
+     */
+    public Map<String, Map<String, Object>> getTenantResourceMetrics() {
+        Map<String, Double> cpuCores = vectorByLabel(
+            "sum by (namespace) (rate(container_cpu_usage_seconds_total{namespace=~\"user-.*\"}[5m]))", "namespace");
+        Map<String, Double> memBytes = vectorByLabel(
+            "sum by (namespace) (container_memory_working_set_bytes{namespace=~\"user-.*\"})", "namespace");
+        Map<String, Double> reqPerSec = vectorByLabel(
+            "sum by (namespace_name) (rate(revision_request_count{namespace_name=~\"user-.*\"}[5m]))", "namespace_name");
+
+        java.util.Set<String> allNamespaces = new java.util.HashSet<>();
+        allNamespaces.addAll(cpuCores.keySet());
+        allNamespaces.addAll(memBytes.keySet());
+        allNamespaces.addAll(reqPerSec.keySet());
+
+        Map<String, Map<String, Object>> byTenant = new java.util.HashMap<>();
+        for (String ns : allNamespaces) {
+            Map<String, Object> stats = new java.util.HashMap<>();
+            stats.put("cpuCores",  cpuCores.get(ns));
+            stats.put("memoryBytes", memBytes.get(ns));
+            stats.put("reqPerSec", reqPerSec.get(ns));
+            byTenant.put(ns, stats);
+        }
+        return byTenant;
+    }
+
+    /**
      * Per-node CPU/RAM/disk usage, keyed by Kubernetes node name (e.g. "vm01").
      * node-exporter labels its series by scrape IP ("instance"), not node name,
      * so we join through node_uname_info{instance, nodename} in Java rather than
