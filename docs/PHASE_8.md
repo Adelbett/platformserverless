@@ -2,7 +2,9 @@
 
 Phase 8 du brief "Monitoring enrichi admin-console" (voir [PHASE_0.md](PHASE_0.md) pour le contexte général).
 
-## Statut : IMPLÉMENTÉE (niveau 1) — en attente de déploiement/vérification en prod
+## Statut : TERMINÉE et confirmée en prod
+
+Section "Storage — Persistent Volumes (0)" affichée sur `/cluster`, résultat vide légitime : aucun PVC n'existe sur ce cluster (toutes les apps déployées sont des services Knative stateless — helloworld-go, kafdrop, nginxdemos-hello, notification-service). Le endpoint fonctionne, il n'y a simplement rien à lister actuellement.
 
 ## Objectif
 
