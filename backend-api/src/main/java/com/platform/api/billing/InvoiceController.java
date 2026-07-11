@@ -37,14 +37,14 @@ public class InvoiceController {
 
     // GET /api/invoices/admin/overdue — admin: all overdue invoices
     @GetMapping("/admin/overdue")
-    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<AppInvoice>> getOverdue() {
         return ResponseEntity.ok(invoiceService.getOverdueInvoices());
     }
 
     // POST /api/invoices/generate — admin trigger manual generation
     @PostMapping("/generate")
-    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, String>> generate() {
         invoiceService.generateMonthlyInvoices();
         return ResponseEntity.ok(Map.of("status", "generated"));
@@ -52,7 +52,7 @@ public class InvoiceController {
 
     // POST /api/invoices/apps/{appId}/suspend — admin suspend
     @PostMapping("/apps/{appId}/suspend")
-    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, String>> suspendApp(@PathVariable String appId) {
         invoiceService.adminSuspendApp(appId);
         return ResponseEntity.ok(Map.of("status", "suspended"));
