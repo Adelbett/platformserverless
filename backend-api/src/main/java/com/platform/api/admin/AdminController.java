@@ -6,6 +6,7 @@ import com.platform.api.app.AppService;
 import com.platform.api.app.KnativeService;
 import com.platform.api.app.dto.AppResponse;
 import com.platform.api.audit.AdminAction;
+import com.platform.api.audit.AdminAuditLogExportService;
 import com.platform.api.audit.AdminAuditLogService;
 import com.platform.api.eventing.KafkaSourceRepository;
 import com.platform.api.eventing.TriggerRepository;
@@ -59,6 +60,7 @@ public class AdminController {
     private final TriggerRepository       triggerRepository;
     private final UserContextService      userContextService;
     private final AdminAuditLogService    auditLogService;
+    private final AdminAuditLogExportService auditLogExportService;
     private final QuotaService            quotaService;
     private final MetricsService          metricsService;
     private final AlertmanagerService     alertmanagerService;
@@ -565,6 +567,21 @@ public class AdminController {
         var result = auditLogService.search(actorUserId, targetId, action, from, to, pageable)
                 .map(com.platform.api.audit.dto.AdminAuditLogResponse::from);
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/audit-log/export")
+    @Operation(summary = "Export the (filtered) admin action audit trail as CSV")
+    public ResponseEntity<String> exportAuditLog(
+            @RequestParam(required = false) String actorUserId,
+            @RequestParam(required = false) String targetId,
+            @RequestParam(required = false) com.platform.api.audit.AdminAction action,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime from,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime to) {
+        String csv = auditLogExportService.exportCsv(actorUserId, targetId, action, from, to);
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"audit-log.csv\"")
+                .header("Content-Type", "text/csv")
+                .body(csv);
     }
 
     // ── Knative status parsing ─────────────────────────────────────────

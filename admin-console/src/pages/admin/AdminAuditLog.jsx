@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ScrollText, RefreshCw, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { ScrollText, RefreshCw, ChevronLeft, ChevronRight, Filter, Download } from 'lucide-react';
 import { adminApi } from '../../api';
 
 const ACTIONS = [
@@ -98,6 +98,26 @@ const AdminAuditLog = () => {
     useEffect(() => { load(0); setPage(0); }, [filters]); // eslint-disable-line react-hooks/exhaustive-deps
     useEffect(() => { load(page); }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    const exportCsv = async () => {
+        try {
+            const params = {};
+            if (filters.action) params.action = filters.action;
+            if (filters.targetId) params.targetId = filters.targetId;
+            if (filters.actorUserId) params.actorUserId = filters.actorUserId;
+            const res = await adminApi.exportAuditLog(params);
+            const url = window.URL.createObjectURL(new Blob([res.data]));
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } catch {
+            setError('Failed to export audit log. Try refreshing and exporting again.');
+        }
+    };
+
     return (
         <div style={{ maxWidth: 1100 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 24 }}>
@@ -115,15 +135,26 @@ const AdminAuditLog = () => {
                         Every suspend, restore, and force-delete action, traced.
                     </p>
                 </div>
-                <button onClick={() => load(page)} style={{
-                    display: 'flex', alignItems: 'center', gap: 7,
-                    padding: '9px 16px', borderRadius: 9,
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    background: 'transparent', color: '#64748B',
-                    cursor: 'pointer', fontSize: 12,
-                }}>
-                    <RefreshCw size={13} /> Refresh
-                </button>
+                <div style={{ display: 'flex', gap: 10 }}>
+                    <button onClick={exportCsv} style={{
+                        display: 'flex', alignItems: 'center', gap: 7,
+                        padding: '9px 16px', borderRadius: 9,
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        background: 'transparent', color: '#64748B',
+                        cursor: 'pointer', fontSize: 12,
+                    }}>
+                        <Download size={13} /> Export CSV
+                    </button>
+                    <button onClick={() => load(page)} style={{
+                        display: 'flex', alignItems: 'center', gap: 7,
+                        padding: '9px 16px', borderRadius: 9,
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        background: 'transparent', color: '#64748B',
+                        cursor: 'pointer', fontSize: 12,
+                    }}>
+                        <RefreshCw size={13} /> Refresh
+                    </button>
+                </div>
             </div>
 
             {error && (
