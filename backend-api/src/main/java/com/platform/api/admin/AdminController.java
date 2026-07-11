@@ -193,6 +193,19 @@ public class AdminController {
         }
     }
 
+    @GetMapping("/cluster/storage")
+    @Operation(summary = "Persistent volume claims across all namespaces")
+    public ResponseEntity<List<Map<String, Object>>> getStorage() {
+        try {
+            List<Map<String, Object>> pvcs = kubernetesClient.persistentVolumeClaims().inAnyNamespace().list().getItems()
+                    .stream().map(this::pvcInfo).collect(Collectors.toList());
+            return ResponseEntity.ok(pvcs);
+        } catch (Exception e) {
+            log.warn("Could not fetch persistent volume claims: {}", e.getMessage());
+            return ResponseEntity.ok(List.of());
+        }
+    }
+
     // ── Knative services ──────────────────────────────────────────────
 
     @GetMapping("/cluster/knative/services")
@@ -641,6 +654,30 @@ public class AdminController {
         var labels = pod.getMetadata().getLabels();
         info.put("app", labels != null ? labels.getOrDefault("app",
                 labels.getOrDefault("app.kubernetes.io/name", "")) : "");
+        return info;
+    }
+
+    private Map<String, Object> pvcInfo(io.fabric8.kubernetes.api.model.PersistentVolumeClaim pvc) {
+        Map<String, Object> info = new LinkedHashMap<>();
+        info.put("name",      pvc.getMetadata().getName());
+        info.put("namespace", pvc.getMetadata().getNamespace());
+        info.put("status",    pvc.getStatus() != null && pvc.getStatus().getPhase() != null ? pvc.getStatus().getPhase() : "Unknown");
+        info.put("storageClass", pvc.getSpec() != null ? pvc.getSpec().getStorageClassName() : null);
+        info.put("accessModes",  pvc.getSpec() != null ? pvc.getSpec().getAccessModes() : List.of());
+        info.put("volumeName",   pvc.getSpec() != null ? pvc.getSpec().getVolumeName() : null);
+
+        String requestedCapacity = (pvc.getSpec() != null && pvc.getSpec().getResources() != null
+                && pvc.getSpec().getResources().getRequests() != null)
+                ? pvc.getSpec().getResources().getRequests().getOrDefault("storage",
+                    new io.fabric8.kubernetes.api.model.Quantity("0")).toString()
+                : "0";
+        info.put("requestedCapacity", requestedCapacity);
+
+        String actualCapacity = (pvc.getStatus() != null && pvc.getStatus().getCapacity() != null)
+                ? pvc.getStatus().getCapacity().getOrDefault("storage",
+                    new io.fabric8.kubernetes.api.model.Quantity("0")).toString()
+                : null;
+        info.put("actualCapacity", actualCapacity);
         return info;
     }
 

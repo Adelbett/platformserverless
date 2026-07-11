@@ -213,6 +213,7 @@ const ClusterManagement = () => {
     const [systemComponents,  setSystemComponents] = useState([]);
     const [events,            setEvents]           = useState([]);
     const [alerts,            setAlerts]           = useState([]);
+    const [storage,           setStorage]          = useState([]);
     const [pods,              setPods]             = useState([]);
     const [apps,              setApps]             = useState([]);
     const [knSvcs,            setKnSvcs]           = useState([]);
@@ -247,6 +248,7 @@ const ClusterManagement = () => {
             adminApi.getSystemComponents().catch(fail('System components')),
             adminApi.getClusterEvents().catch(fail('Cluster events')),
             adminApi.getActiveAlerts().catch(fail('Active alerts')),
+            adminApi.getStorage().catch(fail('Persistent volumes')),
             adminApi.getPods().catch(fail('Pods')),
             adminApi.getAllApps().catch(fail('Applications')),
             adminApi.getKnativeServices().catch(fail('Knative services')),
@@ -254,7 +256,7 @@ const ClusterManagement = () => {
             adminApi.getAllTopics().catch(fail('Kafka topics')),
             adminApi.getAllSources().catch(fail('KafkaSources')),
             adminApi.getAllTriggers().catch(fail('Triggers')),
-        ]).then(([s, cl, n, ns, sc, ev, al, pd, ap, kn, kb, tp, src, trg]) => {
+        ]).then(([s, cl, n, ns, sc, ev, al, st, pd, ap, kn, kb, tp, src, trg]) => {
             setStats(s.data);
             setCluster(cl.data);
             setNodes(Array.isArray(n.data) ? n.data : []);
@@ -262,6 +264,7 @@ const ClusterManagement = () => {
             setSystemComponents(Array.isArray(sc.data) ? sc.data : []);
             setEvents(Array.isArray(ev.data) ? ev.data : []);
             setAlerts(Array.isArray(al.data) ? al.data : []);
+            setStorage(Array.isArray(st.data) ? st.data : []);
             setPods(Array.isArray(pd.data) ? pd.data : []);
             setApps(Array.isArray(ap.data) ? ap.data : []);
             setKnSvcs(Array.isArray(kn.data) ? kn.data : []);
@@ -498,6 +501,38 @@ const ClusterManagement = () => {
                                         <td style={{ padding: '12px 20px', fontSize: 13, color: '#DDE6F0' }}>{fmtReq(ns.reqPerSec)}</td>
                                         <td style={{ padding: '12px 20px' }}>
                                             <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, color: '#3FB950', background: 'rgba(63,185,80,0.1)', border: '1px solid rgba(63,185,80,0.2)', fontFamily: "'JetBrains Mono', monospace" }}>{ns.status}</span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+            </div>
+
+            {/* Persistent volume claims */}
+            <div>
+                <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 700, color: '#DDE6F0', marginBottom: 14 }}>Storage — Persistent Volumes ({storage.length})</h2>
+                <div style={{ background: '#0D1117', border: '1px solid #1F2B3A', borderRadius: 12, overflow: 'hidden' }}>
+                    {storage.length === 0 ? (
+                        <div style={{ color: '#5A7080', fontSize: 13, padding: 24, textAlign: 'center' }}>No persistent volume claims found</div>
+                    ) : (
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead><tr style={{ borderBottom: '1px solid #1F2B3A' }}>
+                                {['PVC Name', 'Namespace', 'Capacity', 'Storage Class', 'Access Modes', 'Status'].map(h => (
+                                    <th key={h} style={{ padding: '12px 20px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#5A7080', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em' }}>{h}</th>
+                                ))}
+                            </tr></thead>
+                            <tbody>
+                                {storage.map((pvc, i) => (
+                                    <tr key={i} style={{ borderBottom: '1px solid rgba(31,43,58,0.5)' }}>
+                                        <td style={{ padding: '12px 20px', fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: '#4A9EF5' }}>{pvc.name}</td>
+                                        <td style={{ padding: '12px 20px', fontSize: 13, color: '#A371F7', fontFamily: "'JetBrains Mono', monospace" }}>{pvc.namespace}</td>
+                                        <td style={{ padding: '12px 20px', fontSize: 13, color: '#DDE6F0' }}>{pvc.actualCapacity || pvc.requestedCapacity || '—'}</td>
+                                        <td style={{ padding: '12px 20px', fontSize: 13, color: '#DDE6F0' }}>{pvc.storageClass || '—'}</td>
+                                        <td style={{ padding: '12px 20px', fontSize: 12, color: '#5A7080' }}>{Array.isArray(pvc.accessModes) ? pvc.accessModes.join(', ') : '—'}</td>
+                                        <td style={{ padding: '12px 20px' }}>
+                                            <StatusPill status={pvc.status} />
                                         </td>
                                     </tr>
                                 ))}
