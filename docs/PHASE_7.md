@@ -2,7 +2,9 @@
 
 Phase 7 du brief "Monitoring enrichi admin-console" (voir [PHASE_0.md](PHASE_0.md) pour le contexte général).
 
-## Statut : IMPLÉMENTÉE — en attente de déploiement/vérification en prod
+## Statut : TERMINÉE et confirmée en prod
+
+Table "Tenant Namespaces" affiche CPU/Memory réels par tenant (ex: `0.00 cores`/`33 MiB` pour user-adel, `0.01 cores`/`693 MiB` pour user-test). Req/sec affiche `—` pour les tenants sans trafic dans les 5 dernières minutes — comportement normal, cohérent avec REQ/SEC en Phase 0.
 
 ## Objectif
 

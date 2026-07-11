@@ -2,7 +2,9 @@
 
 Phase 5 du brief "Monitoring enrichi admin-console" (voir [PHASE_0.md](PHASE_0.md) pour le contexte général).
 
-## Statut : IMPLÉMENTÉE — en attente de déploiement/vérification en prod
+## Statut : TERMINÉE et confirmée en prod
+
+Section "Active Alerts (8)" affichée sur `/cluster` avec badges de sévérité (warning/critical/none) et horodatage, correspondant aux alertes vues via `curl` (TargetDown, Watchdog, KubeJobFailed, etcdInsufficientMembers, etcdMembersDown).
 
 ## Objectif
 
