@@ -37,9 +37,22 @@ L'endpoint appelait directement `triggerRepository.delete(t)` sans jamais touche
 ## Bugs identifiés mais NON corrigés (reportés)
 
 - 🟡 `KafkaSource.ready` / `Trigger.ready` ne sont jamais resynchronisés depuis le statut réel de la CR (contrairement à `App` qui a `AppService.syncStatusFromKubernetes()`). Nécessiterait un job de réconciliation dédié.
-- 🟡 `createTrigger()` ne vérifie pas que le `subscriberName`/URL cible existe réellement avant de créer la CR.
-- 🟡 ~~`KafkaService.createTopic()` vérifie l'unicité du nom de topic par utilisateur, pas globalement~~ → **corrigé ci-dessous**.
-- 🟡 Gestion du conflit `409` incohérente entre `createKnativeKafkaSource` (skip silencieux) et `createKnativeTrigger` (delete + recreate).
+- 🟡 `createTrigger()` ne vérifie pas que le `subscriberName`/URL cible existe réellement avant de créer la CR (non corrigé — nécessiterait de vérifier l'existence du KnativeService cible avant création).
+- 🟡 ~~`KafkaService.createTopic()` vérifie l'unicité du nom de topic par utilisateur, pas globalement~~ → **corrigé**.
+- 🟡 ~~`ready` jamais resynchronisé~~ → **corrigé ci-dessous**.
+- 🟡 ~~Gestion du conflit `409` incohérente~~ → **corrigé ci-dessous**.
+
+## Correctif additionnel — resynchronisation du champ `ready`
+
+`KafkaSource.ready`/`Trigger.ready` restaient figés à leur valeur par défaut de création, sans jamais refléter le statut réel de la CR dans le cluster (contrairement à `App`, qui a `AppService.syncStatusFromKubernetes()`).
+
+**Fix** : nouvelle méthode `EventingService.checkReady(apiVersion, kind, namespace, name)` — lit `status.conditions[].type=Ready` sur la CR (même pattern que `KnativeService.getRealStatus()`), appelée à chaque `listKafkaSources()`/`listTriggersForUser()`/`listTriggers()`, avec persistance si la valeur a changé.
+
+**Bug additionnel trouvé en corrigeant ça** : `EventingController.listTriggers()` (l'endpoint `GET /api/eventing/triggers` réellement utilisé par le frontend) contournait `EventingService` entièrement — il lisait `TriggerRepository` en direct **et mappait `ready` depuis le champ `active`** (`t.getActive()`), pas depuis le vrai champ `ready`. Corrigé : le contrôleur passe maintenant par `EventingService.listTriggersForUser()` (avec resynchronisation), et le DTO lit `t.getReady()`.
+
+## Correctif additionnel — cohérence du traitement `409 Conflict`
+
+`createKnativeKafkaSource` faisait un simple skip silencieux sur conflit (409) — ne mettait jamais à jour la CR existante si son spec avait changé. `createKnativeTrigger` faisait déjà delete + recreate. Harmonisé : `createKnativeKafkaSource` fait maintenant delete + recreate aussi, cohérent avec `createKnativeTrigger`.
 
 ## Correctif additionnel — unicité globale des noms de topics Kafka
 

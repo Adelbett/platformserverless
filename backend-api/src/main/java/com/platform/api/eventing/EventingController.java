@@ -24,7 +24,6 @@ import java.util.stream.Collectors;
 public class EventingController {
 
     private final EventingService eventingService;
-    private final TriggerRepository triggerRepository;
 
     // ── KafkaSources ─────────────────────────────────────────────────
 
@@ -76,7 +75,7 @@ public class EventingController {
     @GetMapping("/triggers")
     @Operation(summary = "List all Triggers for current user")
     public ResponseEntity<List<TriggerDto>> listTriggers(Authentication auth) {
-        List<TriggerDto> result = triggerRepository.findByUserId(auth.getName())
+        List<TriggerDto> result = eventingService.listTriggersForUser(auth.getName())
                 .stream()
                 .map(t -> TriggerDto.builder()
                         .id(t.getId())
@@ -89,7 +88,7 @@ public class EventingController {
                         .filter(t.getFilter())
                         .action(t.getAction())
                         .active(t.getActive())
-                        .ready(t.getActive() != null ? t.getActive() : false)
+                        .ready(t.getReady() != null ? t.getReady() : false)
                         .createdAt(t.getCreatedAt())
                         .updatedAt(t.getUpdatedAt())
                         .build())

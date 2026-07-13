@@ -141,7 +141,17 @@ public class EventingService {
             log.info("KafkaSource '{}' created in namespace '{}' → topic={}", name, appNamespace, topicName);
         } catch (KubernetesClientException e) {
             if (e.getCode() == 409) {
-                log.info("KafkaSource '{}' already exists in namespace '{}', skipping", name, appNamespace);
+                // Delete + recreate (not a no-op skip) so the CR always reflects
+                // the latest spec — consistent with createKnativeTrigger() below.
+                kubernetesClient.genericKubernetesResources("sources.knative.dev/v1beta1", "KafkaSource")
+                        .inNamespace(appNamespace)
+                        .withName(name)
+                        .delete();
+                kubernetesClient.genericKubernetesResources("sources.knative.dev/v1beta1", "KafkaSource")
+                        .inNamespace(appNamespace)
+                        .resource(kafkaSource)
+                        .create();
+                log.info("KafkaSource '{}' recreated in namespace '{}'", name, appNamespace);
             } else {
                 log.error("Failed to create KafkaSource '{}' in namespace '{}': {}", name, appNamespace, e.getMessage());
                 throw e;
@@ -150,9 +160,29 @@ public class EventingService {
     }
 
     public List<KafkaSourceDto> listKafkaSources(String userId) {
-        return kafkaSourceRepository.findByUserId(userId).stream()
+        List<KafkaSource> sources = kafkaSourceRepository.findByUserId(userId);
+        syncKafkaSourceReadiness(sources);
+        return sources.stream()
                 .map(this::toKafkaSourceDto)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Mirrors AppService.syncStatusFromKubernetes(): on every list, ask the
+     * cluster for each CR's real "Ready" condition and persist it if it
+     * changed. Without this, `ready` stays frozen at its creation-time default
+     * forever, regardless of what actually happens in the cluster.
+     */
+    private void syncKafkaSourceReadiness(List<KafkaSource> sources) {
+        if (!kubernetesEnabled) return;
+        for (KafkaSource source : sources) {
+            Boolean realReady = checkReady("sources.knative.dev/v1beta1", "KafkaSource",
+                    source.getNamespace(), source.getName());
+            if (realReady != null && !realReady.equals(source.getReady())) {
+                source.setReady(realReady);
+                kafkaSourceRepository.save(source);
+            }
+        }
     }
 
     public KafkaSourceDto getKafkaSource(String sourceId, String userId) {
@@ -323,7 +353,61 @@ public class EventingService {
 
     public List<Trigger> listTriggers(String kafkaSourceId, String userId) {
         requireOwnedSource(kafkaSourceId, userId);
-        return triggerRepository.findByKafkaSourceId(kafkaSourceId);
+        List<Trigger> triggers = triggerRepository.findByKafkaSourceId(kafkaSourceId);
+        syncTriggerReadiness(triggers);
+        return triggers;
+    }
+
+    /** Used by GET /api/eventing/triggers — all of a user's triggers, readiness resynced. */
+    public List<Trigger> listTriggersForUser(String userId) {
+        List<Trigger> triggers = triggerRepository.findByUserId(userId);
+        syncTriggerReadiness(triggers);
+        return triggers;
+    }
+
+    private void syncTriggerReadiness(List<Trigger> triggers) {
+        if (!kubernetesEnabled) return;
+        for (Trigger trigger : triggers) {
+            // Trigger always lives in "default" alongside the single global Broker.
+            Boolean realReady = checkReady("eventing.knative.dev/v1", "Trigger", "default", trigger.getName());
+            if (realReady != null && !realReady.equals(trigger.getReady())) {
+                trigger.setReady(realReady);
+                triggerRepository.save(trigger);
+            }
+        }
+    }
+
+    /**
+     * Reads a generic Knative-style CR's status.conditions and returns whether
+     * its "Ready" condition is True. Returns null if the resource can't be read
+     * (not found, cluster error) so callers can leave the stored value alone
+     * rather than overwrite it with a guess.
+     */
+    private Boolean checkReady(String apiVersion, String kind, String namespace, String name) {
+        try {
+            GenericKubernetesResource resource = kubernetesClient
+                    .genericKubernetesResources(apiVersion, kind)
+                    .inNamespace(namespace)
+                    .withName(name)
+                    .get();
+            if (resource == null) return null;
+
+            Object statusObj = resource.getAdditionalProperties().get("status");
+            if (!(statusObj instanceof Map<?, ?> status)) return false;
+
+            Object conditionsObj = status.get("conditions");
+            if (!(conditionsObj instanceof List<?> conditions)) return false;
+
+            for (Object cond : conditions) {
+                if (cond instanceof Map<?, ?> condMap && "Ready".equals(condMap.get("type"))) {
+                    return "True".equals(String.valueOf(condMap.get("status")));
+                }
+            }
+            return false;
+        } catch (Exception e) {
+            log.debug("Could not read readiness for {}/{} '{}': {}", apiVersion, kind, name, e.getMessage());
+            return null;
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────
