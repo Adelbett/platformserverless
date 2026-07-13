@@ -38,10 +38,22 @@ L'endpoint appelait directement `triggerRepository.delete(t)` sans jamais touche
 
 - 🟡 `KafkaSource.ready` / `Trigger.ready` ne sont jamais resynchronisés depuis le statut réel de la CR (contrairement à `App` qui a `AppService.syncStatusFromKubernetes()`). Nécessiterait un job de réconciliation dédié.
 - 🟡 `createTrigger()` ne vérifie pas que le `subscriberName`/URL cible existe réellement avant de créer la CR.
-- 🟡 `KafkaService.createTopic()` vérifie l'unicité du nom de topic par utilisateur, pas globalement (les noms Kafka sont uniques cluster-wide) — un conflit entre deux utilisateurs choisissant le même nom produit une erreur 500 générique au lieu d'un message clair.
+- 🟡 ~~`KafkaService.createTopic()` vérifie l'unicité du nom de topic par utilisateur, pas globalement~~ → **corrigé ci-dessous**.
 - 🟡 Gestion du conflit `409` incohérente entre `createKnativeKafkaSource` (skip silencieux) et `createKnativeTrigger` (delete + recreate).
 
-## Fichiers modifiés
+## Correctif additionnel — unicité globale des noms de topics Kafka
+
+`KafkaService.createTopic()` ne vérifiait l'unicité du nom que par utilisateur (`existsByNameAndUserId`), alors que les noms de topics Kafka sont **uniques au niveau du cluster entier**. Deux utilisateurs choisissant le même nom : le second passait la vérification par-utilisateur, insérait sa ligne DB, puis échouait sur le vrai appel Kafka AdminClient (`TopicExistsException`) avec un message générique — le rollback transactionnel fonctionnait déjà correctement (pas de ligne fantôme), seul le message d'erreur était confus.
+
+**Fix** : ajout de `KafkaTopicRepository.existsByName(String)` + vérification globale avant l'insertion, avec un message clair (`"Topic name already in use by another tenant"`).
+
+**Fichiers modifiés** :
+- `backend-api/src/main/java/com/platform/api/kafka/KafkaTopicRepository.java`
+- `backend-api/src/main/java/com/platform/api/kafka/KafkaService.java`
+
+## Fichiers modifiés (résumé complet)
 
 - `backend-api/src/main/java/com/platform/api/eventing/EventingService.java`
 - `backend-api/src/main/java/com/platform/api/eventing/EventingController.java`
+- `backend-api/src/main/java/com/platform/api/kafka/KafkaTopicRepository.java`
+- `backend-api/src/main/java/com/platform/api/kafka/KafkaService.java`

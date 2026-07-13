@@ -37,6 +37,14 @@ public class KafkaService {
         if (topicRepository.existsByNameAndUserId(req.getName(), userId)) {
             throw new ConflictException("Topic already exists: " + req.getName());
         }
+        // Kafka topic names are unique cluster-wide, not per-user — without this
+        // check, a second user picking an already-taken name would pass the
+        // per-user check above, insert a DB row, then fail on the real Kafka
+        // AdminClient call with a generic 500 (TopicExistsException) instead of
+        // a clear conflict message.
+        if (topicRepository.existsByName(req.getName())) {
+            throw new ConflictException("Topic name already in use by another tenant: " + req.getName());
+        }
 
         KafkaTopic topic = KafkaTopic.builder()
                 .name(req.getName())

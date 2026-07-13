@@ -11,4 +11,5 @@ public interface KafkaTopicRepository extends JpaRepository<KafkaTopic, String> 
     List<KafkaTopic> findByUserId(String userId);
     Optional<KafkaTopic> findByNameAndUserId(String name, String userId);
     boolean existsByNameAndUserId(String name, String userId);
+    boolean existsByName(String name);
 }
