@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDateTime;
@@ -40,6 +41,9 @@ public class EventingService {
 
     @Value("${app.kubernetes.enabled:true}")
     private boolean kubernetesEnabled;
+
+    @Value("${app.kafka.bootstrap-servers:localhost:9092}")
+    private String kafkaBootstrapServers;
 
     /**
      * Publish a CloudEvent to the Knative broker via HTTP POST.
@@ -74,6 +78,7 @@ public class EventingService {
 
     // ── KafkaSource Management ────────────────────────────────────────
 
+    @Transactional
     public KafkaSourceDto createKafkaSource(String userId, String kafkaTopicId, String name, String namespace, String config) {
         String consumerGroup = name + "-group";
         String ns = namespace != null ? namespace : "default";
@@ -83,7 +88,7 @@ public class EventingService {
                 .userId(userId)
                 .name(name)
                 .namespace(ns)
-                .bootstrapServers("my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092")
+                .bootstrapServers(kafkaBootstrapServers)
                 .consumerGroup(consumerGroup)
                 .config(config)
                 .updatedAt(LocalDateTime.now())
@@ -96,6 +101,9 @@ public class EventingService {
             String topicName = kafkaTopicRepository.findById(kafkaTopicId)
                     .map(t -> t.getName())
                     .orElse(kafkaTopicId);
+            // Let failures propagate — @Transactional rolls back the DB row above so
+            // we never end up with a KafkaSource that "exists" in the DB but was
+            // never actually created in the cluster.
             createKnativeKafkaSource(name, topicName, consumerGroup, ns);
         }
 
@@ -103,44 +111,41 @@ public class EventingService {
     }
 
     private void createKnativeKafkaSource(String name, String topicName, String consumerGroup, String appNamespace) {
-        try {
-            GenericKubernetesResource kafkaSource = new GenericKubernetesResourceBuilder()
-                    .withApiVersion("sources.knative.dev/v1beta1")
-                    .withKind("KafkaSource")
-                    .withNewMetadata()
-                        .withName(name)
-                        .withNamespace("default")
-                    .endMetadata()
-                    .addToAdditionalProperties("spec", Map.of(
-                        "bootstrapServers", List.of("my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"),
-                        "topics", List.of(topicName),
-                        "consumerGroup", consumerGroup,
-                        "sink", Map.of(
-                            "ref", Map.of(
-                                "apiVersion", "eventing.knative.dev/v1",
-                                "kind", "Broker",
-                                "name", "default",
-                                "namespace", "default"
-                            )
+        GenericKubernetesResource kafkaSource = new GenericKubernetesResourceBuilder()
+                .withApiVersion("sources.knative.dev/v1beta1")
+                .withKind("KafkaSource")
+                .withNewMetadata()
+                    .withName(name)
+                    .withNamespace(appNamespace)
+                .endMetadata()
+                .addToAdditionalProperties("spec", Map.of(
+                    "bootstrapServers", List.of(kafkaBootstrapServers),
+                    "topics", List.of(topicName),
+                    "consumerGroup", consumerGroup,
+                    "sink", Map.of(
+                        "ref", Map.of(
+                            "apiVersion", "eventing.knative.dev/v1",
+                            "kind", "Broker",
+                            "name", "default",
+                            "namespace", "default"
                         )
-                    ))
-                    .build();
+                    )
+                ))
+                .build();
 
-            try {
-                kubernetesClient.genericKubernetesResources("sources.knative.dev/v1beta1", "KafkaSource")
-                        .inNamespace("default")
-                        .resource(kafkaSource)
-                        .create();
-                log.info("KafkaSource '{}' created → topic={}", name, topicName);
-            } catch (KubernetesClientException e) {
-                if (e.getCode() == 409) {
-                    log.info("KafkaSource '{}' already exists, skipping", name);
-                } else {
-                    throw e;
-                }
+        try {
+            kubernetesClient.genericKubernetesResources("sources.knative.dev/v1beta1", "KafkaSource")
+                    .inNamespace(appNamespace)
+                    .resource(kafkaSource)
+                    .create();
+            log.info("KafkaSource '{}' created in namespace '{}' → topic={}", name, appNamespace, topicName);
+        } catch (KubernetesClientException e) {
+            if (e.getCode() == 409) {
+                log.info("KafkaSource '{}' already exists in namespace '{}', skipping", name, appNamespace);
+            } else {
+                log.error("Failed to create KafkaSource '{}' in namespace '{}': {}", name, appNamespace, e.getMessage());
+                throw e;
             }
-        } catch (Exception e) {
-            log.error("Failed to create KafkaSource '{}': {}", name, e.getMessage());
         }
     }
 
@@ -157,6 +162,7 @@ public class EventingService {
 
     // ── Trigger Management ───────────────────────────────────────────
 
+    @Transactional
     public void createTrigger(String userId, String kafkaSourceId, String filter, String action) {
         KafkaSource source = requireOwnedSource(kafkaSourceId, userId);
 
@@ -179,12 +185,57 @@ public class EventingService {
 
         triggerRepository.save(trigger);
 
-        // Create the real Knative Trigger resource on the cluster
+        // Create the real Knative Trigger resource on the cluster. Let failures
+        // propagate — @Transactional rolls back the DB row above so we never end
+        // up with a Trigger that "exists" in the DB but was never actually created.
         if (kubernetesEnabled) {
-            createKnativeTrigger(triggerName, filter, action, source.getNamespace());
+            createKnativeTrigger(triggerName, filter, action);
         }
     }
 
+    /**
+     * Deletes a Trigger the user owns, from both the database and the cluster.
+     * The Trigger CR always lives in the "default" namespace alongside the single
+     * global Broker — Knative requires a Trigger and its Broker to share a
+     * namespace (spec.broker is a bare name, not a namespace-qualified ref).
+     */
+    @Transactional
+    public void deleteTrigger(String triggerId, String userId) {
+        Trigger trigger = triggerRepository.findById(triggerId)
+                .orElseThrow(() -> new NotFoundException("Trigger not found: " + triggerId));
+        if (!trigger.getUserId().equals(userId)) {
+            throw new UnauthorizedException("Access denied to Trigger: " + triggerId);
+        }
+
+        if (kubernetesEnabled) {
+            try {
+                kubernetesClient.genericKubernetesResources("eventing.knative.dev/v1", "Trigger")
+                        .inNamespace("default")
+                        .withName(trigger.getName())
+                        .delete();
+                log.info("Knative Trigger '{}' deleted", trigger.getName());
+            } catch (KubernetesClientException e) {
+                if (e.getCode() == 404) {
+                    log.info("Knative Trigger '{}' already gone from the cluster, proceeding", trigger.getName());
+                } else {
+                    // Propagate — @Transactional keeps the DB row so the user can
+                    // retry, instead of silently leaving an orphaned Trigger CR.
+                    log.error("Could not delete Knative Trigger '{}': {}", trigger.getName(), e.getMessage());
+                    throw e;
+                }
+            }
+        }
+
+        triggerRepository.delete(trigger);
+    }
+
+    /**
+     * Best-effort cascade delete, called during app teardown (AppService.deleteApp)
+     * after the Knative Service itself has already been deleted. Cluster cleanup
+     * failures here are logged, not thrown, so a stuck Kafka/Trigger CR never
+     * blocks deleting the app itself — unlike deleteTrigger()'s standalone path,
+     * which fails loudly since there's no larger deletion already in progress.
+     */
     public void deleteByServiceName(String serviceName, String userId) {
         String sourceName = serviceName + "-source";
         kafkaSourceRepository.findByUserId(userId).stream()
@@ -206,54 +257,67 @@ public class EventingService {
                                 }
                                 triggerRepository.delete(t);
                             });
+                    if (kubernetesEnabled) {
+                        try {
+                            kubernetesClient.genericKubernetesResources("sources.knative.dev/v1beta1", "KafkaSource")
+                                    .inNamespace(source.getNamespace())
+                                    .withName(source.getName())
+                                    .delete();
+                            log.info("Knative KafkaSource '{}' deleted", source.getName());
+                        } catch (Exception e) {
+                            log.warn("Could not delete Knative KafkaSource '{}': {}", source.getName(), e.getMessage());
+                        }
+                    }
                     kafkaSourceRepository.delete(source);
                     log.info("KafkaSource '{}' and its triggers deleted", sourceName);
                 });
     }
 
-    private void createKnativeTrigger(String triggerName, String eventType, String subscriberUrl, String appNamespace) {
-        try {
-            GenericKubernetesResource knativeTrigger = new GenericKubernetesResourceBuilder()
-                    .withApiVersion("eventing.knative.dev/v1")
-                    .withKind("Trigger")
-                    .withNewMetadata()
-                        .withName(triggerName)
-                        .withNamespace("default")  // broker lives in default namespace
-                    .endMetadata()
-                    .addToAdditionalProperties("spec", Map.of(
-                        "broker", "default",
-                        "filter", Map.of(
-                            "attributes", Map.of("type", eventType)
-                        ),
-                        "subscriber", Map.of(
-                            "uri", subscriberUrl
-                        )
-                    ))
-                    .build();
+    /**
+     * Trigger and Broker must live in the same namespace (spec.broker is a bare
+     * name, not a namespace-qualified ref) — always "default" since that's the
+     * only Broker provisioned on this cluster.
+     */
+    private void createKnativeTrigger(String triggerName, String eventType, String subscriberUrl) {
+        GenericKubernetesResource knativeTrigger = new GenericKubernetesResourceBuilder()
+                .withApiVersion("eventing.knative.dev/v1")
+                .withKind("Trigger")
+                .withNewMetadata()
+                    .withName(triggerName)
+                    .withNamespace("default")
+                .endMetadata()
+                .addToAdditionalProperties("spec", Map.of(
+                    "broker", "default",
+                    "filter", Map.of(
+                        "attributes", Map.of("type", eventType)
+                    ),
+                    "subscriber", Map.of(
+                        "uri", subscriberUrl
+                    )
+                ))
+                .build();
 
-            try {
+        try {
+            kubernetesClient.genericKubernetesResources("eventing.knative.dev/v1", "Trigger")
+                    .inNamespace("default")
+                    .resource(knativeTrigger)
+                    .create();
+            log.info("Knative Trigger '{}' created in default namespace → {}", triggerName, subscriberUrl);
+        } catch (KubernetesClientException e) {
+            if (e.getCode() == 409) {
+                kubernetesClient.genericKubernetesResources("eventing.knative.dev/v1", "Trigger")
+                        .inNamespace("default")
+                        .withName(triggerName)
+                        .delete();
                 kubernetesClient.genericKubernetesResources("eventing.knative.dev/v1", "Trigger")
                         .inNamespace("default")
                         .resource(knativeTrigger)
                         .create();
-                log.info("Knative Trigger '{}' created in default namespace → {}", triggerName, subscriberUrl);
-            } catch (KubernetesClientException e) {
-                if (e.getCode() == 409) {
-                    kubernetesClient.genericKubernetesResources("eventing.knative.dev/v1", "Trigger")
-                            .inNamespace("default")
-                            .withName(triggerName)
-                            .delete();
-                    kubernetesClient.genericKubernetesResources("eventing.knative.dev/v1", "Trigger")
-                            .inNamespace("default")
-                            .resource(knativeTrigger)
-                            .create();
-                    log.info("Knative Trigger '{}' recreated", triggerName);
-                } else {
-                    throw e;
-                }
+                log.info("Knative Trigger '{}' recreated", triggerName);
+            } else {
+                log.error("Failed to create Knative Trigger '{}': {}", triggerName, e.getMessage());
+                throw e;
             }
-        } catch (Exception e) {
-            log.error("Failed to create Knative Trigger '{}': {}", triggerName, e.getMessage());
         }
     }
 

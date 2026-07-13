@@ -69,11 +69,7 @@ public class EventingController {
     @PreAuthorize("@permissionService.has(authentication.name, 'MANAGE_EVENTING')")
     @Operation(summary = "Delete a Trigger")
     public ResponseEntity<Void> deleteTrigger(@PathVariable String id, Authentication auth) {
-        triggerRepository.findById(id).ifPresent(t -> {
-            if (t.getUserId().equals(auth.getName())) {
-                triggerRepository.delete(t);
-            }
-        });
+        eventingService.deleteTrigger(id, auth.getName());
         return ResponseEntity.noContent().build();
     }
 
