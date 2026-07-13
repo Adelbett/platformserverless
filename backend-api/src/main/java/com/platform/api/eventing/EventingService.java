@@ -391,23 +391,31 @@ public class EventingService {
                     .withName(name)
                     .get();
             if (resource == null) return null;
-
-            Object statusObj = resource.getAdditionalProperties().get("status");
-            if (!(statusObj instanceof Map<?, ?> status)) return false;
-
-            Object conditionsObj = status.get("conditions");
-            if (!(conditionsObj instanceof List<?> conditions)) return false;
-
-            for (Object cond : conditions) {
-                if (cond instanceof Map<?, ?> condMap && "Ready".equals(condMap.get("type"))) {
-                    return "True".equals(String.valueOf(condMap.get("status")));
-                }
-            }
-            return false;
+            return isReadyConditionTrue(resource.getAdditionalProperties().get("status"));
         } catch (Exception e) {
             log.debug("Could not read readiness for {}/{} '{}': {}", apiVersion, kind, name, e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * Pure parsing of a Knative-style status object's condition list — no
+     * cluster access, extracted so the tricky part (finding the "Ready"
+     * condition among others, handling malformed/missing data) is unit
+     * testable on its own, same pattern as AdminController.resolveReadyStatus().
+     */
+    static boolean isReadyConditionTrue(Object statusObj) {
+        if (!(statusObj instanceof Map<?, ?> status)) return false;
+
+        Object conditionsObj = status.get("conditions");
+        if (!(conditionsObj instanceof List<?> conditions)) return false;
+
+        for (Object cond : conditions) {
+            if (cond instanceof Map<?, ?> condMap && "Ready".equals(condMap.get("type"))) {
+                return "True".equals(String.valueOf(condMap.get("status")));
+            }
+        }
+        return false;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────
@@ -430,7 +438,7 @@ public class EventingService {
                 .consumerGroup(source.getConsumerGroup())
                 .bootstrapServers(source.getBootstrapServers())
                 .namespace(source.getNamespace())
-                .ready(source.getReady() != null ? source.getReady() : true)
+                .ready(source.getReady() != null ? source.getReady() : false)
                 .config(source.getConfig())
                 .createdAt(source.getCreatedAt())
                 .updatedAt(source.getUpdatedAt())
