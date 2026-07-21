@@ -23,6 +23,7 @@ public class PodLogService {
         LogWatch watch = kubernetesClient.pods()
                 .inNamespace(namespace)
                 .withName(podName)
+                .inContainer("user-container")
                 .tailingLines(100)
                 .watchLog();
 
