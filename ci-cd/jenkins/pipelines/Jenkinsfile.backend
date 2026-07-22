@@ -89,7 +89,9 @@ pipeline {
                             --context=dir://$(pwd)/backend-api \
                             --dockerfile=$(pwd)/ci-cd/docker/backend-kaniko.Dockerfile \
                             --destination=${IMAGE_NAME}:${IMAGE_TAG} \
-                            --destination=${IMAGE_NAME}:latest
+                            --destination=${IMAGE_NAME}:latest \
+                            --use-new-run \
+                            --snapshot-mode=redo
 
                         kubectl set image deployment/platform-api \
                             platform-api=$IMAGE_NAME:$IMAGE_TAG \
