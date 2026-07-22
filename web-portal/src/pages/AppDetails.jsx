@@ -620,6 +620,23 @@ const AppDetails = () => {
                                 </h1>
                                 <StatusBadge status={appData.status} />
                             </div>
+                            {appData.status === 'FAILED' && appData.failureMessage && (
+                                <div style={{
+                                    display: 'flex', alignItems: 'flex-start', gap: 8,
+                                    marginTop: 8, padding: '10px 14px', borderRadius: 8,
+                                    background: 'rgba(239,68,68,0.08)',
+                                    border: '1px solid rgba(239,68,68,0.25)',
+                                    maxWidth: 680,
+                                }}>
+                                    <AlertTriangle size={14} style={{ color: '#EF4444', flexShrink: 0, marginTop: 2 }} />
+                                    <div>
+                                        <p style={{ fontSize: 11, fontWeight: 700, color: '#EF4444', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Deployment Error</p>
+                                        <p style={{ fontSize: 12, color: '#FCA5A5', margin: 0, fontFamily: "'JetBrains Mono', monospace", lineHeight: 1.5, wordBreak: 'break-word' }}>
+                                            {appData.failureMessage}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
                             <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 6, flexWrap: 'wrap' }}>
                                 <span style={{ fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }} className="text-secondary">{appImage}</span>
                                 <span style={{ fontSize: 12, color: '#9CA3AF' }}>Created {createdFmt}</span>

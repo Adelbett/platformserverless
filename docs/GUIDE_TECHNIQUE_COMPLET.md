@@ -1,4 +1,4 @@
-# Guide Technique Complet — Plateforme Serverless NextStep
+ # Guide Technique Complet — Plateforme Serverless NextStep
 
 > Basé **uniquement** sur le code source réel du projet (backend-api + web-portal).  
 > Toute référence à un fichier indique le vrai fichier dans le dépôt.
@@ -658,5 +658,107 @@ Le backend appelle directement `kubernetesClient...create()` avec l'image fourni
 **Fichier :** `KnativeService.java`, `buildKnativeManifest()` — Le champ `envVars` de `AppRequest` est reçu par le backend mais **les variables de l'utilisateur ne sont pas ajoutées** dans la liste `env` du container (seulement les 5 variables Kafka auto-injectées). Toutes les variables custom saisies dans l'onglet "Environment Variables" du formulaire sont silencieusement perdues.
 
 **Impact :** app déployée sans ses variables d'environnement → crashe probable si elle en a besoin (ex: `DATABASE_URL`).
+
+---
+
+## 4. Fixes appliqués en cours de session
+
+### Fix 1 — Container Logs bloqué sur CONNECTING (RÉSOLU)
+**Fichier modifié :** `backend-api/src/main/java/com/platform/api/logs/PodLogService.java`
+
+**Problème :** Les pods Knative contiennent toujours **2 containers** :
+- `user-container` → ton app
+- `queue-proxy` → sidecar Knative (gère scale-to-zero)
+
+Le code appelait `.watchLog()` sans préciser le container. Kubernetes refusait car il ne savait pas lequel choisir → SSE fermé immédiatement → frontend bloqué sur CONNECTING.
+
+**Avant :**
+```java
+LogWatch watch = kubernetesClient.pods()
+    .inNamespace(namespace)
+    .withName(podName)
+    .tailingLines(100)
+    .watchLog();  // ← Kubernetes : "lequel des 2 ?" → ERREUR
+```
+
+**Après :**
+```java
+LogWatch watch = kubernetesClient.pods()
+    .inNamespace(namespace)
+    .withName(podName)
+    .inContainer("user-container")  // ← container utilisateur Knative (toujours ce nom)
+    .tailingLines(100)
+    .watchLog();
+```
+
+---
+
+### Fix 2 — Message d'erreur Knative affiché dans l'UI (RÉSOLU)
+**Fichiers modifiés :**
+- `backend-api/.../app/dto/AppResponse.java` — ajout du champ `failureMessage`
+- `backend-api/.../app/KnativeService.java` — ajout de `getFailureMessage()`
+- `backend-api/.../app/AppService.java` — population du champ dans `toResponse()`
+- `web-portal/src/pages/AppDetails.jsx` — affichage du message sous le badge FAILED
+
+**Problème :** Quand une app passe en `FAILED` (image introuvable, crash, etc.), l'utilisateur voyait juste le badge rouge `FAILED` sans aucune explication. Il devait aller dans le cluster avec `kubectl describe ksvc ...` pour comprendre.
+
+**Exemple d'erreur maintenant visible dans l'UI :**
+```
+● FAILED
+⚠ Deployment Error
+  Unable to fetch image "gcr.io/knative-samples/event-display:latest":
+  failed to resolve image to digest: 404 Not Found
+```
+
+**Code ajouté dans `KnativeService.java` :**
+```java
+public String getFailureMessage(String serviceName, String namespace) {
+    // Lit les conditions du KService
+    // Trouve Ready=False et retourne son message
+    for (Map<?, ?> cond : conditions) {
+        if ("Ready".equals(cond.get("type")) && "False".equals(cond.get("status"))) {
+            return String.valueOf(cond.get("message"));
+        }
+    }
+    return null;
+}
+```
+
+**Code ajouté dans `AppService.toResponse()` :**
+```java
+.failureMessage("FAILED".equals(app.getStatus())
+    ? knativeService.getFailureMessage(app.getServiceName(), app.getNamespace())
+    : null)
+```
+
+**Code ajouté dans `AppDetails.jsx` :**
+```jsx
+{appData.status === 'FAILED' && appData.failureMessage && (
+    <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', ... }}>
+        <AlertTriangle /> Deployment Error
+        <p>{appData.failureMessage}</p>
+    </div>
+)}
+```
+
+---
+
+### Fix 3 — Jenkins spawn helper (CPU throttling) — Historique complet
+
+**Problème :** `Failed to exec spawn helper: error=0, exit value: 1` à chaque build Jenkins après le premier.
+
+**Cause racine :** Le JVM Jenkins lance ~46 threads. Quand le CPU limit est trop bas (500m), le kernel Linux throttle les processus via cgroup. Le throttling se produit exactement pendant la fenêtre `fork()` / `posix_spawn()` du `jspawnhelper` → le process fils ne démarre pas → IOException.
+
+**Solution finale :**
+```bash
+# requests bas (pour que le pod puisse scheduler sur le nœud)
+# limits haut (pour que le pod puisse utiliser du CPU pendant les builds)
+kubectl patch deployment jenkins -n jenkins --type='json' \
+  -p='[{"op":"replace","path":"/spec/template/spec/containers/0/resources",
+        "value":{"requests":{"cpu":"100m","memory":"256Mi"},
+                 "limits":{"cpu":"2","memory":"3Gi"}}}]'
+```
+
+**Règle :** `requests` = place réservée au démarrage. `limits` = maximum utilisable pendant le build. Toujours mettre `limits` ≥ 2 CPU pour Jenkins.
 
 **Recommandation :** boucler sur `req.getEnvVars()` et les ajouter à la liste `env`.

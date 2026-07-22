@@ -110,7 +110,45 @@ public class EventingService {
         return toKafkaSourceDto(source);
     }
 
+    // ── Ensure a Knative Broker exists in the user namespace ─────────────────────
+    private void ensureBrokerExists(String namespace) {
+        try {
+            GenericKubernetesResource existing = kubernetesClient
+                    .genericKubernetesResources("eventing.knative.dev/v1", "Broker")
+                    .inNamespace(namespace).withName("default").get();
+            if (existing != null) {
+                log.info("Knative Broker 'default' already exists in namespace '{}'", namespace);
+                return;
+            }
+        } catch (Exception ignored) {}
+
+        GenericKubernetesResource broker = new GenericKubernetesResourceBuilder()
+                .withApiVersion("eventing.knative.dev/v1")
+                .withKind("Broker")
+                .withNewMetadata()
+                    .withName("default")
+                    .withNamespace(namespace)
+                .endMetadata()
+                .build();
+        try {
+            kubernetesClient.genericKubernetesResources("eventing.knative.dev/v1", "Broker")
+                    .inNamespace(namespace).resource(broker).create();
+            log.info("Knative Broker 'default' created in namespace '{}'", namespace);
+        } catch (KubernetesClientException e) {
+            if (e.getCode() == 409) {
+                log.info("Knative Broker 'default' already exists in namespace '{}'", namespace);
+            } else {
+                log.error("Failed to create Broker in namespace '{}': {}", namespace, e.getMessage());
+                throw e;
+            }
+        }
+    }
+
     private void createKnativeKafkaSource(String name, String topicName, String consumerGroup, String appNamespace) {
+        // Ensure a Broker exists in the user namespace — KafkaSource sink and Broker
+        // must share the same namespace (Knative admission webhook requirement).
+        ensureBrokerExists(appNamespace);
+
         GenericKubernetesResource kafkaSource = new GenericKubernetesResourceBuilder()
                 .withApiVersion("sources.knative.dev/v1beta1")
                 .withKind("KafkaSource")
@@ -127,7 +165,7 @@ public class EventingService {
                             "apiVersion", "eventing.knative.dev/v1",
                             "kind", "Broker",
                             "name", "default",
-                            "namespace", "default"
+                            "namespace", appNamespace
                         )
                     )
                 ))
@@ -141,8 +179,6 @@ public class EventingService {
             log.info("KafkaSource '{}' created in namespace '{}' → topic={}", name, appNamespace, topicName);
         } catch (KubernetesClientException e) {
             if (e.getCode() == 409) {
-                // Delete + recreate (not a no-op skip) so the CR always reflects
-                // the latest spec — consistent with createKnativeTrigger() below.
                 kubernetesClient.genericKubernetesResources("sources.knative.dev/v1beta1", "KafkaSource")
                         .inNamespace(appNamespace)
                         .withName(name)
@@ -219,7 +255,8 @@ public class EventingService {
         // propagate — @Transactional rolls back the DB row above so we never end
         // up with a Trigger that "exists" in the DB but was never actually created.
         if (kubernetesEnabled) {
-            createKnativeTrigger(triggerName, filter, action);
+            // Trigger must be in the same namespace as its Broker (user namespace)
+            createKnativeTrigger(triggerName, filter, action, source.getNamespace());
         }
     }
 
@@ -238,18 +275,21 @@ public class EventingService {
         }
 
         if (kubernetesEnabled) {
+            // Find the source namespace to delete trigger from correct namespace
+            String triggerNamespace = triggerRepository.findById(triggerId)
+                    .flatMap(t -> kafkaSourceRepository.findById(t.getKafkaSourceId()))
+                    .map(KafkaSource::getNamespace)
+                    .orElse("default");
             try {
                 kubernetesClient.genericKubernetesResources("eventing.knative.dev/v1", "Trigger")
-                        .inNamespace("default")
+                        .inNamespace(triggerNamespace)
                         .withName(trigger.getName())
                         .delete();
-                log.info("Knative Trigger '{}' deleted", trigger.getName());
+                log.info("Knative Trigger '{}' deleted from namespace '{}'", trigger.getName(), triggerNamespace);
             } catch (KubernetesClientException e) {
                 if (e.getCode() == 404) {
                     log.info("Knative Trigger '{}' already gone from the cluster, proceeding", trigger.getName());
                 } else {
-                    // Propagate — @Transactional keeps the DB row so the user can
-                    // retry, instead of silently leaving an orphaned Trigger CR.
                     log.error("Could not delete Knative Trigger '{}': {}", trigger.getName(), e.getMessage());
                     throw e;
                 }
@@ -277,7 +317,7 @@ public class EventingService {
                                 if (kubernetesEnabled) {
                                     try {
                                         kubernetesClient.genericKubernetesResources("eventing.knative.dev/v1", "Trigger")
-                                                .inNamespace("default")
+                                                .inNamespace(source.getNamespace())
                                                 .withName(triggerName)
                                                 .delete();
                                         log.info("Knative Trigger '{}' deleted", triggerName);
@@ -303,18 +343,14 @@ public class EventingService {
                 });
     }
 
-    /**
-     * Trigger and Broker must live in the same namespace (spec.broker is a bare
-     * name, not a namespace-qualified ref) — always "default" since that's the
-     * only Broker provisioned on this cluster.
-     */
-    private void createKnativeTrigger(String triggerName, String eventType, String subscriberUrl) {
+    // Trigger must be in the same namespace as its Broker (user namespace).
+    private void createKnativeTrigger(String triggerName, String eventType, String subscriberUrl, String namespace) {
         GenericKubernetesResource knativeTrigger = new GenericKubernetesResourceBuilder()
                 .withApiVersion("eventing.knative.dev/v1")
                 .withKind("Trigger")
                 .withNewMetadata()
                     .withName(triggerName)
-                    .withNamespace("default")
+                    .withNamespace(namespace)
                 .endMetadata()
                 .addToAdditionalProperties("spec", Map.of(
                     "broker", "default",
@@ -329,21 +365,21 @@ public class EventingService {
 
         try {
             kubernetesClient.genericKubernetesResources("eventing.knative.dev/v1", "Trigger")
-                    .inNamespace("default")
+                    .inNamespace(namespace)
                     .resource(knativeTrigger)
                     .create();
-            log.info("Knative Trigger '{}' created in default namespace → {}", triggerName, subscriberUrl);
+            log.info("Knative Trigger '{}' created in namespace '{}' → {}", triggerName, namespace, subscriberUrl);
         } catch (KubernetesClientException e) {
             if (e.getCode() == 409) {
                 kubernetesClient.genericKubernetesResources("eventing.knative.dev/v1", "Trigger")
-                        .inNamespace("default")
+                        .inNamespace(namespace)
                         .withName(triggerName)
                         .delete();
                 kubernetesClient.genericKubernetesResources("eventing.knative.dev/v1", "Trigger")
-                        .inNamespace("default")
+                        .inNamespace(namespace)
                         .resource(knativeTrigger)
                         .create();
-                log.info("Knative Trigger '{}' recreated", triggerName);
+                log.info("Knative Trigger '{}' recreated in namespace '{}'", triggerName, namespace);
             } else {
                 log.error("Failed to create Knative Trigger '{}': {}", triggerName, e.getMessage());
                 throw e;

@@ -164,6 +164,32 @@ public class KnativeService {
         }
     }
 
+    // ── Failure message (why FAILED) ─────────────────────────────────
+
+    public String getFailureMessage(String serviceName, String namespace) {
+        String ns = namespace != null ? namespace : defaultNamespace;
+        if (!kubernetesEnabled) return null;
+        try {
+            GenericKubernetesResource ksvc = kubernetesClient
+                    .genericKubernetesResources("serving.knative.dev/v1", "Service")
+                    .inNamespace(ns).withName(serviceName).get();
+            if (ksvc == null) return null;
+            Map<?, ?> status = (Map<?, ?>) ksvc.getAdditionalProperties().get("status");
+            if (status == null) return null;
+            @SuppressWarnings("unchecked")
+            List<Map<?, ?>> conditions = (List<Map<?, ?>>) status.get("conditions");
+            if (conditions == null) return null;
+            for (Map<?, ?> cond : conditions) {
+                if ("Ready".equals(cond.get("type")) && "False".equals(String.valueOf(cond.get("status")))) {
+                    return String.valueOf(cond.get("message"));
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not get failure message for '{}': {}", serviceName, e.getMessage());
+        }
+        return null;
+    }
+
     // ── Exists check ────────────────────────────────────────────────
 
     public boolean exists(String serviceName, String namespace) {

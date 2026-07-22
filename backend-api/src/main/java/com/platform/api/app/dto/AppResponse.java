@@ -33,4 +33,5 @@ public class AppResponse {
     private String memoryRequest;
     private LocalDateTime deployedAt;
     private LocalDateTime updatedAt;
+    private String failureMessage;
 }

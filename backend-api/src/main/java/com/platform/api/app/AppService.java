@@ -346,6 +346,9 @@ public class AppService {
                 .kafkaConsumerGroup(resolveConsumerGroup(app.getServiceName(), app.getUserId()))
                 .kafkaSourceName(resolveKafkaSourceName(app.getServiceName(), app.getUserId()))
                 .triggerFilter(resolveTriggerFilter(app.getServiceName(), app.getUserId()))
+                .failureMessage("FAILED".equals(app.getStatus())
+                        ? knativeService.getFailureMessage(app.getServiceName(), app.getNamespace())
+                        : null)
                 .build();
     }
 
