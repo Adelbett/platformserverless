@@ -3,6 +3,8 @@ pipeline {
 
     options {
         durabilityHint('PERFORMANCE_OPTIMIZED')
+        // Retry the whole pipeline once on spawn-helper failures (Kaniko /tmp corruption)
+        retry(2)
     }
 
     tools {
@@ -14,36 +16,39 @@ pipeline {
         IMAGE_NAME        = 'adelbettaieb/platform-api'
         IMAGE_TAG         = "v${BUILD_NUMBER}"
         NAMESPACE         = 'platform'
-        // Force JNA to use a persistent directory instead of /tmp
-        // This prevents Kaniko from corrupting the spawn helper during build
-        JAVA_TOOL_OPTIONS = '-Djna.tmpdir=/var/jenkins_home/.jna-tmp'
+        // Force JNA + Maven to never use /tmp — Kaniko wipes /tmp during build
+        // which kills Jenkins's spawn helper (fork() fails with exit value: 1)
+        JAVA_TOOL_OPTIONS = '-Djna.tmpdir=/var/jenkins_home/.jna-tmp -Djava.io.tmpdir=/var/jenkins_home/.java-tmp'
+        TMPDIR            = '/var/jenkins_home/.java-tmp'
     }
 
     stages {
 
         stage('Cleanup') {
             steps {
-                // Remove @script left by previous build (corrupt .git causes next checkout to fail)
-                // Remove stale JNA tmp dirs that Kaniko corrupts during build
-                // Ensure the persistent JNA tmpdir (JAVA_TOOL_OPTIONS below) actually
-                // exists — mvn forks its own JVM and also honors jna.tmpdir, but if the
-                // directory is missing JNA silently falls back to /tmp, which Kaniko
-                // then corrupts, killing Jenkins's own spawn helper.
                 sh '''
+                    # Remove stale @script workspace left by previous failed checkout
                     find /var/jenkins_home/workspace -maxdepth 1 -name "*@script*" -type d \
                         -exec rm -rf {} + 2>/dev/null || true
+
+                    # Remove any JNA dirs that landed in /tmp before Kaniko ran
                     find /tmp -maxdepth 1 -name "jna-*" -type d \
                         -exec rm -rf {} + 2>/dev/null || true
+
+                    # Persistent tmp dirs — these survive Kaniko's /tmp wipe
                     mkdir -p /var/jenkins_home/.jna-tmp
+                    mkdir -p /var/jenkins_home/.java-tmp
                 '''
             }
         }
 
         stage('Checkout') {
             steps {
-                git branch: 'main',
-                    credentialsId: 'github-credentials',
-                    url: 'https://github.com/Adelbett/platformserverless.git'
+                retry(3) {
+                    git branch: 'main',
+                        credentialsId: 'github-credentials',
+                        url: 'https://github.com/Adelbett/platformserverless.git'
+                }
             }
         }
 
@@ -69,10 +74,17 @@ pipeline {
                 )]) {
                     sh '''
                         mkdir -p /kaniko/.docker
+
+                        # Rebuild persistent tmp dirs in case a previous Kaniko run cleared them
+                        mkdir -p /var/jenkins_home/.jna-tmp
+                        mkdir -p /var/jenkins_home/.java-tmp
+
                         printf '{"auths":{"https://index.docker.io/v1/":{"auth":"%s"}}}' \
                             $(printf '%s:%s' "$DOCKER_USER" "$DOCKER_PASS" | base64 -w0) \
                             > /kaniko/.docker/config.json
 
+                        # TMPDIR points to jenkins_home so Kaniko cannot corrupt JVM tmp
+                        TMPDIR=/var/jenkins_home/.java-tmp \
                         DOCKER_CONFIG=/kaniko/.docker /kaniko/executor \
                             --context=dir://$(pwd)/backend-api \
                             --dockerfile=$(pwd)/ci-cd/docker/backend-kaniko.Dockerfile \
