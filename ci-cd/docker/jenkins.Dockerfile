@@ -18,4 +18,14 @@ RUN curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/sta
     chmod +x kubectl && \
     mv kubectl /usr/local/bin/kubectl
 
+# Increase open file descriptor limit for Jenkins JVM
+# Default 1024 is too low: Jenkins + Kaniko builds exhaust FDs → jspawnhelper fails
+RUN echo "jenkins soft nofile 65536\njenkins hard nofile 65536" >> /etc/security/limits.conf && \
+    echo "session required pam_limits.so" >> /etc/pam.d/common-session
+
 USER jenkins
+
+ENV JAVA_OPTS="-Xmx1g -Xms512m \
+  -Djava.io.tmpdir=/var/jenkins_home/tmp \
+  -Djna.tmpdir=/var/jenkins_home/jna \
+  -Dorg.jenkinsci.plugins.durabletask.BourneShellScript.HEARTBEAT_CHECK_INTERVAL=86400"

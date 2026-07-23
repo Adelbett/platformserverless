@@ -110,5 +110,15 @@ pipeline {
         failure {
             echo "❌ Pipeline échoué — vérifier les logs"
         }
+        always {
+            // Kaniko perturbe le JVM Jenkins après le build (fork() échoue)
+            // Safe restart remet le JVM dans un état propre sans interrompre d'autres builds
+            sh '''
+                curl -s -X POST http://localhost:8080/safeRestart \
+                    --user "admin:$(cat /var/jenkins_home/secrets/initialAdminPassword 2>/dev/null || echo admin)" \
+                    --retry 3 --retry-delay 2 || true
+            '''
+            echo "🔄 Jenkins safe restart déclenché — JVM propre pour le prochain build"
+        }
     }
 }
