@@ -27,9 +27,15 @@ spec:
                 - name: PGHOST
                   value: "postgres.platform.svc.cluster.local"
                 - name: PGUSER
-                  value: "postgres"
+                  valueFrom:
+                    secretKeyRef:
+                      name: platform-api-secrets
+                      key: postgres-username
                 - name: PGPASSWORD
-                  value: "postgres"
+                  valueFrom:
+                    secretKeyRef:
+                      name: platform-api-secrets
+                      key: postgres-password
                 - name: PGDATABASE
                   value: "platformserverless"
               command: ["/bin/sh", "-c"]

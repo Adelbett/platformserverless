@@ -1,5 +1,9 @@
 package com.platform.api.logs;
 
+import com.platform.api.app.App;
+import com.platform.api.app.AppRepository;
+import com.platform.api.exception.NotFoundException;
+import com.platform.api.exception.UnauthorizedException;
 import com.platform.api.user.UserContextService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -11,13 +15,24 @@ import java.util.List;
 public class LogService {
 
     private final DeploymentLogRepository logRepository;
+    private final AppRepository appRepository;
     private final UserContextService userContextService;
 
-    public List<DeploymentLog> getLogsByApp(String appId, String level) {
+    public List<DeploymentLog> getLogsByApp(String appId, String level, String username) {
+        String effectiveUserId = userContextService.resolve(username).effectiveUserId();
+        App app = appRepository.findById(appId)
+                .orElseThrow(() -> new NotFoundException("App not found: " + appId));
+        if (!app.getUserId().equals(effectiveUserId)) {
+            throw new UnauthorizedException("Access denied to app: " + appId);
+        }
         return filterByLevel(logRepository.findByAppIdOrderByCreatedAtDesc(appId), level);
     }
 
-    public List<DeploymentLog> getLogsByUser(String userId, String level) {
+    public List<DeploymentLog> getLogsByUser(String userId, String level, String username) {
+        String effectiveUserId = userContextService.resolve(username).effectiveUserId();
+        if (!effectiveUserId.equals(userId)) {
+            throw new UnauthorizedException("Access denied to logs for user: " + userId);
+        }
         return filterByLevel(logRepository.findByUserIdOrderByCreatedAtDesc(userId), level);
     }
 

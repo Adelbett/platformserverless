@@ -1,5 +1,6 @@
 package com.platform.api.payment;
 
+import com.platform.api.exception.UnauthorizedException;
 import com.platform.api.user.User;
 import com.platform.api.user.UserRepository;
 import com.stripe.Stripe;
@@ -101,8 +102,14 @@ public class PaymentService {
     }
 
     // ── Detach a payment method ────────────────────────────────────────────────
-    public void detachPaymentMethod(String paymentMethodId) throws Exception {
+    public void detachPaymentMethod(String userId, String paymentMethodId) throws Exception {
+        String customerId = getOrCreateCustomer(userId);
+
         PaymentMethod pm = PaymentMethod.retrieve(paymentMethodId);
+        if (pm.getCustomer() == null || !pm.getCustomer().equals(customerId)) {
+            throw new UnauthorizedException("Access denied to payment method: " + paymentMethodId);
+        }
+
         pm.detach();
     }
 

@@ -45,8 +45,10 @@ public class PaymentController {
     // ── Delete a payment method ────────────────────────────────────────────────
     @DeleteMapping("/methods/{paymentMethodId}")
     public ResponseEntity<Void> deleteMethod(
+            @AuthenticationPrincipal Jwt jwt,
             @PathVariable String paymentMethodId) throws Exception {
-        paymentService.detachPaymentMethod(paymentMethodId);
+        String userId = resolveUserId(jwt);
+        paymentService.detachPaymentMethod(userId, paymentMethodId);
         return ResponseEntity.noContent().build();
     }
 

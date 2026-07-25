@@ -28,15 +28,17 @@ public class LogController {
     @GetMapping("/apps/{id}")
     @Operation(summary = "Get deployment logs for a specific app, optionally filtered by level (INFO/WARN/ERROR)")
     public ResponseEntity<List<DeploymentLog>> getAppLogs(@PathVariable String id,
-                                                           @RequestParam(required = false) String level) {
-        return ResponseEntity.ok(logService.getLogsByApp(id, level));
+                                                           @RequestParam(required = false) String level,
+                                                           Authentication auth) {
+        return ResponseEntity.ok(logService.getLogsByApp(id, level, auth.getName()));
     }
 
     @GetMapping("/users/{id}")
     @Operation(summary = "Get all deployment logs for a user, optionally filtered by level (INFO/WARN/ERROR)")
     public ResponseEntity<List<DeploymentLog>> getUserLogs(@PathVariable String id,
-                                                            @RequestParam(required = false) String level) {
-        return ResponseEntity.ok(logService.getLogsByUser(id, level));
+                                                            @RequestParam(required = false) String level,
+                                                            Authentication auth) {
+        return ResponseEntity.ok(logService.getLogsByUser(id, level, auth.getName()));
     }
 
     @GetMapping("/me")

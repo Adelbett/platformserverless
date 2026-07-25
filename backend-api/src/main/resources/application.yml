@@ -41,9 +41,13 @@ server:
   port: 8082
 
 # JWT Configuration
+# Not currently read by any application code (auth goes through Keycloak /
+# OAuth2 Resource Server, see spring.security.oauth2.resourceserver.jwt
+# above) — kept for a possible future use, sourced strictly from the
+# environment so no secret value ever lives in this file.
 app:
   jwt:
-    secret: "c2VjcmV0S2V5Rm9yUGxhdGZvcm1TZXJ2ZXJsZXNzUGxhdGZvcm1CYWNrZW5kQXBpMjAyNg=="  # base64 encoded secret
+    secret: ${APP_JWT_SECRET:}
     expiration-ms: 86400000  # 24 hours
 
   # Billing alerts
