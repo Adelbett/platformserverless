@@ -463,7 +463,7 @@ KafkaSource CR = {
 ```java
 // subscriberUrl = URL de l'app Knative (retournée par KnativeService.deploy)
 // Ex: "http://order-processor-a3f7b2.user-a3f7b2.10.9.21.224.sslip.io"
-
+// e fait ca 
 Trigger CR = {
   apiVersion: "eventing.knative.dev/v1",
   kind: "Trigger",
