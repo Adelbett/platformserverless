@@ -34,7 +34,12 @@ spec:
               name: platform-api-secrets
               key: postgres-password
         - name: KEYCLOAK_ISSUER_URI
-          value: "http://keycloak.platform.svc.cluster.local:8080/realms/platform"
+          # Must match the "iss" claim Keycloak actually stamps on tokens,
+          # which is the public-facing URL the browser used to reach it
+          # (VITE_KEYCLOAK_URL in the frontend .env), NOT the in-cluster
+          # DNS name — Spring's JWT issuer check is a literal string
+          # compare against the token's "iss", not a reachability check.
+          value: "http://10.9.21.236:8080/realms/platform"
         - name: KEYCLOAK_URL
           value: "http://keycloak.platform.svc.cluster.local:8080"
         - name: KEYCLOAK_ADMIN_USER

@@ -13,7 +13,6 @@ import com.platform.api.quota.QuotaService;
 import com.platform.api.user.UserContextService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +34,7 @@ public class AppService {
     private final TriggerRepository triggerRepository;
     private final UserContextService userContextService;
     private final QuotaService quotaService;
+    private final AppDeploymentAsyncRunner deploymentAsyncRunner;
 
     // ── Create & Deploy ──────────────────────────────────────────────
 
@@ -69,46 +69,9 @@ public class AppService {
         appRepository.save(app);
         addLog(app.getId(), effectiveUserId, "Deployment triggered", "DEPLOYMENT_START");
 
-        triggerDeployAsync(app, req);
+        deploymentAsyncRunner.triggerDeploy(app, req);
 
         return toResponse(app);
-    }
-
-    @Async
-    protected void triggerDeployAsync(App app, AppRequest req) {
-        try {
-            String url = knativeService.deploy(app.getId(), app.getServiceName(), app.getNamespace(), req);
-            app.setUrl(url);
-            app.setStatus("RUNNING");
-            app.setUpdatedAt(LocalDateTime.now());
-            appRepository.save(app);
-            addLog(app.getId(), app.getUserId(), "Deployment successful. URL: " + url, "DEPLOYMENT_SUCCESS");
-            log.info("App {} deployed successfully at {}", app.getId(), url);
-
-            // Auto-create KafkaSource + Trigger if kafka integration requested
-            if (Boolean.TRUE.equals(req.getKafkaEnabled()) && req.getKafkaTopicId() != null) {
-                String sourceName = app.getServiceName() + "-source";
-                String filter = req.getFilterEventType() != null
-                        ? req.getFilterEventType()
-                        : "order.created";
-
-                var source = eventingService.createKafkaSource(
-                        app.getUserId(), req.getKafkaTopicId(), sourceName, app.getNamespace(), null);
-
-                eventingService.createTrigger(
-                        app.getUserId(), source.getId(), filter, url);
-
-                addLog(app.getId(), app.getUserId(),
-                        "KafkaSource + Trigger created for topic " + req.getKafkaTopicId(), "KAFKA_WIRED");
-                log.info("Kafka pipeline wired for app {}: source={} filter={}", app.getId(), sourceName, filter);
-            }
-        } catch (Exception e) {
-            app.setStatus("FAILED");
-            app.setUpdatedAt(LocalDateTime.now());
-            appRepository.save(app);
-            addLog(app.getId(), app.getUserId(), "Deployment failed: " + e.getMessage(), "DEPLOYMENT_FAIL");
-            log.error("App {} deployment failed: {}", app.getId(), e.getMessage());
-        }
     }
 
     // ── Read ──────────────────────────────────────────────────────────
@@ -187,7 +150,7 @@ public class AppService {
         app.setUpdatedAt(LocalDateTime.now());
         appRepository.save(app);
         addLog(appId, effectiveUserId, "App updated — redeploying", "UPDATE");
-        triggerDeployAsync(app, buildRequestFromApp(app));
+        deploymentAsyncRunner.triggerDeploy(app, buildRequestFromApp(app));
         return toResponse(app);
     }
 
@@ -202,7 +165,7 @@ public class AppService {
         app.setUpdatedAt(LocalDateTime.now());
         appRepository.save(app);
         addLog(appId, effectiveUserId, "Re-deployment triggered", "DEPLOYMENT_START");
-        triggerDeployAsync(app, buildRequestFromApp(app));
+        deploymentAsyncRunner.triggerDeploy(app, buildRequestFromApp(app));
         return toResponse(app);
     }
 

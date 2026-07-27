@@ -5,6 +5,8 @@ import io.fabric8.kubernetes.api.model.GenericKubernetesResource;
 import io.fabric8.kubernetes.api.model.GenericKubernetesResourceBuilder;
 import io.fabric8.kubernetes.api.model.Namespace;
 import io.fabric8.kubernetes.api.model.NamespaceBuilder;
+import io.fabric8.kubernetes.api.model.networking.v1.NetworkPolicy;
+import io.fabric8.kubernetes.api.model.networking.v1.NetworkPolicyBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientException;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,8 @@ public class KnativeService {
 
     // ── Namespace ─────────────────────────────────────────────────────
 
+    private static final String TENANT_NETWORK_POLICY_NAME = "tenant-default-isolation";
+
     private void ensureNamespaceExists(String namespace) {
         Namespace existing = kubernetesClient.namespaces().withName(namespace).get();
         if (existing == null) {
@@ -45,6 +49,99 @@ public class KnativeService {
         } else {
             log.info("Namespace '{}' already exists.", namespace);
         }
+        ensureNetworkPolicyExists(namespace);
+    }
+
+    // Default-deny network isolation for a tenant namespace (audit ticket
+    // 009). Mirrors k8s/tenant/network-policy.yaml, which was applied by
+    // hand to the namespaces that already existed before this method was
+    // added — this makes it automatic for every namespace created from now
+    // on.
+    //
+    // Allowed: traffic within the same tenant namespace; ingress from
+    // Kourier (public routing), knative-serving (Knative control plane
+    // probes/routing) and monitoring (Prometheus scraping); egress to DNS,
+    // to the shared Kafka namespace, and back to knative-serving/
+    // kourier-system. Everything else — including direct pod-to-pod
+    // traffic with other tenant namespaces or with platform/kafka's other
+    // internals (Postgres, Keycloak) — is denied by default.
+    private void ensureNetworkPolicyExists(String namespace) {
+        NetworkPolicy existing = kubernetesClient.network().v1().networkPolicies()
+                .inNamespace(namespace).withName(TENANT_NETWORK_POLICY_NAME).get();
+        if (existing != null) {
+            return;
+        }
+
+        NetworkPolicy policy = new NetworkPolicyBuilder()
+                .withNewMetadata()
+                    .withName(TENANT_NETWORK_POLICY_NAME)
+                    .withNamespace(namespace)
+                .endMetadata()
+                .withNewSpec()
+                    .withNewPodSelector().endPodSelector()
+                    .withPolicyTypes("Ingress", "Egress")
+                    .addNewIngress()
+                        .addNewFrom().withNewPodSelector().endPodSelector().endFrom()
+                    .endIngress()
+                    .addNewIngress()
+                        .addNewFrom()
+                            .withNewNamespaceSelector()
+                                .addToMatchLabels("kubernetes.io/metadata.name", "kourier-system")
+                            .endNamespaceSelector()
+                        .endFrom()
+                    .endIngress()
+                    .addNewIngress()
+                        .addNewFrom()
+                            .withNewNamespaceSelector()
+                                .addToMatchLabels("kubernetes.io/metadata.name", "knative-serving")
+                            .endNamespaceSelector()
+                        .endFrom()
+                    .endIngress()
+                    .addNewIngress()
+                        .addNewFrom()
+                            .withNewNamespaceSelector()
+                                .addToMatchLabels("kubernetes.io/metadata.name", "monitoring")
+                            .endNamespaceSelector()
+                        .endFrom()
+                    .endIngress()
+                    .addNewEgress()
+                        .addNewTo().withNewPodSelector().endPodSelector().endTo()
+                    .endEgress()
+                    .addNewEgress()
+                        .addNewTo()
+                            .withNewNamespaceSelector()
+                                .addToMatchLabels("kubernetes.io/metadata.name", "kube-system")
+                            .endNamespaceSelector()
+                        .endTo()
+                        .addNewPort().withProtocol("UDP").withNewPort(53).endPort()
+                        .addNewPort().withProtocol("TCP").withNewPort(53).endPort()
+                    .endEgress()
+                    .addNewEgress()
+                        .addNewTo()
+                            .withNewNamespaceSelector()
+                                .addToMatchLabels("kubernetes.io/metadata.name", "kafka")
+                            .endNamespaceSelector()
+                        .endTo()
+                    .endEgress()
+                    .addNewEgress()
+                        .addNewTo()
+                            .withNewNamespaceSelector()
+                                .addToMatchLabels("kubernetes.io/metadata.name", "knative-serving")
+                            .endNamespaceSelector()
+                        .endTo()
+                    .endEgress()
+                    .addNewEgress()
+                        .addNewTo()
+                            .withNewNamespaceSelector()
+                                .addToMatchLabels("kubernetes.io/metadata.name", "kourier-system")
+                            .endNamespaceSelector()
+                        .endTo()
+                    .endEgress()
+                .endSpec()
+                .build();
+
+        kubernetesClient.network().v1().networkPolicies().inNamespace(namespace).resource(policy).create();
+        log.info("NetworkPolicy '{}' created in namespace '{}'.", TENANT_NETWORK_POLICY_NAME, namespace);
     }
 
     // ── Deploy ────────────────────────────────────────────────────────

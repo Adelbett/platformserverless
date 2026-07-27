@@ -1,6 +1,7 @@
 package com.platform.api.kafka;
 
 import com.platform.api.kafka.dto.CreateTopicRequest;
+import com.platform.api.user.UserContextService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,33 +23,38 @@ import java.util.List;
 public class KafkaController {
 
     private final KafkaService kafkaService;
+    private final UserContextService userContextService;
 
     @PostMapping
     @PreAuthorize("@permissionService.has(authentication.name, 'MANAGE_KAFKA')")
     @Operation(summary = "Create a new Kafka topic")
     public ResponseEntity<KafkaTopicDto> createTopic(@Valid @RequestBody CreateTopicRequest request,
                                                      Authentication auth) {
+        String effectiveUserId = userContextService.resolve(auth.getName()).effectiveUserId();
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(kafkaService.createTopic(auth.getName(), request));
+                .body(kafkaService.createTopic(effectiveUserId, request));
     }
 
     @GetMapping
     @Operation(summary = "List all Kafka topics for the current user")
     public ResponseEntity<List<KafkaTopicDto>> listTopics(Authentication auth) {
-        return ResponseEntity.ok(kafkaService.listTopics(auth.getName()));
+        String effectiveUserId = userContextService.resolve(auth.getName()).effectiveUserId();
+        return ResponseEntity.ok(kafkaService.listTopics(effectiveUserId));
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Get Kafka topic details")
     public ResponseEntity<KafkaTopicDto> getTopic(@PathVariable String id, Authentication auth) {
-        return ResponseEntity.ok(kafkaService.getTopic(id, auth.getName()));
+        String effectiveUserId = userContextService.resolve(auth.getName()).effectiveUserId();
+        return ResponseEntity.ok(kafkaService.getTopic(id, effectiveUserId));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("@permissionService.has(authentication.name, 'MANAGE_KAFKA')")
     @Operation(summary = "Delete a Kafka topic")
     public ResponseEntity<Void> deleteTopic(@PathVariable String id, Authentication auth) {
-        kafkaService.deleteTopic(id, auth.getName());
+        String effectiveUserId = userContextService.resolve(auth.getName()).effectiveUserId();
+        kafkaService.deleteTopic(id, effectiveUserId);
         return ResponseEntity.noContent().build();
     }
 }

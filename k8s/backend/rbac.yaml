@@ -1,13 +1,32 @@
-# Grants platform-api read access to cluster-scoped resources it already
-# queries (nodes, events) but had no explicit RBAC for — this is almost
-# certainly why /api/admin/cluster/nodes silently returns an empty list
-# instead of the 3 real nodes: the API call fails with 403, and
-# AdminController.getNodes() swallows the exception and returns 200 + [].
+# RBAC for the ServiceAccount running platform-api (currently the "default"
+# ServiceAccount of the "platform" namespace — no dedicated ServiceAccount
+# was ever created; see the ClusterRoleBinding below).
 #
-# Namespace-scoped resources (pods, namespaces themselves) already work,
-# which means the ServiceAccount has *some* broad permissions — but "nodes"
-# specifically requires its own RBAC rule since it's a distinct resource
-# type at the cluster scope.
+# ── Audit context (2026, ticket 006) ────────────────────────────────────
+# This file previously declared only the "nodes"/"events" ClusterRole
+# below. A second ClusterRole/ClusterRoleBinding pair
+# ("platform-backend-role" / "platform-correct-binding") existed live on
+# the cluster, applied by hand at some point, and was NOT reflected here —
+# meaning this file did not describe the platform's actual permissions.
+# It was reconstructed from the live cluster (`kubectl get clusterrole
+# platform-backend-role -o yaml`) and is now versioned below, so that
+# rebuilding the cluster from this repo reproduces the real permission set.
+#
+# Two gaps were found and fixed while reconciling: "persistentvolumeclaims"
+# (used by AdminController.getStorage) and "resourcequotas" (used by
+# QuotaService.syncToCluster) were missing — both features were silently
+# failing (403 swallowed, empty/no-op result) before this fix.
+#
+# NOTE — deliberately NOT reduced in scope here: "pods"/"services"/
+# "deployments"/"namespaces" below still grant get/list/watch/create/
+# update/delete at CLUSTER scope, i.e. platform-api's ServiceAccount can
+# currently delete resources in ANY namespace on the cluster (kube-system,
+# monitoring, jenkins, kafka...), not just tenant namespaces. This is
+# broader than the application's actual code paths appear to need — see
+# the follow-up ticket (rbac scope reduction) before tightening this,
+# since narrowing live cluster permissions risks breaking a code path not
+# caught by static review. This file documents and completes today's
+# real permissions; it does not yet reduce them.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -22,15 +41,75 @@ kind: ClusterRoleBinding
 metadata:
   name: platform-api-cluster-reader
 subjects:
-  # platform-api runs under the namespace's "default" ServiceAccount (no
-  # dedicated one was ever created) — this grants the permission to every
-  # pod in "platform" using "default", not just platform-api specifically.
-  # Acceptable for now (read-only, low-risk resources); a follow-up could
-  # give platform-api its own ServiceAccount for a tighter blast radius.
   - kind: ServiceAccount
     name: default
     namespace: platform
 roleRef:
   kind: ClusterRole
   name: platform-api-cluster-reader
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: platform-backend-role
+rules:
+  # Raw K8s resources — cluster-wide, including create/update/delete.
+  # See the audit note above: broader than a static code review shows is
+  # needed; kept as-is for this ticket (documentation, not reduction).
+  - apiGroups: ["", "apps"]
+    resources: ["pods", "services", "deployments", "namespaces"]
+    verbs: ["get", "list", "watch", "create", "update", "delete"]
+
+  # Knative Serving — core to how the platform deploys tenant apps.
+  - apiGroups: ["serving.knative.dev"]
+    resources: ["services", "revisions", "routes"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Knative Eventing / sources — used by EventingService.
+  - apiGroups: ["eventing.knative.dev", "sources.knative.dev"]
+    resources: ["brokers", "triggers", "kafkasources"]
+    verbs: ["get", "list", "watch", "create", "update", "delete"]
+
+  # Strimzi Kafka topics — used by KafkaService.
+  - apiGroups: ["kafka.strimzi.io"]
+    resources: ["kafkatopics"]
+    verbs: ["get", "list", "watch", "create", "update", "delete"]
+
+  # Pod logs — used by PodLogService/PodLogStreamService.
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get", "list"]
+
+  # Added by ticket 006 — was missing, AdminController.getStorage() was
+  # silently returning an empty list without it.
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list"]
+
+  # Added by ticket 006 — was missing, QuotaService.syncToCluster() was
+  # silently failing (caught, logged, never applied) without it.
+  - apiGroups: [""]
+    resources: ["resourcequotas"]
+    verbs: ["get", "list", "watch", "create", "update"]
+
+  # Added by ticket 009 — used by KnativeService.ensureNetworkPolicyExists()
+  # to create a default-deny NetworkPolicy for each tenant namespace.
+  # Confirmed missing on the live cluster before this fix
+  # (`kubectl auth can-i create networkpolicies ... default` returned "no").
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "create", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: platform-correct-binding
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: platform
+roleRef:
+  kind: ClusterRole
+  name: platform-backend-role
   apiGroup: rbac.authorization.k8s.io

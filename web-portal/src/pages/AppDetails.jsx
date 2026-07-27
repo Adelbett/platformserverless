@@ -9,6 +9,7 @@ import {
     Shield, AlertTriangle
 } from 'lucide-react';
 import { appsApi, logsApi, metricsApi, adminApi } from '../api';
+import { openSseStream } from '../api/sse';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
@@ -367,24 +368,18 @@ const ContainerLogViewer = ({ appId, dark, appStatus }) => {
     const hasActivePod = appStatus === 'RUNNING';
 
     useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (!token || !appId || !hasActivePod) {
+        if (!appId || !hasActivePod) {
             setConnected(false);
             return;
         }
 
-        const es = new EventSource(`/api/logs/apps/${appId}/pod-logs/stream?token=${encodeURIComponent(token)}`);
+        const close = openSseStream(`/api/logs/apps/${appId}/pod-logs/stream`, {
+            onOpen: () => setConnected(true),
+            onMessage: (data) => setLines((prev) => [...prev.slice(-499), data]),
+            onError: () => setConnected(false),
+        });
 
-        es.onopen = () => setConnected(true);
-        es.onmessage = (e) => {
-            setLines((prev) => [...prev.slice(-499), e.data]);
-        };
-        es.onerror = () => {
-            setConnected(false);
-            es.close();
-        };
-
-        return () => es.close();
+        return close;
     }, [appId, hasActivePod]);
 
     useEffect(() => {
@@ -526,24 +521,18 @@ const AppDetails = () => {
         return () => { active = false; };
     }, [id]);
 
-    // SSE — métriques temps réel (token promu en header par SseTokenFilter côté backend)
+    // SSE — métriques temps réel (Authorization envoyé en en-tête, plus en query string)
     useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (!token) return;
-        const es = new EventSource(`/api/metrics/apps/${id}/stream?token=${encodeURIComponent(token)}`);
-        es.onmessage = (e) => {
-            try {
-                const m = JSON.parse(e.data);
-                setMetrics(m);
-                const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            } catch {}
-        };
-        es.onerror = () => {
-            es.close();
-            // Fallback polling si SSE échoue
-            metricsApi.getApp(id).then(r => setMetrics(r.data)).catch(() => {});
-        };
-        return () => es.close();
+        const close = openSseStream(`/api/metrics/apps/${id}/stream`, {
+            onMessage: (data) => {
+                try { setMetrics(JSON.parse(data)); } catch {}
+            },
+            onError: () => {
+                // Fallback polling si SSE échoue
+                metricsApi.getApp(id).then(r => setMetrics(r.data)).catch(() => {});
+            },
+        });
+        return close;
     }, [id]);
 
     const openEdit = () => {

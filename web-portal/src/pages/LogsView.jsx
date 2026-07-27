@@ -5,6 +5,7 @@ const AddIcon      = () => <span>+</span>;
 const RemoveIcon   = () => <span>−</span>;
 const RefreshIcon  = () => <span>↻</span>;
 import { logsApi } from '../api';
+import { openSseStream } from '../api/sse';
 import { useAuth } from '../context/AuthContext';
 
 const levelColor = (level) => {
@@ -27,13 +28,12 @@ const LogsView = () => {
 
     useEffect(() => {
         let active = true;
-        let eventSource = null;
+        let closeSse = () => {};
 
         const loadHistory = async () => {
             try {
                 setLoading(true);
-                const userId = user?.username || user?.id || 'admin';
-                const response = await logsApi.getByUser(userId);
+                const response = await logsApi.getMine();
                 if (!active) return;
                 setLogs(Array.isArray(response.data) ? response.data : []);
             } catch {
@@ -45,21 +45,18 @@ const LogsView = () => {
         };
 
         const connectSse = () => {
-            const token = localStorage.getItem('token');
-            if (!token) return;
-            // SSE with Authorization via URL param (EventSource doesn't support headers)
-            eventSource = new EventSource(`/api/logs/stream?token=${token}`);
-            eventSource.addEventListener('log', (e) => {
-                if (!active) return;
-                try {
-                    const newLog = JSON.parse(e.data);
-                    setLogs((prev) => [newLog, ...prev]);
-                } catch {}
+            // Authorization sent as a header, not a `?token=` query param
+            // (which used to leak into server/proxy access logs).
+            closeSse = openSseStream('/api/logs/stream', {
+                onEvent: (eventName, data) => {
+                    if (!active || eventName !== 'log') return;
+                    try {
+                        const newLog = JSON.parse(data);
+                        setLogs((prev) => [newLog, ...prev]);
+                    } catch {}
+                },
+                // Don't reconnect on error — matches the previous behavior.
             });
-            eventSource.onerror = () => {
-                eventSource?.close();
-                // Don't reconnect on auth errors — backend SSE not yet deployed
-            };
         };
 
         loadHistory();
@@ -67,7 +64,7 @@ const LogsView = () => {
 
         return () => {
             active = false;
-            eventSource?.close();
+            closeSse();
         };
     }, [user]);
 

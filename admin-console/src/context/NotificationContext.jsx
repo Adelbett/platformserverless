@@ -46,7 +46,7 @@ export const NotificationProvider = ({ children }) => {
     const loadNotifications = useCallback(async (rids) => {
         if (!user?.username) return;
         try {
-            const res = await logsApi.getByUser(user.username);
+            const res = await logsApi.getMine();
             const logs = Array.isArray(res.data) ? res.data : [];
             setNotifications(
                 logs

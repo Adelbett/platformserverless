@@ -10,6 +10,7 @@ import {
     ChevronDown, ExternalLink,
 } from 'lucide-react';
 import { appsApi, metricsApi } from '../api';
+import { openSseStream } from '../api/sse';
 import { useTheme } from '../context/ThemeContext';
 
 // Admin-level cluster monitoring (all tenants, pods, Knative, Kafka, eventing,
@@ -187,15 +188,12 @@ const AppMetricsPanel = ({ appId, dark }) => {
     const [cpuHistory,  setCpuHistory]  = useState([]);
     const [lastMetric,  setLastMetric]  = useState(null);
     const [noData,      setNoData]      = useState(false);
-    const esRef      = useRef(null);
     const timerRef   = useRef(null);
     const gridColor = dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)';
     const axisColor = dark ? '#374151' : '#94A3B8';
 
     useEffect(() => {
         if (!appId) return;
-        const token = localStorage.getItem('token');
-        if (esRef.current) esRef.current.close();
         if (timerRef.current) clearTimeout(timerRef.current);
         setReqHistory([]); setLatHistory([]); setErrHistory([]); setCpuHistory([]);
         setNoData(false);
@@ -203,24 +201,23 @@ const AppMetricsPanel = ({ appId, dark }) => {
         // After 6s without data, assume app is scaled to zero
         timerRef.current = setTimeout(() => setNoData(true), 6000);
 
-        const es = new EventSource(`/api/metrics/apps/${appId}/stream?token=${token}`);
-        esRef.current = es;
-        es.onmessage = (e) => {
-            try {
-                const m = JSON.parse(e.data);
-                clearTimeout(timerRef.current);
-                setNoData(false);
-                setLastMetric(m);
-                const ts = new Date().toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                const push = (setter, key) => setter(prev => [...prev.slice(-59), { t: ts, value: m[key] ?? 0 }]);
-                push(setReqHistory,  'requestsPerSecond');
-                push(setLatHistory,  'avgLatencyMs');
-                push(setErrHistory,  'errorRate');
-                push(setCpuHistory,  'cpuUsage');
-            } catch {}
-        };
-        es.onerror = () => es.close();
-        return () => { es.close(); clearTimeout(timerRef.current); };
+        const close = openSseStream(`/api/metrics/apps/${appId}/stream`, {
+            onMessage: (data) => {
+                try {
+                    const m = JSON.parse(data);
+                    clearTimeout(timerRef.current);
+                    setNoData(false);
+                    setLastMetric(m);
+                    const ts = new Date().toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    const push = (setter, key) => setter(prev => [...prev.slice(-59), { t: ts, value: m[key] ?? 0 }]);
+                    push(setReqHistory,  'requestsPerSecond');
+                    push(setLatHistory,  'avgLatencyMs');
+                    push(setErrHistory,  'errorRate');
+                    push(setCpuHistory,  'cpuUsage');
+                } catch {}
+            },
+        });
+        return () => { close(); clearTimeout(timerRef.current); };
     }, [appId]);
 
     const charts = [
@@ -323,12 +320,10 @@ const Monitoring = () => {
 
     // SSE cluster metrics
     useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (!token) return;
-        const es = new EventSource(`/api/metrics/cluster/stream?token=${token}`);
-        es.onmessage = (e) => { try { setCluster(JSON.parse(e.data)); } catch {} };
-        es.onerror = () => es.close();
-        return () => es.close();
+        const close = openSseStream('/api/metrics/cluster/stream', {
+            onMessage: (data) => { try { setCluster(JSON.parse(data)); } catch {} },
+        });
+        return close;
     }, []);
 
     const refresh = () => { setRefreshing(true); loadData(); };

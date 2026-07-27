@@ -24,7 +24,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak.platform.svc.cluster.local:8080/realms/platform}
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://10.9.21.236:8080/realms/platform}
 
 app:
   kubernetes:
@@ -50,7 +50,7 @@ app:
     url: ${APP_ALERTMANAGER_URL:http://monitoring-stack-kube-prom-alertmanager.monitoring.svc.cluster.local:9093}
 
   cors:
-    allowed-origins: "*"
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://10.9.21.238,http://10.9.21.223:30081,http://10.9.21.224:30081,http://10.9.21.225:30081}
 
 management:
   health:

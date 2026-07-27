@@ -10,21 +10,21 @@ Suivi des corrections issues de `AUDIT_COMPLET.md`. Une correction = une discuss
 |----|---|---|---|
 | 001 | [IDOR sur les logs de déploiement (C1)](001-idor-logs-deploiement.md) | Backend | ✅ Fait |
 | 002 | [IDOR sur suppression de moyen de paiement Stripe (C2)](002-idor-stripe-payment-method.md) | Backend | ✅ Fait |
-| 003 | [Secrets en clair (Postgres/Keycloak/JWT mort)](003-secrets-en-clair.md) | Backend + Kubernetes | ✅ Fait (code) — ⚠️ commandes cluster à appliquer par l'utilisateur |
-| 004 | CORS `allowedOriginPatterns("*")` + `allowCredentials(true)` | Backend | À faire |
-| 005 | Absence de `resources.limits` + `LimitRange` sur les Knative Services tenants | Backend + Kubernetes | À faire |
-| 006 | RBAC sous-déclaré vs. permissions réellement exercées | Kubernetes | À faire |
-| 007 | JWT transmis en query string sur les flux SSE | Frontend | À faire |
-| 008 | Authentification ROPC au lieu d'Authorization Code + PKCE | Frontend | À faire |
-| 009 | Absence totale de NetworkPolicy (isolation réseau tenants) | Kubernetes | À faire |
+| 003 | [Secrets en clair (Postgres/Keycloak/JWT mort)](003-secrets-en-clair.md) | Backend + Kubernetes | ✅ Fait — déployé et vérifié sur le cluster (pod `platform-api` Running, logs propres) |
+| 004 | [CORS `allowedOriginPatterns("*")` + `allowCredentials(true)`](004-cors-wildcard-credentials.md) | Backend | ✅ Fait |
+| 005 | Absence de `resources.limits` + `LimitRange` sur les Knative Services tenants | Backend + Kubernetes | ⏭️ Ignoré — décision produit : consommation libre, facturation à l'usage |
+| 006 | [RBAC sous-déclaré vs. permissions réellement exercées](006-rbac-sous-declare.md) | Kubernetes | ✅ Fait — vérifié sur le cluster (`can-i` → yes/yes) |
+| 007 | [JWT transmis en query string sur les flux SSE](007-jwt-query-string-sse.md) | Frontend | ✅ Fait |
+| 008 | Authentification ROPC au lieu d'Authorization Code + PKCE | Frontend | ⏭️ Ignoré — décision utilisateur |
+| 009 | [Absence totale de NetworkPolicy (isolation réseau tenants)](009-network-policy-tenants.md) | Kubernetes + Backend | ✅ Fait (code) — commandes cluster à appliquer |
 
 ### Haute
 
 | ID | Sujet | Composant(s) | État |
 |----|---|---|---|
-| 010 | `@Async` inopérant par auto-invocation (déploiement bloquant) | Backend | À faire |
-| 011 | SSE logs cassé pour les MEMBER (clé username vs userId) | Backend | À faire |
-| 012 | Isolation tenant rompue sur Kafka/Eventing pour les MEMBER (C18) | Backend | À faire |
+| 010 | [`@Async` inopérant par auto-invocation (déploiement bloquant)](010-async-self-invocation.md) | Backend | ✅ Fait |
+| 011 | [SSE logs cassé (clé username vs userId — touchait en réalité tous les rôles)](011-sse-logs-cle-incoherente.md) | Backend | ✅ Fait |
+| 012 | [Isolation tenant rompue sur Kafka/Eventing pour les MEMBER (C18)](012-isolation-kafka-eventing.md) | Backend | ✅ Fait |
 | 013 | `Thread.sleep` bloquant en boucle dans le déploiement Knative | Backend | À faire |
 | 014 | Élévation de rôle potentielle dépendante de la config Keycloak (C6) | Backend + Keycloak (config) | À faire |
 | 015 | Mismatch labels Prometheus (monitoring backend probablement inactif) | Kubernetes | À faire |
@@ -67,6 +67,7 @@ Suivi des corrections issues de `AUDIT_COMPLET.md`. Une correction = une discuss
 | 042 | Conteneurs applicatifs tournant en root (pas de `USER`) | Docker | À faire |
 | 043 | Pas de page 404 dédiée / liens factices `href="#"` | Frontend | À faire |
 | 044 | Code mort frontend (`auth/keycloak.js` orphelin, `msw` inutilisé) | Frontend | À faire |
+| 045 | `generateServiceName()` : `substring` fragile (C12) — `StringIndexOutOfBoundsException` si `userId` a un caractère non-alphanumérique et ≤6 caractères après nettoyage (reproduit en conditions réelles via `AppServiceTest`, ticket 010) | Backend | À faire |
 
 ---
 
@@ -76,3 +77,10 @@ Suivi des corrections issues de `AUDIT_COMPLET.md`. Une correction = une discuss
 - Chaque correction fait l'objet d'un fichier `docs/audit-fixes/0XX-nom-du-probleme.md` créé **après** ta validation et l'application du correctif.
 - Aucune modification de code n'est faite sans ton accord explicite.
 - Ce tableau sera mis à jour au fur et à mesure (État : À faire / En cours / ✅ Fait).
+
+## Incidents de production découverts hors plan initial
+
+| ID | Sujet | Composant(s) | État |
+|----|---|---|---|
+| 046 | [Logs invisibles — frontend envoie le username au lieu de l'id effectif](046-frontend-logs-username-vs-userid.md) (régression révélée par le ticket 001) | Frontend | ✅ Fait |
+| 047 | [Panne d'authentification totale — `KEYCLOAK_ISSUER_URI` incohérent avec l'URL réelle de Keycloak](047-keycloak-issuer-uri-mismatch.md) | Backend + Kubernetes | ✅ Fait — vérifié en production |

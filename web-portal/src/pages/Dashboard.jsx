@@ -268,7 +268,7 @@ const Dashboard = () => {
                 setApps(Array.isArray(appsRes.data) ? appsRes.data : []);
                 setCluster(metricsRes.data);
                 if (user?.username) {
-                    const logsRes = await logsApi.getByUser(user.username).catch(() => ({ data: [] }));
+                    const logsRes = await logsApi.getMine().catch(() => ({ data: [] }));
                     if (active) setLogs(Array.isArray(logsRes.data) ? logsRes.data : []);
                 }
             } finally {

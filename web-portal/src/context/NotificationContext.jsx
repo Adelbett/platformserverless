@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { logsApi } from '../api';
+import { openSseStream } from '../api/sse';
 import { useAuth } from './AuthContext';
 
 const NotificationContext = createContext(null);
@@ -46,7 +47,7 @@ export const NotificationProvider = ({ children }) => {
     const loadNotifications = useCallback(async (rids) => {
         if (!user?.username) return;
         try {
-            const res = await logsApi.getByUser(user.username);
+            const res = await logsApi.getMine();
             const logs = Array.isArray(res.data) ? res.data : [];
             setNotifications(
                 logs
@@ -62,21 +63,21 @@ export const NotificationProvider = ({ children }) => {
     // SSE stream for real-time notifications
     useEffect(() => {
         if (!user?.username) return;
-        const token = localStorage.getItem('token');
-        if (!token) return;
-        const es = new EventSource(`/api/logs/stream?token=${token}`);
-        es.addEventListener('log', (e) => {
-            try {
-                const log = JSON.parse(e.data);
-                if (!SHOW_TYPES.includes(log.type)) return;
-                setNotifications(prev => {
-                    if (prev.find(n => n.id === log.id)) return prev;
-                    return [toNotif(log, readIds), ...prev].slice(0, 20);
-                });
-            } catch {}
+
+        const close = openSseStream('/api/logs/stream', {
+            onEvent: (eventName, data) => {
+                if (eventName !== 'log') return;
+                try {
+                    const log = JSON.parse(data);
+                    if (!SHOW_TYPES.includes(log.type)) return;
+                    setNotifications(prev => {
+                        if (prev.find(n => n.id === log.id)) return prev;
+                        return [toNotif(log, readIds), ...prev].slice(0, 20);
+                    });
+                } catch {}
+            },
         });
-        es.onerror = () => es.close();
-        return () => es.close();
+        return close;
     }, [user?.username]);
 
     const markAllRead = () => {

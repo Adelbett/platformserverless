@@ -1,6 +1,7 @@
 package com.platform.api.logs;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.platform.api.user.UserContextService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,11 +19,20 @@ import java.util.List;
 public class LogSseService {
 
     private final ObjectMapper objectMapper;
+    private final UserContextService userContextService;
 
-    // userId → list of active emitters (multiple browser tabs)
+    // effectiveUserId (DB id, same key used by push()/DeploymentLog.userId)
+    // → list of active emitters (multiple browser tabs)
     private final Map<String, List<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
-    public SseEmitter subscribe(String userId) {
+    // `username` is the authenticated principal name (Authentication#getName(),
+    // i.e. the Keycloak preferred_username) — resolved here to the same
+    // effectiveUserId that push() looks emitters up by (a DB UUID, and for a
+    // MEMBER, their CLIENT_ADMIN's id). Subscribing by username directly used
+    // to silently never match push()'s lookup key, for any role.
+    public SseEmitter subscribe(String username) {
+        String userId = userContextService.resolve(username).effectiveUserId();
+
         SseEmitter emitter = new SseEmitter(0L); // no timeout
         emitters.computeIfAbsent(userId, k -> new CopyOnWriteArrayList<>()).add(emitter);
 
@@ -37,7 +47,7 @@ public class LogSseService {
             removeEmitter(userId, emitter);
         }
 
-        log.info("SSE subscribed for user '{}'", userId);
+        log.info("SSE subscribed for user '{}' (effective id '{}')", username, userId);
         return emitter;
     }
 
