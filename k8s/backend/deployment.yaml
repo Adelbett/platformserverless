@@ -42,6 +42,13 @@ spec:
           value: "http://10.9.21.236:8080/realms/platform"
         - name: KEYCLOAK_URL
           value: "http://keycloak.platform.svc.cluster.local:8080"
+        - name: CORS_ALLOWED_ORIGINS
+          # platform-web: LoadBalancer external IP AND its auto-assigned
+          # NodePort (31088, reachable on any of the 3 nodes). platform-admin:
+          # NodePort 30081, also reachable on any of the 3 nodes. Explicit
+          # here (not just the JAR's baked-in default) so this survives a
+          # plain `kubectl apply` without needing a new image build.
+          value: "http://10.9.21.238,http://10.9.21.223:30081,http://10.9.21.224:30081,http://10.9.21.225:30081,http://10.9.21.223:31088,http://10.9.21.224:31088,http://10.9.21.225:31088"
         - name: KEYCLOAK_ADMIN_USER
           valueFrom:
             secretKeyRef:

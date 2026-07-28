@@ -7,7 +7,6 @@ import com.platform.api.eventing.KafkaSourceRepository;
 import com.platform.api.eventing.TriggerRepository;
 import com.platform.api.logs.DeploymentLogRepository;
 import com.platform.api.logs.LogSseService;
-import com.platform.api.quota.QuotaService;
 import com.platform.api.user.UserContextService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,7 +37,6 @@ class AppServiceTest {
     @Mock private KafkaSourceRepository kafkaSourceRepository;
     @Mock private TriggerRepository triggerRepository;
     @Mock private UserContextService userContextService;
-    @Mock private QuotaService quotaService;
     @Mock private AppDeploymentAsyncRunner deploymentAsyncRunner;
 
     private AppService service;
@@ -47,7 +45,7 @@ class AppServiceTest {
     void setUp() {
         service = new AppService(appRepository, logRepository, knativeService, eventingService,
                 logSseService, kafkaSourceRepository, triggerRepository, userContextService,
-                quotaService, deploymentAsyncRunner);
+                deploymentAsyncRunner);
 
         // "u1" (no non-alphanumeric characters) deliberately avoids the
         // pre-existing generateServiceName() substring bug (audit finding

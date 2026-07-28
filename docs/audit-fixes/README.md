@@ -84,3 +84,5 @@ Suivi des corrections issues de `AUDIT_COMPLET.md`. Une correction = une discuss
 |----|---|---|---|
 | 046 | [Logs invisibles — frontend envoie le username au lieu de l'id effectif](046-frontend-logs-username-vs-userid.md) (régression révélée par le ticket 001) | Frontend | ✅ Fait |
 | 047 | [Panne d'authentification totale — `KEYCLOAK_ISSUER_URI` incohérent avec l'URL réelle de Keycloak](047-keycloak-issuer-uri-mismatch.md) | Backend + Kubernetes | ✅ Fait — vérifié en production |
+| 049 | [Liste blanche CORS incomplète — NodePort de `platform-web` (31088) manquant](049-cors-nodeport-manquant.md) | Backend + Kubernetes | ✅ Fait |
+| 048 | [Suppression de la limite sur le nombre d'apps par tenant](048-suppression-quota-nombre-apps.md) (décision produit) | Backend | ✅ Fait |
