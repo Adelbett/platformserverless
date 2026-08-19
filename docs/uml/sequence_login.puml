@@ -1,0 +1,104 @@
+@startuml sequence_login
+' Séquence — authentification réelle (Resource Owner Password Credentials)
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 11
+skinparam sequence {
+  ArrowColor #2C3E50
+  LifeLineBorderColor #7F8C8D
+  ParticipantBorderColor #2C3E50
+  ParticipantBackgroundColor #F7F9FC
+}
+autonumber
+
+title Authentification — flux réellement implémenté (ROPC, grant_type=password)
+
+actor "Utilisateur" as U
+participant "Login.jsx" as LOGIN
+participant "AuthContext.jsx" as AUTHCTX
+participant "localStorage" as LS
+participant "Keycloak\n/realms/platform/protocol/openid-connect/token" as KC
+participant "api/client.js\n(axios)" as AXIOS
+participant "SecurityConfig\n(Resource Server)" as SEC
+participant "KeycloakJwtAuthConverter" as CONV
+participant "UserSyncFilter" as SYNC
+participant "UserRepository\n(PostgreSQL)" as REPO
+participant "UserController\nGET /api/users/me" as UCTRL
+
+== Connexion ==
+U -> LOGIN : saisit username + password
+LOGIN -> AUTHCTX : login(username, password)
+activate AUTHCTX
+
+AUTHCTX -> KC : POST token\nx-www-form-urlencoded\ngrant_type=password\nclient_id=platform-web\nusername, password
+activate KC
+KC --> AUTHCTX : { access_token, refresh_token }
+deactivate KC
+
+note right of AUTHCTX #FFF3CD
+  Flux réel = Resource Owner Password
+  Credentials (ROPC) : le mot de passe
+  transite par le SPA.
+  Ce n'est PAS Authorization Code + PKCE :
+  keycloak-js est bien importé
+  (auth/keycloak.js) mais l'instance
+  Keycloak n'est jamais utilisée pour
+  la connexion.
+end note
+
+AUTHCTX -> AUTHCTX : parseToken(access_token)\n(décodage base64 du payload JWT)
+AUTHCTX -> LS : setItem('token'), setItem('refreshToken')
+
+AUTHCTX -> UCTRL : GET /api/users/me\nAuthorization: Bearer <access_token>
+activate UCTRL
+UCTRL -> SEC : validation de la signature JWT (JWK Keycloak)
+SEC -> CONV : convert(Jwt) → rôles realm_access → GrantedAuthority
+CONV --> SEC : JwtAuthenticationToken
+SEC -> SYNC : doFilterInternal (après BearerTokenAuthenticationFilter)
+SYNC -> REPO : findByUsername(...) — crée l'utilisateur s'il n'existe pas
+REPO --> SYNC : User
+UCTRL --> AUTHCTX : UserDto { role, permissions, … }
+deactivate UCTRL
+
+AUTHCTX -> AUTHCTX : startAutoRefresh(refresh_token)
+AUTHCTX --> LOGIN : utilisateur connecté
+deactivate AUTHCTX
+LOGIN -> U : redirection /dashboard
+
+== Appels applicatifs ==
+U -> AXIOS : action dans l'interface
+AXIOS -> LS : getItem('token')
+AXIOS -> SEC : requête + header Authorization: Bearer <JWT>
+alt 401 Unauthorized
+  AXIOS -> LS : removeItem('token','refreshToken','user')
+  AXIOS -> U : redirection /login
+end
+
+== Rafraîchissement automatique ==
+loop minuterie / rechargement de page
+  AUTHCTX -> KC : POST token\ngrant_type=refresh_token\nclient_id=platform-web
+  KC --> AUTHCTX : nouveaux access_token + refresh_token
+  AUTHCTX -> LS : mise à jour des jetons
+end
+
+== Déconnexion ==
+U -> AUTHCTX : logout()
+AUTHCTX -> KC : POST /protocol/openid-connect/logout\nclient_id, refresh_token
+AUTHCTX -> LS : purge des jetons
+
+' Classes utilisées : User, UserDto, UserRole
+' Contrôleurs utilisés : UserController (GET /api/users/me), AuthController (POST /api/auth/register pour l'inscription)
+' Services utilisés : SecurityConfig, KeycloakJwtAuthConverter, UserSyncFilter, UserService, KeycloakAdminService
+' Pourquoi ces éléments apparaissent : la connexion ne touche jamais le backend — le SPA appelle directement le token endpoint de Keycloak ; le backend n'intervient qu'en Resource Server pour valider le JWT et synchroniser l'utilisateur.
+' Fichiers sources vérifiés :
+'   web-portal/src/context/AuthContext.jsx:8 (TOKEN_URL), :68-97 (login, grant_type=password), :43-49 et :58-63 (refresh_token), :114-119 (logout)
+'   web-portal/src/auth/keycloak.js:1-9 (instance keycloak-js déclarée mais non utilisée pour le login)
+'   web-portal/src/pages/Login.jsx:8,17-31 ; web-portal/src/api/client.js:8-25 (intercepteurs)
+'   backend-api/src/main/java/com/platform/api/security/SecurityConfig.java:41-65
+'   backend-api/src/main/java/com/platform/api/security/KeycloakJwtAuthConverter.java:17-20
+'   backend-api/src/main/java/com/platform/api/security/UserSyncFilter.java:27-29
+'   backend-api/src/main/java/com/platform/api/user/UserController.java:29-31
+'   backend-api/src/main/java/com/platform/api/auth/KeycloakAdminService.java:46 (grant_type=password pour le compte de service admin)
+' Divergence relevée : le flux documenté « Authorization Code + PKCE » n'est PAS implémenté. Le code utilise ROPC (grant_type=password) depuis le navigateur, et stocke les jetons dans localStorage. admin-console/src/context/AuthContext.jsx applique le même schéma.
+@enduml

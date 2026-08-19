@@ -1,0 +1,111 @@
+@startuml uc_monitoring
+' Cas d'utilisation — supervision, logs et alerting
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam usecase {
+  BackgroundColor #F7F9FC
+  BorderColor #2C3E50
+}
+skinparam actorStyle awesome
+left to right direction
+
+actor "MEMBER" as MEMBER
+actor "CLIENT_ADMIN" as CADMIN
+actor "ADMIN" as ADMIN
+actor "Visiteur" as ANON
+actor "Prometheus /\nAlertmanager" as PROM <<système>>
+actor "Ordonnanceurs\n(@Scheduled)" as SCHED <<système>>
+actor "Knative Serving" as KNE <<système>>
+
+rectangle "Supervision & Observabilité" {
+
+  package "Logs (/api/logs — permission VIEW_LOGS)" {
+    usecase "Consulter les logs d'une application\nGET /apps/{id}" as UC_LAPP
+    usecase "Consulter les logs d'un utilisateur\nGET /users/{id}" as UC_LUSER
+    usecase "Consulter ses propres logs\nGET /me" as UC_LME
+    usecase "Streamer les logs de déploiement\nGET /stream (SSE)" as UC_LSTREAM
+    usecase "Streamer les logs du conteneur\nGET /apps/{id}/pod-logs/stream (SSE)" as UC_PODSTREAM
+  }
+
+  package "Métriques (/api/metrics — permission VIEW_MONITORING)" {
+    usecase "Consulter les métriques d'une app\nGET /apps/{id}" as UC_MAPP
+    usecase "Consulter les métriques cluster\nGET /cluster" as UC_MCLUSTER
+    usecase "Streamer les métriques d'une app\nGET /apps/{id}/stream (SSE)" as UC_MSTREAM
+    usecase "Streamer les métriques cluster\nGET /cluster/stream (SSE)" as UC_MCSTREAM
+  }
+
+  package "Administration" {
+    usecase "Consulter tous les logs\nGET /api/admin/logs" as UC_ALOGS
+    usecase "Superviser nœuds, pods,\nnamespaces, stockage, Knative" as UC_CLUSTER
+    usecase "Consulter les alertes actives\n(Alertmanager)" as UC_ALERTS
+    usecase "Consulter les métriques par tenant\net par nœud" as UC_TENANTM
+    usecase "Consulter le journal d'audit admin\n(+ export)" as UC_AUDIT
+  }
+
+  usecase "Consulter la page de statut publique\nGET /api/status, /api/status/incidents" as UC_STATUS
+
+  usecase "Détecter les CrashLoopBackOff\n(toutes les 5 min)" as UC_CRASH
+  usecase "Alerter sur dépassement de budget\n(checkBudgetAlerts)" as UC_BUDGET
+  usecase "Réconcilier le statut des applications\n(KnativeWatcher)" as UC_WATCH
+  usecase "Notifier en temps réel via SSE" as UC_SSE
+}
+
+MEMBER --> UC_LAPP
+MEMBER --> UC_LUSER
+MEMBER --> UC_LME
+MEMBER --> UC_LSTREAM
+MEMBER --> UC_PODSTREAM
+MEMBER --> UC_MAPP
+MEMBER --> UC_MCLUSTER
+MEMBER --> UC_MSTREAM
+MEMBER --> UC_MCSTREAM
+CADMIN --|> MEMBER
+
+ADMIN --> UC_ALOGS
+ADMIN --> UC_CLUSTER
+ADMIN --> UC_ALERTS
+ADMIN --> UC_TENANTM
+ADMIN --> UC_AUDIT
+
+ANON  --> UC_STATUS
+
+SCHED --> UC_CRASH
+SCHED --> UC_BUDGET
+KNE   --> UC_WATCH
+
+UC_MAPP     ..> PROM : <<include>> requêtes PromQL
+UC_MCLUSTER ..> PROM : <<include>>
+UC_TENANTM  ..> PROM : <<include>>
+UC_ALERTS   ..> PROM : <<include>> GET /api/v2/alerts
+UC_LSTREAM   ..> UC_SSE : <<include>>
+UC_PODSTREAM ..> UC_SSE : <<include>>
+UC_MSTREAM   ..> UC_SSE : <<include>>
+UC_MCSTREAM  ..> UC_SSE : <<include>>
+UC_CRASH     ..> UC_SSE : <<include>>
+UC_BUDGET    ..> UC_SSE : <<include>>
+
+note bottom of UC_PODSTREAM
+  Lecture ciblée sur le conteneur
+  « user-container » du pod Knative
+  (le sidecar queue-proxy est exclu).
+end note
+
+' Classes utilisées : DeploymentLog, LogDto, Metric, MetricDto, LogDocument, MetricDocument, Incident, AdminAuditLog
+' Contrôleurs utilisés : LogController, MetricsController, AdminController, StatusController
+' Services utilisés : LogService, LogSseService, PodLogService, PodLogStreamService, MetricsService, AlertmanagerService, StatusService, AdminAuditLogService, AdminAuditLogExportService, CrashLoopScheduler, BillingService, KnativeWatcher
+' Pourquoi ces éléments apparaissent : chaque cas correspond à un endpoint réel ; les cas « système » correspondent aux @Scheduled (CrashLoopScheduler, BillingScheduler) et au watcher Knative.
+' Fichiers sources vérifiés :
+'   logs/LogController.java:17-59 (@PreAuthorize VIEW_LOGS au niveau de la classe, 5 endpoints)
+'   logs/PodLogService.java:22-26 (inContainer("user-container"))
+'   logs/PodLogStreamService.java:22-40 ; logs/LogSseService.java:26-54
+'   metrics/MetricsController.java:18-64 (@PreAuthorize VIEW_MONITORING au niveau de la classe)
+'   metrics/MetricsService.java:43-206 ; metrics/AlertmanagerService.java:21-29
+'   admin/AdminController.java:136-215 (logs, nodes, namespaces, pods, storage, knative services), :555-572 (audit-log + export)
+'   status/StatusController.java:15-31 (public) ; status/StatusRateLimitFilter.java
+'   app/CrashLoopScheduler.java:16-17 ; billing/BillingService.java:118 (checkBudgetAlerts)
+'   app/KnativeWatcher.java:36-90
+'   k8s/monitoring/service-monitor.yaml, queue-proxy-podmonitor.yaml, alert-rules.yaml, alertmanager-config.yaml
+' Divergence relevée : les entités LogDocument/MetricDocument (Elasticsearch) existent dans le code mais aucun contrôleur ne les expose — la lecture des logs se fait sur DeploymentLog (PostgreSQL) et sur l'API pods/log de Kubernetes.
+@enduml

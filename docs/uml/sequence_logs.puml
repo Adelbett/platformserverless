@@ -1,0 +1,148 @@
+@startuml sequence_logs
+' Séquence — consultation et streaming SSE des logs
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 11
+skinparam sequence {
+  ArrowColor #2C3E50
+  LifeLineBorderColor #7F8C8D
+  ParticipantBorderColor #2C3E50
+  ParticipantBackgroundColor #F7F9FC
+}
+autonumber
+
+title Logs — flux SSE (déploiement + conteneur user-container)
+
+actor "Utilisateur" as U
+participant "web-portal\nLogsView.jsx / api/sse.js\n(fetchEventSource)" as WEB
+participant ":SseTokenFilter" as SSEF
+participant ":SecurityConfig\n(JWT)" as SEC
+participant ":LogController" as C
+participant ":PermissionService" as PS
+participant ":LogService" as LS
+participant ":DeploymentLogRepository" as LR
+participant ":LogSseService" as SSE
+participant ":PodLogStreamService" as PLS
+participant ":UserContextService" as UCS
+participant ":AppRepository" as AR
+participant ":KnativeService" as K
+participant ":PodLogService" as PL
+participant "KubernetesClient\npods().watchLog()" as KC
+participant ":AppService /\n:AppDeploymentAsyncRunner" as PROD
+
+== A. Historique des logs de déploiement ==
+U -> WEB : ouvre l'écran Logs
+WEB -> C : GET /api/logs/me?level=…\nAuthorization: Bearer <JWT>
+activate C
+C -> PS : has(username, "VIEW_LOGS")   [@PreAuthorize sur la classe]
+PS --> C : true
+C -> LS : getMyLogs(username, level)
+activate LS
+LS -> UCS : resolve(username) → effectiveUserId
+LS -> LR : findByUserId(effectiveUserId) (+ filtre level)
+LR --> LS : List<DeploymentLog>
+LS --> C : List<DeploymentLog>
+deactivate LS
+C --> WEB : 200 OK (JSON)
+deactivate C
+
+== B. Flux temps réel des logs de déploiement ==
+WEB -> SSEF : GET /api/logs/stream (Accept: text/event-stream)
+activate SSEF
+note right of SSEF
+  Si ?token=… est présent et qu'il n'y a pas
+  d'en-tête Authorization, le filtre enveloppe
+  la requête pour exposer « Bearer <token> ».
+  api/sse.js envoie désormais l'en-tête directement.
+end note
+SSEF -> SEC : chaîne de filtres
+SEC -> C : streamLogs(auth)
+activate C
+C -> SSE : subscribe(auth.getName())
+activate SSE
+SSE -> UCS : resolve(username).effectiveUserId()
+SSE -> SSE : new SseEmitter(0L) — sans timeout\nenregistré dans emitters[effectiveUserId]
+SSE -> WEB : event "connected" / data "ok"
+SSE --> C : SseEmitter
+deactivate SSE
+C --> WEB : flux ouvert
+deactivate C
+deactivate SSEF
+
+loop à chaque événement du cycle de vie
+  PROD -> LR  : save(DeploymentLog{type=DEPLOYMENT_START|SUCCESS|FAIL|\nKAFKA_WIRED|UPDATE|DELETE|ROLLBACK|CRASH_LOOP_ALERT})
+  PROD -> SSE : push(deploymentLog)
+  activate SSE
+  SSE -> SSE  : emitters.get(deploymentLog.getUserId())
+  SSE -> WEB  : event "log" / data = JSON du DeploymentLog
+  note right of SSE
+    Les émetteurs en erreur (IOException)
+    sont retirés de la liste.
+  end note
+  deactivate SSE
+  WEB -> U : ligne ajoutée au terminal
+end
+
+== C. Flux des logs du conteneur applicatif ==
+WEB -> C : GET /api/logs/apps/{id}/pod-logs/stream
+activate C
+C -> PS : has(username, "VIEW_LOGS")
+C -> PLS : stream(appId, auth.getName(), emitter)
+activate PLS
+PLS -> UCS : resolve(username)
+PLS -> AR  : findById(appId)
+alt app introuvable
+  PLS --> C : NotFoundException
+else propriétaire différent de effectiveUserId
+  PLS --> C : UnauthorizedException
+end
+PLS -> K : getFirstPodName(app.getServiceName(), app.getNamespace())
+activate K
+K -> KC : pods().inNamespace(ns)\n.withLabel("serving.knative.dev/service", serviceName).list()
+K --> PLS : nom du 1er pod (ou null)
+deactivate K
+alt aucun pod actif (revision scalée à zéro)
+  PLS -> WEB : emitter.completeWithError(NotFoundException("No running pod…"))
+else pod disponible
+  PLS -> PL : streamPodLogs(namespace, podName, emitter)
+  activate PL
+  PL -> KC : pods().withName(pod)\n.inContainer("user-container")\n.tailingLines(100).watchLog()
+  note right of PL
+    Le conteneur est explicitement ciblé :
+    un pod Knative contient aussi le sidecar
+    queue-proxy, dont les logs ne concernent
+    pas l'utilisateur.
+  end note
+  KC --> PL : LogWatch (InputStream)
+  PL -> PL : emitter.onCompletion(watch::close)\nemitter.onTimeout(watch::close)
+  PL -> PL : démarrage du thread "pod-log-stream-<pod>"
+  loop lecture ligne à ligne
+    KC --> PL  : ligne de log
+    PL -> WEB  : SseEmitter.event().data(line)
+  end
+  PL -> WEB : emitter.complete() en fin de flux
+  deactivate PL
+end
+deactivate PLS
+deactivate C
+
+WEB -> WEB : controller.abort() au démontage du composant React
+
+' Classes utilisées : DeploymentLog, App, SseEmitter, LogWatch, UserContextService.UserContext
+' Contrôleurs utilisés : LogController (GET /apps/{id}, /users/{id}, /me, /stream, /apps/{id}/pod-logs/stream)
+' Services utilisés : LogService, LogSseService, PodLogStreamService, PodLogService, KnativeService, UserContextService, PermissionService, SseTokenFilter
+' Pourquoi ces éléments apparaissent : deux flux SSE distincts coexistent — les logs applicatifs de la plateforme (DeploymentLog poussés par LogSseService) et les logs bruts du conteneur (LogWatch Fabric8 relayé par PodLogService).
+' Fichiers sources vérifiés :
+'   logs/LogController.java:17-59 (@PreAuthorize VIEW_LOGS niveau classe, produces TEXT_EVENT_STREAM_VALUE)
+'   logs/LogService.java:21-42 ; logs/DeploymentLogRepository.java
+'   logs/LogSseService.java:26-54 (clé = effectiveUserId, SseEmitter(0L), event "connected" puis "log")
+'   logs/PodLogStreamService.java:22-40 (contrôle de propriété, getFirstPodName, completeWithError)
+'   logs/PodLogService.java:22-47 (inContainer("user-container"), tailingLines(100), thread dédié)
+'   app/KnativeService.java:468-480 (label serving.knative.dev/service)
+'   security/SseTokenFilter.java:20-40 (repli sur ?token=)
+'   web-portal/src/api/sse.js:1-49 (@microsoft/fetch-event-source, en-tête Authorization, abort au cleanup)
+' Divergences relevées :
+'   - LogSseService indexe les émetteurs par effectiveUserId (et non par username) : un MEMBER reçoit les logs de son CLIENT_ADMIN.
+'   - Le streaming des logs de pod n'utilise pas de pool de threads géré : un « new Thread(...) » brut est créé par flux.
+@enduml

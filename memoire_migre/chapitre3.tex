@@ -1,0 +1,523 @@
+\chapter{Release 2 : Exploitation et commercialisation}
+
+\section{Introduction}
+
+La Release 1 a livré le cœur applicatif de la plateforme, accessible au CLIENT\_ADMIN et aux MEMBER de son équipe. Cette release complète la plateforme du point de vue de son exploitant, l'équipe de NextStep IT, et d'un besoin transversal aux deux profils : la facturation. Elle regroupe trois sprints : le Sprint 7, qui livre la facturation à l'usage et les paiements ; le Sprint 8, qui livre la gestion des comptes clients, de leurs quotas et l'audit des actions administratives ; le Sprint 9, qui livre la supervision du cluster et le statut public de la plateforme.
+
+\clearpage
+\section{Sprint 7 : Gestion de la facturation et des paiements}
+
+\subsection{Introduction}
+
+Ce sprint facture l'usage réel des applications déployées sur la plateforme et permet son règlement en ligne. Il s'adresse au CLIENT\_ADMIN (et au MEMBER autorisé) pour la consultation et le paiement, et à l'ADMIN pour le pilotage global.
+
+\subsection{Sprint Backlog}
+
+Le tableau~\ref{tab:sb-sprint7} présente le backlog détaillé du Sprint 7, obtenu en décomposant chaque User Story retenue en tâches techniques.
+
+\needspace{0.9\textheight}
+{
+\setlength{\LTleft}{-1.5cm}
+\setlength{\LTright}{-1.5cm}
+\setlength{\tabcolsep}{8pt}
+\renewcommand{\arraystretch}{1.9}
+\begin{longtable}{|p{6.6cm}|>{\raggedright\arraybackslash}p{8.1cm}|>{\centering\arraybackslash}p{2.3cm}|}
+\hline
+User Story & Tâches & Estimation \\
+\hline
+\endfirsthead
+\hline
+User Story & Tâches & Estimation \\
+\hline
+\endhead
+\hline
+\endfoot
+
+\caption{Backlog du Sprint 7}
+\label{tab:sb-sprint7}
+\endlastfoot
+
+\multirow{3}{6.6cm}{\centering En tant que CLIENT\_ADMIN, je veux consulter mon historique d'usage et de facturation afin de suivre mes dépenses.}
+& Développer le calcul périodique de l'usage. & 1 \\ \cline{2-3}
+& Développer la consultation de sa facturation. & 1 \\ \cline{2-3}
+& Développer la page de facturation du portail. & 1 \\ \hline
+
+\multirow{4}{6.6cm}{\centering En tant que CLIENT\_ADMIN, je veux enregistrer un moyen de paiement et régler mes factures afin de rester en règle.}
+& Intégrer le prestataire de paiement. & 1 \\ \cline{2-3}
+& Développer l'enregistrement d'un moyen de paiement. & 1 \\ \cline{2-3}
+& Développer le paiement d'une facture. & 1 \\ \cline{2-3}
+& Tester le paiement. & 1 \\ \hline
+
+\multirow{1}{6.6cm}{\centering En tant que CLIENT\_ADMIN, je veux exporter un rapport de facturation afin de le transmettre à ma comptabilité.}
+& Développer l'export du rapport de facturation. & 1 \\ \hline
+
+\multirow{3}{6.6cm}{\centering En tant qu'ADMIN, je veux consulter la facturation de tous les clients et générer les factures mensuelles afin de piloter la facturation globale.}
+& Développer la vue de facturation globale. & 1 \\ \cline{2-3}
+& Développer la génération mensuelle des factures. & 1 \\ \cline{2-3}
+& Développer le déclenchement manuel d'un instantané d'usage. & 1 \\ \hline
+
+\multirow{3}{6.6cm}{\centering En tant qu'ADMIN, je veux relancer et suspendre les clients en situation d'impayé afin de limiter les pertes.}
+& Développer les relances avant échéance. & 1 \\ \cline{2-3}
+& Développer la suspension pour non-paiement. & 1 \\ \cline{2-3}
+& Tester ce mécanisme. & 1 \\ \hline
+
+\end{longtable}
+}
+
+\subsection{Diagramme de cas d'utilisation du Sprint 7}
+
+Le diagramme réunit CLIENT\_ADMIN et MEMBER (sous permission \texttt{VIEW\_BILLING}/\texttt{EXPORT\_BILLING}), ADMIN, et le prestataire de paiement (acteur externe, notification par webhook), avec l'ensemble des fonctionnalités du sprint.
+
+\EmplacementFigure{13cm}{8cm}{Diagramme de cas d'utilisation du Sprint 7 — Gestion de la facturation et des paiements}{fig:uc-sprint7}
+
+\subsection{Services Web}
+
+\needspace{5cm}
+\begin{longtable}{|p{6cm}|p{9.3cm}|}
+\hline
+Service Web & Description \\
+\hline
+\endfirsthead
+\hline
+Service Web & Description \\
+\hline
+\endhead
+\hline
+\endfoot
+\endlastfoot
+\texttt{GET /api/billing/me} & Consulter sa facturation. \\ \hline
+\texttt{GET /api/billing/export} & Exporter un rapport de facturation. \\ \hline
+\texttt{GET /api/billing/admin} & Facturation globale, tous clients confondus (ADMIN). \\ \hline
+\texttt{POST /api/billing/admin/snapshot} & Déclencher un instantané d'usage (ADMIN). \\ \hline
+\texttt{GET /api/invoices} & Lister ses factures. \\ \hline
+\texttt{POST /api/invoices/\{id\}/pay} & Payer une facture. \\ \hline
+\texttt{GET /api/invoices/admin/overdue} & Factures impayées (ADMIN). \\ \hline
+\texttt{POST /api/invoices/generate} & Générer les factures mensuelles (ADMIN). \\ \hline
+\texttt{POST /api/invoices/apps/\{appId\}/suspend} & Suspendre une application pour impayé (ADMIN). \\ \hline
+\texttt{GET /api/payment/config} & Configuration publique du prestataire de paiement. \\ \hline
+\texttt{POST /api/payment/setup-intent} & Enregistrer un moyen de paiement. \\ \hline
+\texttt{GET /api/payment/methods} & Lister ses moyens de paiement. \\ \hline
+\texttt{DELETE /api/payment/methods/\{id\}} & Supprimer un moyen de paiement. \\ \hline
+\texttt{POST /api/payment/pay} & Payer. \\ \hline
+\texttt{GET /api/payment/transactions} & Historique des transactions. \\ \hline
+\texttt{POST /api/payment/webhook} & Notification du prestataire de paiement. \\ \hline
+\end{longtable}
+
+\subsection{Conception}
+
+Deux fonctionnalités sont détaillées : la consultation de sa facturation, la plus fréquemment utilisée ; le paiement d'une facture, techniquement la plus riche puisqu'elle implique un prestataire externe.
+
+\subsubsection{Cas d'utilisation : « Consulter sa facturation »}
+
+\subsubsection*{Description textuelle}
+
+\renewcommand{\arraystretch}{1.5}
+\begin{longtable}{|p{4cm}|p{11cm}|}
+\hline
+Nom & Consulter sa facturation \\
+\hline
+Acteur & CLIENT\_ADMIN, MEMBER (avec permission de consultation de la facturation) \\
+\hline
+Pré-condition & Le compte dispose d'au moins une application ayant fait l'objet d'un instantané de consommation \\
+\hline
+Scénario nominal & 1. L'utilisateur ouvre la page de facturation du portail. 2. Le backend agrège les instantanés horaires et les factures du compte. 3. Le portail affiche le coût projeté du mois en cours ainsi que l'historique des factures. \\
+\hline
+Post-condition & L'utilisateur dispose d'une vue à jour de sa consommation et de ses factures. \\
+\hline
+\caption{Description textuelle du cas d'utilisation « Consulter sa facturation »}
+\label{tab:uc-billing}
+\end{longtable}
+
+\subsubsection*{Diagramme de séquence système}
+
+\EmplacementFigure{13cm}{6cm}{Diagramme de séquence système — Consulter sa facturation}{fig:seqsys-billing}
+
+\subsubsection*{Diagramme de séquence objet}
+
+\EmplacementFigure{13cm}{7cm}{Diagramme de séquence objet — Consulter sa facturation}{fig:seqobj-billing}
+
+\subsubsection{Cas d'utilisation : « Payer une facture »}
+
+\subsubsection*{Description textuelle}
+
+\renewcommand{\arraystretch}{1.5}
+\begin{longtable}{|p{4cm}|p{11cm}|}
+\hline
+Nom & Payer une facture \\
+\hline
+Acteur & CLIENT\_ADMIN \\
+\hline
+Pré-condition & Un moyen de paiement est enregistré ; une facture est en attente de règlement \\
+\hline
+Scénario nominal & 1. Le CLIENT\_ADMIN sélectionne une facture en attente. 2. Le backend déclenche le règlement auprès du prestataire de paiement avec le moyen de paiement enregistré. 3. Le prestataire notifie le backend du résultat par webhook. 4. Le statut de la facture est mis à jour. \\
+\hline
+Post-condition & La facture est marquée réglée, ou l'échec est signalé à l'utilisateur. \\
+\hline
+\caption{Description textuelle du cas d'utilisation « Payer une facture »}
+\label{tab:uc-pay}
+\end{longtable}
+
+\subsubsection*{Diagramme de séquence système}
+
+\EmplacementFigure{13cm}{6cm}{Diagramme de séquence système — Payer une facture}{fig:seqsys-pay}
+
+\subsubsection*{Diagramme de séquence objet}
+
+\EmplacementFigure{14cm}{8cm}{Diagramme de séquence objet — Payer une facture}{fig:seqobj-pay}
+
+\subsection{Réalisation du Sprint 7}
+
+Fonctionnalité : Consulter sa facturation. La page de facturation du portail affiche le coût projeté du mois en cours et l'historique des factures.
+
+\EmplacementFigure{13cm}{8cm}{Interface de facturation du compte client}{fig:capture-billing}
+
+Fonctionnalité : Enregistrer un moyen de paiement et payer une facture. Le CLIENT\_ADMIN enregistre un moyen de paiement et règle ses factures depuis la même page.
+
+\EmplacementFigure{13cm}{8cm}{Interface de paiement}{fig:capture-payment}
+
+Fonctionnalité : Exporter un rapport de facturation. L'utilisateur exporte son historique de facturation.
+
+\EmplacementFigure{13cm}{8cm}{Export du rapport de facturation}{fig:capture-billingexport}
+
+Fonctionnalité : Facturation globale et génération des factures (ADMIN). L'ADMIN consulte, depuis la console d'administration, la facturation de l'ensemble des clients et déclenche la génération des factures mensuelles.
+
+\EmplacementFigure{13cm}{8cm}{Interface de facturation globale (console d'administration)}{fig:capture-adminbilling}
+
+Fonctionnalité : Relancer et suspendre les clients en situation d'impayé (ADMIN). L'ADMIN consulte les factures impayées et suspend, le cas échéant, l'application concernée.
+
+\EmplacementFigure{13cm}{8cm}{Interface de suivi des impayés}{fig:capture-overdue}
+
+\subsection{Conclusion}
+
+Ce sprint livre la facturation à l'usage et son règlement en ligne, consultables par le client comme par l'équipe d'exploitation. Aucune limite de ressources par défaut n'est appliquée par tenant, ce qui expose le modèle à une facturation potentiellement illimitée en l'absence d'action du client ; ce point est repris au chapitre de validation.
+
+\clearpage
+\section{Sprint 8 : Gestion des comptes clients, des quotas et de l'audit}
+
+\subsection{Introduction}
+
+Ce sprint donne à l'ADMIN les moyens de gérer les comptes clients eux-mêmes : suspension, réactivation, quotas de ressources, et la traçabilité des actions administratives sensibles au travers d'un journal d'audit exportable. C'est un domaine exclusivement réservé à l'ADMIN, distinct de la gestion des utilisateurs individuels (Sprint 3).
+
+\subsection{Sprint Backlog}
+
+Le tableau~\ref{tab:sb-sprint8} présente le backlog détaillé du Sprint 8, obtenu en décomposant chaque User Story retenue en tâches techniques.
+
+\needspace{0.9\textheight}
+{
+\setlength{\LTleft}{-1.5cm}
+\setlength{\LTright}{-1.5cm}
+\setlength{\tabcolsep}{8pt}
+\renewcommand{\arraystretch}{1.9}
+\begin{longtable}{|p{6.6cm}|>{\raggedright\arraybackslash}p{8.1cm}|>{\centering\arraybackslash}p{2.3cm}|}
+\hline
+User Story & Tâches & Estimation \\
+\hline
+\endfirsthead
+\hline
+User Story & Tâches & Estimation \\
+\hline
+\endhead
+\hline
+\endfoot
+
+\caption{Backlog du Sprint 8}
+\label{tab:sb-sprint8}
+\endlastfoot
+
+\multirow{4}{6.6cm}{\centering En tant qu'ADMIN, je veux lister et suspendre ou réactiver un compte client afin de gérer les abus ou les impayés.}
+& Développer la liste des comptes clients avec leur état. & 1 \\ \cline{2-3}
+& Développer la suspension d'un compte. & 1 \\ \cline{2-3}
+& Développer la réactivation d'un compte. & 1 \\ \cline{2-3}
+& Tester ces actions. & 1 \\ \hline
+
+\multirow{3}{6.6cm}{\centering En tant qu'ADMIN, je veux consulter et modifier le quota de ressources d'un client afin d'encadrer sa consommation.}
+& Développer la consultation du quota. & 1 \\ \cline{2-3}
+& Développer la modification du quota. & 1 \\ \cline{2-3}
+& Propager le quota vers le cluster. & 1 \\ \hline
+
+\multirow{3}{6.6cm}{\centering En tant qu'ADMIN, je veux consulter et exporter le journal d'audit des actions administratives afin de garder une traçabilité.}
+& Développer l'enregistrement automatique des actions administratives. & 1 \\ \cline{2-3}
+& Développer la consultation paginée et filtrable du journal. & 1 \\ \cline{2-3}
+& Développer l'export CSV. & 1 \\ \hline
+
+\end{longtable}
+}
+
+\subsection{Diagramme de cas d'utilisation du Sprint 8}
+
+Acteur unique : ADMIN. Le diagramme réunit l'ensemble des fonctionnalités du sprint : gestion des comptes clients, gestion des quotas, consultation et export du journal d'audit.
+
+\EmplacementFigure{12cm}{7cm}{Diagramme de cas d'utilisation du Sprint 8 — Comptes clients, quotas et audit}{fig:uc-sprint8}
+
+\subsection{Services Web}
+
+\needspace{5cm}
+\begin{longtable}{|p{6cm}|p{9.3cm}|}
+\hline
+Service Web & Description \\
+\hline
+\endfirsthead
+\hline
+Service Web & Description \\
+\hline
+\endhead
+\hline
+\endfoot
+\endlastfoot
+\texttt{GET /api/admin/clients} & Lister les comptes clients avec leur état de suspension. \\ \hline
+\texttt{POST /api/admin/clients/\{userId\}/suspend} & Suspendre un compte client. \\ \hline
+\texttt{POST /api/admin/clients/\{userId\}/restore} & Réactiver un compte client. \\ \hline
+\texttt{GET /api/admin/clients/\{userId\}/quota} & Consulter le quota d'un client. \\ \hline
+\texttt{PUT /api/admin/clients/\{userId\}/quota} & Modifier le quota d'un client. \\ \hline
+\texttt{GET /api/admin/audit-log} & Consulter le journal d'audit, paginé et filtrable. \\ \hline
+\texttt{GET /api/admin/audit-log/export} & Exporter le journal d'audit (CSV). \\ \hline
+\end{longtable}
+
+\subsection{Conception}
+
+Deux fonctionnalités sont détaillées : la suspension d'un compte client, l'action de gouvernance la plus significative de ce sprint ; la consultation du journal d'audit, qui trace précisément ce type d'action.
+
+\subsubsection{Cas d'utilisation : « Suspendre un compte client »}
+
+\subsubsection*{Description textuelle}
+
+\renewcommand{\arraystretch}{1.5}
+\begin{longtable}{|p{4cm}|p{11cm}|}
+\hline
+Nom & Suspendre un compte client \\
+\hline
+Acteur & ADMIN \\
+\hline
+Pré-condition & Le compte client existe et n'est pas déjà suspendu \\
+\hline
+Scénario nominal & 1. L'ADMIN sélectionne un compte client depuis la console d'administration. 2. Il déclenche la suspension. 3. Le backend suspend l'ensemble des services du client. 4. L'action est journalisée dans le journal d'audit. \\
+\hline
+Post-condition & Les services du client sont suspendus, l'action est tracée. \\
+\hline
+\caption{Description textuelle du cas d'utilisation « Suspendre un compte client »}
+\label{tab:uc-suspend-client}
+\end{longtable}
+
+\subsubsection*{Diagramme de séquence système}
+
+\EmplacementFigure{13cm}{6cm}{Diagramme de séquence système — Suspendre un compte client}{fig:seqsys-suspend}
+
+\subsubsection*{Diagramme de séquence objet}
+
+\EmplacementFigure{13cm}{7cm}{Diagramme de séquence objet — Suspendre un compte client}{fig:seqobj-suspend}
+
+\subsubsection{Cas d'utilisation : « Consulter et exporter le journal d'audit »}
+
+\subsubsection*{Description textuelle}
+
+\renewcommand{\arraystretch}{1.5}
+\begin{longtable}{|p{4cm}|p{11cm}|}
+\hline
+Nom & Consulter et exporter le journal d'audit \\
+\hline
+Acteur & ADMIN \\
+\hline
+Pré-condition & Des actions administratives ont déjà été journalisées \\
+\hline
+Scénario nominal & 1. L'ADMIN ouvre le journal d'audit. 2. Il filtre les actions par type ou par période. 3. Il exporte, le cas échéant, la vue filtrée au format CSV. \\
+\hline
+Post-condition & L'ADMIN dispose d'une trace consultable ou exportable des actions administratives. \\
+\hline
+\caption{Description textuelle du cas d'utilisation « Consulter et exporter le journal d'audit »}
+\label{tab:uc-audit}
+\end{longtable}
+
+\subsubsection*{Diagramme de séquence système}
+
+\EmplacementFigure{13cm}{6cm}{Diagramme de séquence système — Consulter le journal d'audit}{fig:seqsys-audit}
+
+\subsubsection*{Diagramme de séquence objet}
+
+\EmplacementFigure{13cm}{7cm}{Diagramme de séquence objet — Consulter le journal d'audit}{fig:seqobj-audit}
+
+\subsection{Réalisation du Sprint 8}
+
+Fonctionnalité : Lister et suspendre ou réactiver un compte client. La console d'administration liste les comptes clients avec leur état, et permet de les suspendre ou de les réactiver.
+
+\EmplacementFigure{13cm}{8cm}{Interface de gestion des comptes clients}{fig:capture-adminclients}
+
+Fonctionnalité : Consulter et modifier le quota d'un client. Le quota de ressources d'un client (CPU, mémoire, nombre maximal d'applications) est consultable et modifiable, et propagé au cluster.
+
+\EmplacementFigure{13cm}{8cm}{Interface de gestion des quotas}{fig:capture-quota}
+
+Fonctionnalité : Consulter et exporter le journal d'audit. Le journal d'audit liste les actions administratives sensibles, filtrables et exportables.
+
+\EmplacementFigure{13cm}{8cm}{Interface du journal d'audit}{fig:capture-auditlog}
+
+Les actions tracées sont limitées à huit types : suspension et réactivation d'un compte client, suspension, réactivation, suppression forcée et redimensionnement d'une application, suppression forcée d'un sujet Kafka, et modification d'un quota. Le journal d'audit ne trace donc que la gouvernance administrative, jamais les consultations.
+
+\subsection{Conclusion}
+
+Ce sprint donne à l'ADMIN les leviers de gouvernance des comptes clients, avec une traçabilité systématique de leur usage. Il complète, sur le plan administratif, ce que le Sprint 9 complète sur le plan de la supervision technique du cluster.
+
+\clearpage
+\section{Sprint 9 : Gestion de l'exploitation du cluster et du statut public}
+
+\subsection{Introduction}
+
+Ce sprint dote l'ADMIN d'une supervision complète de l'état du cluster Kubernetes, et expose au public une page de statut synthétique de la disponibilité de la plateforme. Les deux fonctionnalités s'appuient sur la même donnée de santé du cluster, l'une en détail et en interne, l'autre de façon synthétique et publique.
+
+\subsection{Sprint Backlog}
+
+Le tableau~\ref{tab:sb-sprint9} présente le backlog détaillé du Sprint 9, obtenu en décomposant chaque User Story retenue en tâches techniques.
+
+\needspace{0.9\textheight}
+{
+\setlength{\LTleft}{-1.5cm}
+\setlength{\LTright}{-1.5cm}
+\setlength{\tabcolsep}{8pt}
+\renewcommand{\arraystretch}{1.9}
+\begin{longtable}{|p{6.6cm}|>{\raggedright\arraybackslash}p{8.1cm}|>{\centering\arraybackslash}p{2.3cm}|}
+\hline
+User Story & Tâches & Estimation \\
+\hline
+\endfirsthead
+\hline
+User Story & Tâches & Estimation \\
+\hline
+\endhead
+\hline
+\endfoot
+
+\caption{Backlog du Sprint 9}
+\label{tab:sb-sprint9}
+\endlastfoot
+
+\multirow{3}{6.6cm}{\centering En tant qu'ADMIN, je veux consulter l'état complet du cluster Kubernetes afin de superviser l'infrastructure.}
+& Développer la consultation des nœuds, pods, namespaces et volumes. & 1 \\ \cline{2-3}
+& Développer la consultation des services Knative et des courtiers Kafka. & 1 \\ \cline{2-3}
+& Développer la vue d'ensemble consolidée du cluster. & 1 \\ \hline
+
+\multirow{3}{6.6cm}{\centering En tant qu'ADMIN, je veux consulter les alertes et les événements du cluster afin de détecter rapidement les incidents.}
+& Développer la consultation des alertes actives. & 1 \\ \cline{2-3}
+& Développer la consultation des événements d'avertissement récents. & 1 \\ \cline{2-3}
+& Développer la santé des composants système. & 1 \\ \hline
+
+\multirow{3}{6.6cm}{\centering En tant que visiteur, je veux consulter le statut public de la plateforme afin de connaître sa disponibilité.}
+& Développer la consultation du statut par composant. & 1 \\ \cline{2-3}
+& Développer l'historique des incidents. & 1 \\ \cline{2-3}
+& Limiter le débit de ces points d'accès publics. & 1 \\ \hline
+
+\end{longtable}
+}
+
+\subsection{Diagramme de cas d'utilisation du Sprint 9}
+
+Le diagramme réunit l'ADMIN (supervision détaillée du cluster) et le Public non authentifié (statut synthétique), ce dernier accès restant également ouvert aux trois autres rôles une fois connectés.
+
+\EmplacementFigure{13cm}{8cm}{Diagramme de cas d'utilisation du Sprint 9 — Exploitation du cluster et statut public}{fig:uc-sprint9}
+
+\subsection{Services Web}
+
+\needspace{5cm}
+\begin{longtable}{|p{6cm}|p{9.3cm}|}
+\hline
+Service Web & Description \\
+\hline
+\endfirsthead
+\hline
+Service Web & Description \\
+\hline
+\endhead
+\hline
+\endfoot
+\endlastfoot
+\texttt{GET /api/admin/stats} & Statistiques globales de la plateforme (ADMIN). \\ \hline
+\texttt{GET /api/admin/cluster/nodes}, \texttt{/namespaces}, \texttt{/pods}, \texttt{/storage} & État des nœuds, espaces de noms, pods et volumes (ADMIN). \\ \hline
+\texttt{GET /api/admin/cluster/knative/services}, \texttt{/kafka/brokers} & État des services Knative et des courtiers Kafka (ADMIN). \\ \hline
+\texttt{GET /api/admin/cluster/alerts}, \texttt{/events} & Alertes actives et événements d'avertissement récents (ADMIN). \\ \hline
+\texttt{GET /api/admin/cluster/system-components} & Santé des composants système (ADMIN). \\ \hline
+\texttt{GET /api/admin/cluster/overview} & Vue d'ensemble consolidée du cluster (ADMIN). \\ \hline
+\texttt{GET /api/metrics/cluster} & Métriques agrégées du cluster (ADMIN). \\ \hline
+\texttt{GET /api/status} & Statut public par composant, débit limité. \\ \hline
+\texttt{GET /api/status/incidents} & Historique des incidents, débit limité. \\ \hline
+\end{longtable}
+
+\subsection{Conception}
+
+Deux fonctionnalités sont détaillées : la supervision du cluster, cœur du sprint côté ADMIN ; le statut public, fonctionnalité livrée dans le code mais jusqu'ici absente de ce mémoire.
+
+\subsubsection{Cas d'utilisation : « Superviser le cluster »}
+
+\subsubsection*{Description textuelle}
+
+\renewcommand{\arraystretch}{1.5}
+\begin{longtable}{|p{4cm}|p{11cm}|}
+\hline
+Nom & Superviser le cluster \\
+\hline
+Acteur & ADMIN \\
+\hline
+Pré-condition & L'ADMIN est authentifié sur la console d'administration \\
+\hline
+Scénario nominal & 1. L'ADMIN ouvre la page de supervision du cluster. 2. Le backend consulte l'API Kubernetes (nœuds, pods, espaces de noms) et Alertmanager (alertes actives). 3. L'état du cluster et les alertes actives sont affichés. \\
+\hline
+Post-condition & L'ADMIN dispose d'une vue à jour de l'état global du cluster. \\
+\hline
+\caption{Description textuelle du cas d'utilisation « Superviser le cluster »}
+\label{tab:uc-cluster}
+\end{longtable}
+
+\subsubsection*{Diagramme de séquence système}
+
+\EmplacementFigure{13cm}{6cm}{Diagramme de séquence système — Superviser le cluster}{fig:seqsys-cluster}
+
+\subsubsection*{Diagramme de séquence objet}
+
+\EmplacementFigure{13cm}{7cm}{Diagramme de séquence objet — Superviser le cluster}{fig:seqobj-cluster}
+
+\subsubsection{Cas d'utilisation : « Consulter le statut public »}
+
+\subsubsection*{Description textuelle}
+
+\renewcommand{\arraystretch}{1.5}
+\begin{longtable}{|p{4cm}|p{11cm}|}
+\hline
+Nom & Consulter le statut public de la plateforme \\
+\hline
+Acteur & Public non authentifié (également accessible aux trois autres rôles) \\
+\hline
+Pré-condition & Aucune \\
+\hline
+Scénario nominal & 1. Le visiteur ouvre la page de statut public. 2. Le backend interroge l'état des composants de la plateforme. 3. La disponibilité par composant et l'historique des incidents sont affichés. \\
+\hline
+Post-condition & Le visiteur connaît l'état de disponibilité de la plateforme, sans avoir besoin de s'authentifier. \\
+\hline
+\caption{Description textuelle du cas d'utilisation « Consulter le statut public »}
+\label{tab:uc-status}
+\end{longtable}
+
+\subsubsection*{Diagramme de séquence système}
+
+\EmplacementFigure{13cm}{6cm}{Diagramme de séquence système — Consulter le statut public}{fig:seqsys-status}
+
+\subsubsection*{Diagramme de séquence objet}
+
+\EmplacementFigure{13cm}{7cm}{Diagramme de séquence objet — Consulter le statut public}{fig:seqobj-status}
+
+\subsection{Réalisation du Sprint 9}
+
+Fonctionnalité : Superviser le cluster. La console d'administration affiche l'état des nœuds, des pods et des alertes actives du cluster.
+
+\EmplacementFigure{13cm}{8cm}{Interface de supervision du cluster}{fig:capture-cluster}
+
+Fonctionnalité : Consulter les alertes et événements du cluster. Les alertes Alertmanager actives et les événements d'avertissement récents sont consultables depuis la même console.
+
+\EmplacementFigure{13cm}{8cm}{Interface des alertes et événements du cluster}{fig:capture-alerts}
+
+Fonctionnalité : Consulter le statut public. Un visiteur non authentifié consulte la disponibilité de la plateforme par composant et l'historique des incidents.
+
+\EmplacementFigure{13cm}{8cm}{Page de statut public de la plateforme}{fig:capture-status}
+
+\subsection{Conclusion}
+
+Ce sprint clôt la Release 2 avec une supervision technique complète du cluster côté ADMIN, et une transparence de disponibilité offerte au public. La plateforme dispose désormais de l'ensemble des capacités de gestion applicative, de facturation et de supervision nécessaires à son exploitation par l'équipe de NextStep IT.
+
+\section{Conclusion}
+
+La Release 2 a complété la plateforme du point de vue de son exploitant : une facturation à l'usage mesurée automatiquement et réglable en ligne, une gouvernance des comptes clients tracée par un journal d'audit, et une supervision du cluster doublée d'une page de statut public. Comme pour la Release 1, plusieurs anomalies concrètes ont été identifiées et corrigées, et certaines limites ont été sciemment reportées, dans un contexte de ressources et de délai contraints, plutôt que dissimulées.

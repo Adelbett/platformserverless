@@ -1,0 +1,112 @@
+@startuml architecture_logique
+' Architecture logique en couches — d'après les packages réels du backend
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam rectangle {
+  BackgroundColor #F7F9FC
+  BorderColor #2C3E50
+}
+skinparam package {
+  BackgroundColor #FFFFFF
+  BorderColor #7F8C8D
+}
+skinparam ArrowColor #2C3E50
+
+title Architecture logique en 4 couches
+
+package "1 — Couche Présentation" as L1 {
+  rectangle "web-portal (React 18 + Vite)\npages/ · components/ · context/AuthContext\napi/client.js (axios) · api/sse.js" as WEB
+  rectangle "admin-console (React 18 + Vite)\npages/admin/ · context/AuthContext\napi/client.js (axios)" as ADM
+  rectangle "REST Controllers (Spring MVC)\nAppController · KafkaController · EventingController\nEventController · LogController · MetricsController\nBillingController · InvoiceController · PaymentController\nUserController · TeamController · ApiKeyController\nAuthController · AdminController · StatusController" as CTRL
+  rectangle "Filtres de sécurité\nSecurityConfig · KeycloakJwtAuthConverter\nSseTokenFilter · ApiKeyFilter · UserSyncFilter\nStatusRateLimitFilter" as SEC
+  rectangle "GlobalExceptionHandler\n(package exception)" as EXC
+}
+
+package "2 — Couche Service (métier)" as L2 {
+  rectangle "AppService\nAppDeploymentAsyncRunner" as SAPP
+  rectangle "EventingService · EventService\nKafkaService" as SEVT
+  rectangle "LogService · LogSseService\nPodLogStreamService" as SLOG
+  rectangle "MetricsService\nAlertmanagerService" as SMET
+  rectangle "BillingService · InvoiceService\nBillingExportService · BillingScheduler" as SBILL
+  rectangle "PaymentService (Stripe)" as SPAY
+  rectangle "UserService · UserContextService\nPermissionService · TeamService\nAuthService · KeycloakAdminService" as SUSR
+  rectangle "QuotaService · ApiKeyService\nStatusService · AdminAuditLogService\nAdminAuditLogExportService" as SMISC
+  rectangle "CrashLoopScheduler" as SSCHED
+}
+
+package "3 — Couche Orchestration Kubernetes (Fabric8)" as L3 {
+  rectangle "KubernetesConfig\n@Bean KubernetesClient" as K8SCFG
+  rectangle "KnativeService\ndeploy() · scaleService() · delete()\ngetRealStatus() · getReadyPods()\nlistRevisions() · rollbackToRevision()\nfindCrashLoopingPods() · getFirstPodName()\n+ ensureNamespaceExists / NetworkPolicy tenant" as KNS
+  rectangle "KnativeServiceHelper" as KNH
+  rectangle "KnativeWatcher\nWatch serving.knative.dev/v1 Service\n(inAnyNamespace, reconnexion auto)" as KNW
+  rectangle "EventingService (CR)\nBroker · Trigger (eventing.knative.dev/v1)\nKafkaSource (sources.knative.dev/v1beta1)" as EVTCR
+  rectangle "PodLogService\npods().inContainer(\"user-container\").watchLog()" as PODLOG
+}
+
+package "4 — Couche Infrastructure / Persistance" as L4 {
+  rectangle "PostgreSQL (Spring Data JPA)\nUserRepository · AppRepository\nDeploymentLogRepository · KafkaTopicRepository\nKafkaSourceRepository · TriggerRepository\nBillingSnapshotRepository · AppInvoiceRepository\nTenantQuotaRepository · ApiKeyRepository\nPaymentTransactionRepository · AdminAuditLogRepository\nIncidentRepository · MetricRepository" as DB
+  rectangle "Cluster Kubernetes\nKnative Serving + Eventing\nKourier" as K8S
+  rectangle "Apache Kafka (Strimzi)\nAdminClient + KafkaProducer" as KAFKA
+  rectangle "Keycloak\n(realm platform, OIDC)" as KEYCLOAK
+  rectangle "Prometheus / Alertmanager" as PROM
+  rectangle "Stripe API" as STRIPE
+  rectangle "Elasticsearch\n(LogDocument / MetricDocument)" as ES
+}
+
+WEB  --> CTRL : HTTPS / JSON + SSE
+ADM  --> CTRL : HTTPS / JSON
+CTRL ..> SEC  : filtrée par
+CTRL ..> EXC
+CTRL --> SAPP
+CTRL --> SEVT
+CTRL --> SLOG
+CTRL --> SMET
+CTRL --> SBILL
+CTRL --> SPAY
+CTRL --> SUSR
+CTRL --> SMISC
+
+SAPP  --> KNS
+SAPP  --> SEVT
+SAPP  --> SLOG
+SSCHED --> SAPP
+SEVT  --> EVTCR
+SLOG  --> PODLOG
+SLOG  --> KNS
+KNW   --> DB
+KNS   --> K8SCFG
+EVTCR --> K8SCFG
+PODLOG --> K8SCFG
+
+K8SCFG --> K8S
+KNS  --> K8S
+EVTCR --> K8S
+EVTCR --> KAFKA
+SEVT --> KAFKA
+SMET --> PROM
+SPAY --> STRIPE
+SUSR --> KEYCLOAK
+SBILL --> DB
+SMISC --> DB
+SAPP --> DB
+SUSR --> DB
+SEVT --> DB
+SLOG --> DB
+SLOG --> ES
+
+' Classes utilisées : toutes les classes de service et d'orchestration listées ci-dessus
+' Contrôleurs utilisés : les 15 @RestController du backend
+' Services utilisés : AppService, AppDeploymentAsyncRunner, KnativeService, KnativeServiceHelper, KnativeWatcher, EventingService, EventService, KafkaService, LogService, LogSseService, PodLogService, PodLogStreamService, MetricsService, AlertmanagerService, BillingService, InvoiceService, BillingExportService, PaymentService, UserService, UserContextService, PermissionService, TeamService, AuthService, KeycloakAdminService, QuotaService, ApiKeyService, StatusService, AdminAuditLogService
+' Pourquoi ces éléments apparaissent : la couche 3 est isolée car tout accès au cluster passe par le bean KubernetesClient de KubernetesConfig, injecté uniquement dans KnativeService, KnativeWatcher, EventingService, PodLogService, QuotaService et AdminController.
+' Fichiers sources vérifiés :
+'   backend-api/src/main/java/com/platform/api/config/KubernetesConfig.java:9-12
+'   backend-api/src/main/java/com/platform/api/app/KnativeService.java:27-29,149,199,245,309,348,368,396,429,468
+'   backend-api/src/main/java/com/platform/api/app/KnativeWatcher.java:24-54
+'   backend-api/src/main/java/com/platform/api/eventing/EventingService.java:27-33,153,175
+'   backend-api/src/main/java/com/platform/api/logs/PodLogService.java:18-26
+'   backend-api/src/main/java/com/platform/api/security/SecurityConfig.java:30-65
+'   backend-api/src/main/resources/application-k8s.yml:32-62
+' Divergence relevée : AdminController accède directement au KubernetesClient (AdminController.java:57) sans passer par un service dédié — la couche 3 est donc court-circuitée pour les écrans de supervision cluster.
+@enduml

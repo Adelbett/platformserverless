@@ -1,0 +1,271 @@
+@startuml diagramme_classes
+' Diagramme de classes — entités JPA réelles
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 11
+skinparam class {
+  BackgroundColor #F7F9FC
+  BorderColor #2C3E50
+  ArrowColor #34495E
+}
+hide empty members
+
+title Modèle de données — entités JPA (PostgreSQL)
+
+enum UserRole {
+  ADMIN
+  CLIENT_ADMIN
+  MEMBER
+}
+
+enum Permission {
+  DEPLOY_APP
+  DELETE_APP
+  MANAGE_KAFKA
+  MANAGE_EVENTING
+  VIEW_LOGS
+  VIEW_MONITORING
+  VIEW_BILLING
+  EXPORT_BILLING
+}
+
+entity User {
+  - id : String
+  - username : String {unique, 50}
+  - email : String {unique, 100}
+  - passwordHash : String
+  - role : String = "MEMBER"
+  - ownerId : String
+  - suspended : boolean = false
+  - permissions : Set<String>
+  - stripeCustomerId : String
+  - createdAt : LocalDateTime
+}
+
+entity App {
+  - id : String
+  - name : String
+  - userId : String
+  - imageName : String
+  - imageTag : String = "latest"
+  - url : String
+  - status : String = "PENDING"
+  - serviceName : String
+  - namespace : String
+  - description : String
+  - port : Integer
+  - minReplicas : Integer = 0
+  - maxReplicas : Integer = 10
+  - cpuRequest : String = "100m"
+  - memoryRequest : String = "128Mi"
+  - deployedAt : LocalDateTime
+  - updatedAt : LocalDateTime
+}
+
+entity DeploymentLog {
+  - id : String
+  - appId : String
+  - appName : String
+  - userId : String
+  - message : String
+  - type : String = "INFO"
+  - createdAt : LocalDateTime
+}
+
+entity ApiKey {
+  - id : String
+  - userId : String
+  - name : String {100}
+  - keyHash : String {unique, SHA-256}
+  - keyPrefix : String {16}
+  - active : boolean = true
+  - lastUsedAt : LocalDateTime
+  - createdAt : LocalDateTime
+}
+
+entity BillingSnapshot {
+  - id : String
+  - userId : String
+  - appId : String
+  - serviceName : String
+  - namespace : String
+  - cpuVcpu : double
+  - memoryGb : double
+  - replicas : int
+  - uptimeFactor : double
+  - cpuCost : double
+  - memoryCost : double
+  - totalCost : double
+  - snapshotTime : LocalDateTime
+}
+
+entity AppInvoice {
+  - id : String
+  - userId : String
+  - appId : String
+  - appName : String
+  - periodStart : LocalDate
+  - periodEnd : LocalDate
+  - dueDate : LocalDate
+  - amountUsd : double
+  - status : String = "PENDING"
+  - stripePaymentIntentId : String
+  - paidAt : LocalDateTime
+  - alertSent : boolean = false
+  - createdAt : LocalDateTime
+}
+
+entity TenantQuota {
+  - id : String
+  - userId : String {unique}
+  - maxCpu : String = "2000m"
+  - maxMemory : String = "4Gi"
+  - maxApps : Integer = 10
+  - createdAt : LocalDateTime
+  - updatedAt : LocalDateTime
+}
+
+entity KafkaTopic {
+  - id : String
+  - name : String {unique}
+  - partitions : Integer = 3
+  - replicas : Integer = 1
+  - config : String
+  - userId : String
+  - createdAt : LocalDateTime
+  - updatedAt : LocalDateTime
+}
+
+entity KafkaSource {
+  - id : String
+  - name : String
+  - userId : String
+  - kafkaTopicId : String
+  - consumerGroup : String
+  - bootstrapServers : String
+  - namespace : String = "default"
+  - ready : Boolean = false
+  - config : String
+  - createdAt : LocalDateTime
+  - updatedAt : LocalDateTime
+}
+
+entity Trigger {
+  - id : String
+  - name : String
+  - userId : String
+  - kafkaSourceId : String
+  - subscriberName : String
+  - brokerName : String = "default"
+  - filterType : String
+  - filter : String
+  - action : String
+  - ready : Boolean = false
+  - active : Boolean = true
+  - createdAt : LocalDateTime
+  - updatedAt : LocalDateTime
+}
+
+entity PaymentTransaction {
+  - id : String
+  - userId : String
+  - stripePaymentIntentId : String {unique}
+  - amount : BigDecimal
+  - currency : String = "usd"
+  - status : String = "pending"
+  - description : String
+  - cardLast4 : String {4}
+  - cardBrand : String {20}
+  - createdAt : LocalDateTime
+}
+
+entity AdminAuditLog {
+  - id : String
+  - actorUserId : String
+  - actorUsername : String
+  - action : String
+  - targetType : String
+  - targetId : String
+  - payloadBefore : String
+  - payloadAfter : String
+  - reason : String
+  - ipAddress : String
+  - createdAt : LocalDateTime
+}
+
+entity Incident {
+  - id : String
+  - title : String
+  - description : String
+  - severity : String = "MINOR"
+  - status : String = "INVESTIGATING"
+  - startedAt : LocalDateTime
+  - resolvedAt : LocalDateTime
+  - createdBy : String
+  - createdAt : LocalDateTime
+}
+
+entity DockerImage {
+  - id : String
+  - userId : String
+  - imageName : String
+  - tag : String = "latest"
+  - valid : Boolean = false
+  - usedCount : Integer = 0
+  - createdAt : LocalDateTime
+}
+
+User "1" --> "0..*" App : posséder
+User "1" --> "0..*" ApiKey : générer
+User "1" --> "0..*" KafkaTopic : créer
+User "1" --> "0..*" KafkaSource : configurer
+User "1" --> "0..*" Trigger : configurer
+User "1" --> "0..1" TenantQuota : être soumis à
+User "1" --> "0..*" AppInvoice : être facturé par
+User "1" --> "0..*" BillingSnapshot : consommer
+User "1" --> "0..*" PaymentTransaction : régler
+User "1" --> "0..*" DockerImage : référencer
+User "0..1" --> "0..*" User : déléguer à
+User ..> UserRole : role
+User ..> Permission : permissions
+
+App "1" --> "0..*" DeploymentLog : journaliser
+App "1" --> "0..*" BillingSnapshot : générer
+App "1" --> "0..*" AppInvoice : facturer
+
+KafkaTopic "1" --> "0..*" KafkaSource : alimenter
+KafkaSource "1" --> "0..*" Trigger : déclencher
+Trigger "0..*" ..> "1" App : cibler
+AdminAuditLog ..> User : tracer
+
+
+
+' Classes utilisées : User, UserRole, Permission, App, DeploymentLog, ApiKey, BillingSnapshot, AppInvoice, TenantQuota, KafkaTopic, KafkaSource, Trigger, PaymentTransaction, AdminAuditLog, Incident, DockerImage
+' Contrôleurs utilisés : n/a (diagramme structurel)
+' Services utilisés : résolution des relations par AppService.resolveKafkaTopic()/resolveConsumerGroup(), UserContextService.resolve()
+' Pourquoi ces éléments apparaissent : ce sont toutes les classes annotées @Entity du backend, avec leurs attributs exacts et leurs valeurs par défaut réelles.
+' Fichiers sources vérifiés :
+'   user/User.java:11-66 ; user/UserRole.java:3-8 ; user/Permission.java:7-32
+'   app/App.java:9-71 ; logs/DeploymentLog.java:9-38 ; apikey/ApiKey.java:9-43
+'   billing/BillingSnapshot.java:8-56 ; billing/AppInvoice.java:10-64
+'   quota/TenantQuota.java:10-44 ; kafka/KafkaTopic.java:10-43
+'   eventing/KafkaSource.java:9-51 ; eventing/Trigger.java:9-58
+'   DockerImage/DockerImage.java:14-40
+'   payment/PaymentTransaction.java:10-50 ; audit/AdminAuditLog.java:9-57 ; status/Incident.java:9-48
+'   app/AppService.java:306,316-341 (jointure de lecture Trigger.subscriberName == App.serviceName)
+'   eventing/EventingService.java:232-260 (création : subscriberName dérivé du champ "action" fourni par l'appelant, pas lu depuis App)
+'   status/StatusController.java, status/StatusService.java (Incident = statut public de la plateforme, sans lien avec App)
+' Divergences relevées :
+'   - User ne porte pas de champ « UserRole role » typé : le rôle est stocké en String et l'enum sert de référence.
+'   - Permission n'est pas persistée comme enum : User.permissions est un Set<String> (@ElementCollection user_permissions).
+'   - Aucune relation JPA bidirectionnelle n'existe dans le code ; les cardinalités affichées sont logiques (colonnes userId/appId/…, non montrées sur les arêtes pour la lisibilité — voir note sous User pour le détail des colonnes réelles).
+'   - "cibler" (Trigger vers App) : confirmé réel en LECTURE (AppService.resolveKafkaTopic/resolveConsumerGroup/resolveKafkaSourceName
+'     comparent app.getServiceName() à Trigger.subscriberName), mais non garanti/vérifié à la CRÉATION du Trigger (EventingService
+'     dérive subscriberName du champ libre "action" fourni par l'appelant, sans lire App.serviceName).
+' Corrections appliquées suite à audit du 2026-08-07 :
+'   - Suppression de l'arête inventée "Incident --> App".
+'   - Ajout des attributs manquants sur AdminAuditLog et PaymentTransaction.
+'   - Simplification demandée : retrait des stéréotypes <<@Entity ...>> sur les entités et des noms de colonnes techniques («userId», etc.)
+'     dans les libellés d'association, au profit du seul verbe métier (le détail des colonnes reste documenté dans les notes et ci-dessus).
+@enduml

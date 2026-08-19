@@ -1,0 +1,149 @@
+@startuml diagramme_composants
+' Diagramme de composants — les 21 packages réels de com.platform.api
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 11
+skinparam component {
+  BackgroundColor #F7F9FC
+  BorderColor #2C3E50
+}
+skinparam ArrowColor #34495E
+skinparam interface { BackgroundColor #FDF6E3 BorderColor #B58900 }
+
+title Composants backend — com.platform.api (21 packages)
+
+package "backend-api" {
+
+  component "security" as SECU
+  component "config" as CFG
+  component "exception" as EXC
+  component "repository" as REPO
+  component "user" as USER
+  component "auth" as AUTH
+  component "team" as TEAM
+  component "apikey" as APIKEY
+  component "app" as APP
+  component "DockerImage" as DIMG
+  component "eventing" as EVT
+  component "kafka" as KAFKA
+  component "logs" as LOGS
+  component "metrics" as MET
+  component "billing" as BILL
+  component "payment" as PAY
+  component "quota" as QUOTA
+  component "audit" as AUDIT
+  component "admin" as ADMIN
+  component "status" as STATUS
+  component "BackendApiApplication" as BOOT
+}
+
+interface "KubernetesClient\n(Fabric8)" as IK8S
+interface "Keycloak OIDC / Admin REST" as IKC
+interface "Kafka AdminClient / Producer" as IKAFKA
+interface "Prometheus / Alertmanager HTTP" as IPROM
+interface "Stripe SDK" as ISTRIPE
+interface "JPA / PostgreSQL" as IJPA
+interface "SSE (text/event-stream)" as ISSE
+
+BOOT  --> CFG
+CFG   -- IK8S
+CFG   ..> APP        : WebSocketConfig / OpenApiConfig
+
+SECU  ..> USER       : PermissionService, UserRepository
+SECU  ..> APIKEY     : ApiKeyService.validate()
+SECU  ..> STATUS     : StatusRateLimitFilter
+SECU  ..> CFG
+
+APP   --> LOGS       : DeploymentLogRepository, LogSseService
+APP   --> EVT        : EventingService (wiring + cascade delete)
+APP   --> USER       : UserContextService
+APP   --> EXC
+APP   -- IK8S
+
+EVT   --> KAFKA      : KafkaTopicRepository
+EVT   --> LOGS
+EVT   -- IK8S
+EVT   -- IKAFKA
+
+KAFKA --> USER
+KAFKA -- IKAFKA
+KAFKA --> EXC
+
+LOGS  --> APP        : AppRepository, KnativeService.getFirstPodName()
+LOGS  --> USER
+LOGS  -- IK8S
+LOGS  -- ISSE
+
+MET   --> APP        : AppRepository
+MET   -- IPROM
+MET   -- ISSE
+
+BILL  --> APP        : AppRepository
+BILL  --> LOGS
+BILL  --> PAY        : PaymentService (InvoiceService.payInvoice)
+BILL  --> USER
+
+PAY   --> USER
+PAY   -- ISTRIPE
+
+QUOTA --> USER
+QUOTA --> APP
+QUOTA -- IK8S
+
+TEAM  --> USER
+TEAM  --> AUTH       : KeycloakAdminService
+
+AUTH  -- IKC
+USER  -- IKC         : KeycloakJwtAuthConverter (via security)
+
+APIKEY --> USER
+
+AUDIT --> USER
+
+ADMIN --> APP
+ADMIN --> KAFKA
+ADMIN --> EVT
+ADMIN --> LOGS
+ADMIN --> USER
+ADMIN --> QUOTA
+ADMIN --> AUDIT
+ADMIN --> MET
+ADMIN -- IK8S
+
+STATUS --> APP
+STATUS --> EXC
+
+DIMG  ..> APP        : catalogue d'images (entité isolée)
+
+REPO  -- IJPA
+USER  --> REPO
+APP   --> REPO
+BILL  --> REPO
+EXC   ..> ADMIN
+
+note right of DIMG
+  Package DockerImage : entité JPA seule,
+  sans contrôleur ni service dédié.
+end note
+
+note bottom of QUOTA
+  QuotaService.assertCanCreateApp() existe encore
+  mais n'est plus appelé par AppService.createApp()
+  (ticket docs/audit-fixes/048).
+end note
+
+' Classes utilisées : App, AppService, KnativeService, KnativeWatcher, EventingService, KafkaService, LogSseService, PodLogService, MetricsService, BillingService, InvoiceService, PaymentService, QuotaService, ApiKeyService, TeamService, KeycloakAdminService, AdminAuditLogService, StatusService, DockerImage, KubernetesConfig, SecurityConfig, GlobalExceptionHandler
+' Contrôleurs utilisés : AppController, KafkaController, EventingController, EventController, LogController, MetricsController, BillingController, InvoiceController, PaymentController, AuthController, UserController, TeamController, ApiKeyController, AdminController, StatusController
+' Services utilisés : voir « Classes utilisées »
+' Pourquoi ces éléments apparaissent : les 21 packages sont ceux réellement présents sous backend-api/src/main/java/com/platform/api/ ; chaque dépendance correspond à un champ « private final » injecté ou à un import inter-package.
+' Fichiers sources vérifiés :
+'   backend-api/src/main/java/com/platform/api/ (arborescence : DockerImage, admin, apikey, app, audit, auth, billing, config, eventing, exception, kafka, logs, metrics, payment, quota, repository, security, status, team, user + BackendApiApplication)
+'   app/AppService.java:27-35 (dépendances vers logs, eventing, user)
+'   logs/PodLogStreamService.java:17-20 (dépendances vers app, user)
+'   billing/InvoiceService.java:24-29 (dépendance vers payment)
+'   admin/AdminController.java:52-66 (12 dépendances inter-packages)
+'   security/SecurityConfig.java:31-35 (filtres)
+'   quota/QuotaService.java:71 (assertCanCreateApp, non appelé)
+' Divergence relevée : une première version du diagramme ne listait que 9 packages ; le dépôt en contient bien 20 packages + la classe racine BackendApiApplication.
+@enduml

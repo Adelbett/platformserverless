@@ -1,0 +1,116 @@
+@startuml sequence_deploiement
+' Séquence — déploiement d'une application (vue fonctionnelle)
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 11
+skinparam sequence {
+  ArrowColor #2C3E50
+  LifeLineBorderColor #7F8C8D
+  ParticipantBorderColor #2C3E50
+  ParticipantBackgroundColor #F7F9FC
+  ActorBorderColor #2C3E50
+}
+autonumber
+
+title Déploiement d'une application — POST /api/apps
+
+actor "CLIENT_ADMIN / MEMBER" as U
+participant "web-portal\nDeployApp.jsx" as WEB
+participant "SecurityConfig\n+ PermissionService" as SEC
+participant "AppController" as CTRL
+participant "AppService" as SVC
+participant "AppRepository\n(PostgreSQL)" as REPO
+participant "LogSseService" as SSE
+participant "AppDeploymentAsyncRunner" as ASYNC
+participant "KnativeService" as KNS
+participant "Cluster K8s\n(Knative Serving)" as K8S
+participant "KnativeWatcher" as WATCH
+
+U -> WEB : saisit image, tag, port,\nmin/max replicas, CPU, mémoire
+WEB -> CTRL : POST /api/apps\nAuthorization: Bearer <JWT>
+activate CTRL
+
+CTRL -> SEC : @PreAuthorize\n@permissionService.has(name,'DEPLOY_APP')
+activate SEC
+SEC --> CTRL : autorisé
+deactivate SEC
+
+CTRL -> SVC : createApp(auth.getName(), request)
+activate SVC
+
+SVC -> SVC : userContextService.resolve(username)\n→ (effectiveUserId, namespace "user-<owner>")
+
+note right of SVC #FFF3CD
+  Pas de contrôle de quota bloquant :
+  l'appel quotaService.assertCanCreateApp()
+  a été retiré de createApp().
+  La facturation se fait à la consommation
+  réelle (BillingService).
+end note
+
+SVC -> SVC : generateServiceName(imageName, effectiveUserId)
+SVC -> REPO : save(App{status="DEPLOYING"})
+activate REPO
+REPO --> SVC : App persistée
+deactivate REPO
+
+SVC -> SSE : push(DeploymentLog "Deployment triggered"\ntype=DEPLOYMENT_START)
+SSE --> WEB : event SSE (/api/logs/stream)
+
+SVC ->> ASYNC : triggerDeploy(app, req)  <<@Async>>
+SVC --> CTRL : AppResponse(status="DEPLOYING")
+deactivate SVC
+CTRL --> WEB : 201 Created
+deactivate CTRL
+WEB --> U : "Déploiement en cours…"
+
+group Traitement asynchrone (pool @Async)
+  activate ASYNC
+  ASYNC -> KNS : deploy(appId, serviceName, namespace, req)
+  activate KNS
+  KNS -> K8S : ensureNamespaceExists(ns)\n+ NetworkPolicy tenant-default-isolation
+  KNS -> K8S : create serving.knative.dev/v1 Service
+  alt HTTP 409 (service déjà existant)
+    KNS -> K8S : delete + recreate
+  end
+  KNS --> ASYNC : URL publique
+  deactivate KNS
+
+  ASYNC -> REPO : save(App{url, status="RUNNING"})
+  ASYNC -> SSE : push(log "Deployment successful. URL: …"\ntype=DEPLOYMENT_SUCCESS)
+
+  opt req.kafkaEnabled == true && req.kafkaTopicId != null
+    ASYNC -> ASYNC : eventingService.createKafkaSource(...)\n+ eventingService.createTrigger(...)
+    ASYNC -> SSE : push(log type=KAFKA_WIRED)
+  end
+
+  alt Exception pendant le déploiement
+    ASYNC -> REPO : save(App{status="FAILED"})
+    ASYNC -> SSE : push(log "Deployment failed: …"\ntype=DEPLOYMENT_FAIL)
+  end
+  deactivate ASYNC
+end
+
+group Réconciliation continue
+  K8S ->> WATCH : Watch event (ADDED / MODIFIED / DELETED)\nsur serving.knative.dev/v1 Service
+  WATCH -> WATCH : filtre namespace startsWith("user-")
+  WATCH -> REPO : updateAppsInDb(serviceName, ns, status)
+end
+
+SSE --> WEB : flux de logs temps réel
+WEB --> U   : statut RUNNING + URL
+
+' Classes utilisées : App, AppRequest, AppResponse, DeploymentLog
+' Contrôleurs utilisés : AppController (POST /api/apps)
+' Services utilisés : PermissionService, UserContextService, AppService, AppDeploymentAsyncRunner, KnativeService, LogSseService, KnativeWatcher
+' Pourquoi ces éléments apparaissent : createApp() persiste l'App puis délègue à un bean séparé pour que @Async passe réellement par le proxy Spring ; le statut final est écrit soit par le runner, soit par le watcher.
+' Fichiers sources vérifiés :
+'   app/AppController.java:27-34 (@PreAuthorize DEPLOY_APP)
+'   app/AppService.java:39-73 (createApp — commentaire lignes 46-47 : « No cap on app count »)
+'   app/AppDeploymentAsyncRunner.java:36-71 (@Async triggerDeploy, wiring Kafka lignes 48-63, gestion d'échec 64-70)
+'   app/KnativeService.java:149-190 (deploy + gestion du 409)
+'   app/KnativeWatcher.java:36-90 (watch + filtre "user-")
+'   logs/LogSseService.java:33-54
+' Divergence relevée : QuotaService.assertCanCreateApp() (quota/QuotaService.java:71) existe toujours mais n'est appelé nulle part depuis AppService — aucune vérification de quota bloquante n'a lieu au déploiement (ticket docs/audit-fixes/048).
+@enduml

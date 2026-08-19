@@ -1,0 +1,299 @@
+\chapter{Release 3 : Industrialisation}
+
+\section{Introduction}
+
+Les releases précédentes ont livré l'ensemble des capacités fonctionnelles de la plateforme, backend et interfaces graphiques confondus, pour les trois acteurs identifiés (CLIENT\_ADMIN, MEMBER, ADMIN). Cette dernière release, avant le chapitre de validation, ne porte plus sur des fonctionnalités nouvelles mais sur la solidité technique de la plateforme : consolider les mesures de sécurité mises en place au fil des sprints précédents (Sprint 10), puis harmoniser et fiabiliser les chaînes d'intégration continue de l'ensemble de ses composants (Sprint 11).
+
+\clearpage
+\section{Sprint 10 : Durcissement et sécurité}
+
+\subsection{Introduction}
+
+Ce sprint a pour objectif de consolider, en un point unique, les mesures de sécurité mises en place au fil des sprints précédents, et d'en ajouter quelques-unes supplémentaires identifiées lors d'une relecture transversale du projet, en amont de l'audit de sécurité formel présenté au chapitre de validation. Il ne s'agit pas d'un audit noté, mais d'un travail de durcissement technique mené par l'équipe de développement elle-même.
+
+\subsection{Objectifs du Sprint}
+
+\begin{itemize}
+    \item Vérifier et compléter les rôles Kubernetes (RBAC) du backend, au-delà des extensions déjà apportées ponctuellement (Sprint 3, Sprint 9).
+    \item Restreindre la configuration CORS du backend à une liste explicite d'origines autorisées.
+    \item Identifier et corriger les accès non contrôlés à des ressources appartenant à d'autres tenants (IDOR) sur les points d'accès les plus sensibles.
+    \item Documenter, sans les corriger si le délai du projet ne le permet pas, les risques résiduels identifiés, pour reprise explicite au chapitre de validation.
+\end{itemize}
+
+\subsection{Sprint Backlog}
+
+Le tableau~\ref{tab:sb-sprint10} présente le backlog détaillé du Sprint 10, obtenu en décomposant chaque \textit{User Story} retenue en tâches techniques.
+
+% \needspace garantit qu'il reste assez de place sur la page : sans cela une
+% coupure peut tomber au milieu d'un groupe \multirow, dont le contenu deborde
+% alors hors du cadre et laisse une cellule vide sur la page suivante.
+\needspace{0.9\textheight}
+{
+% Le tableau deborde volontairement de 1,5 cm dans chaque marge afin de laisser
+% respirer les trois colonnes ; LTleft/LTright sont les parametres propres a
+% longtable (adjustwidth n'a aucun effet sur cet environnement).
+% Largeur totale : 18,8 cm, soit 1 cm de blanc conserve de chaque cote de la page.
+\setlength{\LTleft}{-1.5cm}
+\setlength{\LTright}{-1.5cm}
+\setlength{\tabcolsep}{8pt}
+\renewcommand{\arraystretch}{1.9}
+\begin{longtable}{|p{6.6cm}|>{\raggedright\arraybackslash}p{8.1cm}|>{\centering\arraybackslash}p{2.3cm}|}
+\hline
+\textbf{User Story} & \textbf{Tâches} & \textbf{Estimation} \\
+\hline
+\endfirsthead
+\hline
+\textbf{User Story} & \textbf{Tâches} & \textbf{Estimation} \\
+\hline
+\endhead
+\hline
+\endfoot
+
+\caption{Backlog du Sprint 10}
+\label{tab:sb-sprint10}
+\endlastfoot
+
+\multirow{1}{6.6cm}{
+\centering
+\textbf{En tant qu'exploitant, je veux que le \texttt{ClusterRole} du backend soit limité aux permissions réellement nécessaires.}
+}
+&
+Reconstruire le \texttt{ClusterRole} à partir des ressources effectivement manipulées, vérifier avec \texttt{kubectl auth can-i}.
+& — \\
+\hline
+
+\multirow{1}{6.6cm}{
+\centering
+\textbf{En tant qu'exploitant, je veux restreindre les origines autorisées à appeler l'API.}
+}
+&
+Configurer \texttt{app.cors.allowed-origins} en liste explicite.
+& — \\
+\hline
+
+\multirow{1}{6.6cm}{
+\centering
+\textbf{En tant qu'exploitant, je veux qu'un client ne puisse pas accéder aux ressources d'un autre tenant par manipulation d'identifiant.}
+}
+&
+Auditer et corriger les accès directs par identifiant sur les points d'accès sensibles (journaux, moyens de paiement).
+& — \\
+\hline
+
+\end{longtable}
+}
+
+\subsection{Conception}
+
+\subsubsection{Synthèse des mesures de durcissement}
+
+Plusieurs mesures de sécurité ont déjà été introduites au fil des sprints précédents, à mesure que les anomalies correspondantes étaient identifiées : reconstruction du \texttt{ClusterRole} du backend (Sprint 3), migration du jeton d'authentification hors des paramètres d'URL du flux de journaux (Sprint 3), correction de la référence au rôle ADMIN dans la facturation (Sprint 7), extension du \texttt{ClusterRole} à la lecture des nœuds et événements pour la console d'administration (Sprint 9). Ce sprint reprend ces mesures dans une démarche volontairement transversale, plutôt que de les laisser dispersées au fil des sprints fonctionnels, et y ajoute la restriction CORS et la revue des accès directs par identifiant (IDOR).
+
+\subsubsection{Configuration CORS}
+
+Le backend restreint les origines autorisées à une liste explicite, portée par la propriété \texttt{app.cors.allowed-origins}, plutôt qu'un caractère générique. Cette configuration autorise l'envoi des identifiants de session (\texttt{allowCredentials}) uniquement pour les origines listées, et limite les méthodes HTTP acceptées à celles réellement utilisées par l'API (\texttt{GET}, \texttt{POST}, \texttt{PUT}, \texttt{PATCH}, \texttt{DELETE}, \texttt{OPTIONS}).
+
+\subsection{Réalisation}
+
+\subsubsection{Mise en œuvre}
+
+La revue des points d'accès manipulant une ressource par identifiant (journaux de déploiement, moyens de paiement enregistrés) a permis de vérifier, ou le cas échéant de corriger, que chaque accès est bien filtré par l'identité effective de l'appelant, résolue par \texttt{UserContextService}, plutôt que par le seul identifiant transmis dans l'URL.
+
+\subsubsection{Configuration et limites assumées}
+
+Ce sprint ne prétend pas clore la question de la sécurité de la plateforme : il s'agit d'une étape de durcissement technique, dont le résultat mesuré (score de sécurité avant/après) est présenté formellement au chapitre de validation, avec la liste complète des vulnérabilités traitées ou assumées comme risque produit. Certains points, en particulier l'absence de limite de ressources par défaut par tenant et le flux d'authentification \textit{Resource Owner Password Credentials} du portail (Sprint 3), ne sont pas traités dans ce sprint et restent des risques assumés.
+
+Au terme de ce sprint, les principales mesures de durcissement identifiées au fil du projet sont consolidées ; le chapitre de validation qui suit en mesure formellement l'effet sur la posture de sécurité globale de la plateforme. Ce sprint ne couvre pas l'ensemble des vulnérabilités possibles : l'absence de limite de ressources par défaut par tenant et le flux d'authentification ROPC du portail restent des risques produit assumés, documentés au chapitre de validation.
+
+\clearpage
+\section{Sprint 11 : Pipeline CI/CD complet}
+
+\subsection{Introduction}
+
+Ce sprint a pour objectif de doter chacun des composants de la plateforme (backend, portail client, console d'administration) d'un pipeline d'intégration continue, puis de consolider et d'harmoniser ces pipelines sur un socle commun plus robuste, en généralisant les mécanismes de fiabilisation mis au point empiriquement lors du Sprint 4 pour le pipeline backend.
+
+\subsection{Objectifs du Sprint}
+
+\begin{itemize}
+    \item Mettre en place un pipeline Jenkins pour le portail client et pour la console d'administration, sur le même principe que le pipeline backend (Sprint 4).
+    \item Harmoniser les pipelines Jenkins existants sur un socle commun plus robuste.
+    \item Fiabiliser l'exécution de Kaniko afin d'éviter les échecs de construction dus à la corruption de l'environnement Jenkins identifiée au Sprint 4.
+    \item Clarifier l'usage des différents fichiers Dockerfile du backend, source de confusion identifiée lors de l'audit du projet.
+\end{itemize}
+
+\subsection{Sprint Backlog}
+
+Le tableau~\ref{tab:sb-sprint11} présente le backlog détaillé du Sprint 11, obtenu en décomposant chaque \textit{User Story} retenue en tâches techniques.
+
+% \needspace garantit qu'il reste assez de place sur la page : sans cela une
+% coupure peut tomber au milieu d'un groupe \multirow, dont le contenu deborde
+% alors hors du cadre et laisse une cellule vide sur la page suivante.
+\needspace{0.9\textheight}
+{
+% Le tableau deborde volontairement de 1,5 cm dans chaque marge afin de laisser
+% respirer les trois colonnes ; LTleft/LTright sont les parametres propres a
+% longtable (adjustwidth n'a aucun effet sur cet environnement).
+% Largeur totale : 18,8 cm, soit 1 cm de blanc conserve de chaque cote de la page.
+\setlength{\LTleft}{-1.5cm}
+\setlength{\LTright}{-1.5cm}
+\setlength{\tabcolsep}{8pt}
+\renewcommand{\arraystretch}{1.9}
+\begin{longtable}{|p{6.6cm}|>{\raggedright\arraybackslash}p{8.1cm}|>{\centering\arraybackslash}p{2.3cm}|}
+\hline
+\textbf{User Story} & \textbf{Tâches} & \textbf{Estimation} \\
+\hline
+\endfirsthead
+\hline
+\textbf{User Story} & \textbf{Tâches} & \textbf{Estimation} \\
+\hline
+\endhead
+\hline
+\endfoot
+
+\caption{Backlog du Sprint 11}
+\label{tab:sb-sprint11}
+\endlastfoot
+
+\multirow{2}{6.6cm}{
+\centering
+\textbf{En tant qu'exploitant, je veux que le portail client et la console d'administration soient construits et déployés automatiquement.}
+}
+&
+Mettre en place le pipeline Jenkins portail (\texttt{npm run build}, Kaniko, Docker Hub).
+& — \\
+\cline{2-3}
+
+&
+Mettre en place le pipeline Jenkins admin-console.
+& — \\
+\hline
+
+\multirow{2}{6.6cm}{
+\centering
+\textbf{En tant qu'exploitant, je veux fiabiliser l'exécution du pipeline backend.}
+}
+&
+Ajouter un réessai automatique à l'étape \textit{Checkout}.
+& — \\
+\cline{2-3}
+
+&
+Ajouter \texttt{--use-new-run}/\texttt{--snapshot-mode=redo} + redémarrage systématique de Jenkins.
+& — \\
+\hline
+
+\multirow{1}{6.6cm}{
+\centering
+\textbf{En tant qu'exploitant, je veux un pipeline unique et cohérent pour tous les composants.}
+}
+&
+Aligner les 4 pipelines sur le socle backend (non réalisé).
+& — \\
+\hline
+
+\multirow{1}{6.6cm}{
+\centering
+\textbf{En tant qu'exploitant, je veux une étape de tests automatisés dans les pipelines.}
+}
+&
+Retirer \texttt{-DskipTests} et ajouter une étape de test (non réalisé).
+& — \\
+\hline
+
+\multirow{1}{6.6cm}{
+\centering
+\textbf{En tant qu'exploitant, je veux une analyse de sécurité des images construites.}
+}
+&
+Intégrer un scanner de vulnérabilités dans le pipeline (non réalisé).
+& — \\
+\hline
+
+\end{longtable}
+}
+
+\subsection{Conception}
+
+La figure~\ref{fig:cicd-pipeline} illustre le pipeline backend, le plus complet des quatre à l'issue de ce sprint. L'étape \textit{Test} y est représentée en pointillés : elle n'est \textbf{pas} réellement exécutée, la compilation Maven étant lancée avec l'option \texttt{-DskipTests} (cf. Réalisation ci-après), elle figure ici comme étape cible non atteinte, pas comme un fait acquis.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=1.1cm, every node/.style={font=\footnotesize}]
+\tikzstyle{box}=[draw, rounded corners, minimum width=1.7cm, minimum height=0.8cm, align=center, fill=Gray!20]
+\tikzstyle{boxdash}=[box, dashed, fill=Gray!5]
+\node[box] (dev) {Developer};
+\node[box, right=0.9cm of dev] (git) {Git};
+\node[box, right=0.9cm of git] (jenkins) {Jenkins};
+\node[box, right=0.9cm of jenkins] (checkout) {Checkout};
+\node[box, right=0.9cm of checkout] (build) {Build\\(Maven)};
+\node[boxdash, right=0.9cm of build] (test) {Test\\(non exécuté)};
+\node[box, below=1.3cm of build] (kaniko) {Kaniko};
+\node[box, right=0.9cm of kaniko] (registry) {Docker Hub};
+\node[box, right=0.9cm of registry] (k8s) {Kubernetes};
+\node[box, right=0.9cm of k8s] (rollout) {Rollout};
+\node[box, right=0.9cm of rollout] (app) {Application};
+\draw[->, thick] (dev) -- (git);
+\draw[->, thick] (git) -- (jenkins);
+\draw[->, thick] (jenkins) -- (checkout);
+\draw[->, thick] (checkout) -- (build);
+\draw[->, thick] (build) -- (test);
+\draw[->, thick] (build) -- (kaniko);
+\draw[->, thick] (kaniko) -- (registry);
+\draw[->, thick] (registry) -- (k8s);
+\draw[->, thick] (k8s) -- (rollout);
+\draw[->, thick] (rollout) -- (app);
+\end{tikzpicture}
+\caption{Pipeline CI/CD backend : Developer $\rightarrow$ Git $\rightarrow$ Jenkins $\rightarrow$ Checkout $\rightarrow$ Build $\rightarrow$ Kaniko $\rightarrow$ Docker Hub $\rightarrow$ Kubernetes $\rightarrow$ Rollout $\rightarrow$ Application}
+\label{fig:cicd-pipeline}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.5}
+\begin{tabular}{|>{\raggedright\arraybackslash}p{2.3cm}|>{\raggedright\arraybackslash}p{2.4cm}|>{\raggedright\arraybackslash}p{3.1cm}|>{\raggedright\arraybackslash}p{3.1cm}|>{\raggedright\arraybackslash}p{3.4cm}|}
+\hline
+\rowcolor{gray!30}
+\textbf{Étape} & \textbf{Outil} & \textbf{Entrée} & \textbf{Sortie} & \textbf{Validation} \\
+\hline
+Checkout & Jenkins + Git (avec réessai) & Dépôt Git & Code source local & Réessai automatique si échec transitoire \\
+\hline
+Build & Maven (\texttt{mvn clean package}, \texttt{-DskipTests}) & Code source & Archive \texttt{.jar} & Compilation sans erreur (tests non exécutés) \\
+\hline
+Construction image & Kaniko (\texttt{--use-new-run}, \texttt{--snapshot-mode=redo}) & \texttt{.jar} + \texttt{backend-kaniko.Dockerfile} & Image de conteneur & Build Kaniko réussi \\
+\hline
+Publication & Docker Hub & Image construite & Image taguée disponible & Push réussi \\
+\hline
+Déploiement & \texttt{kubectl set image} & Nouvelle image publiée & Déploiement Kubernetes mis à jour & \texttt{kubectl rollout status} réussi \\
+\hline
+\end{tabular}
+\caption{Étapes du pipeline CI/CD backend}
+\label{tab:cicd-steps}
+\end{table}
+
+Les pipelines du portail client et de la console d'administration reprennent le même squelette, adapté à une application front-end : construction (\texttt{npm run build}) produisant les fichiers statiques, construction de l'image de conteneur (Nginx servant ces fichiers statiques) via Kaniko, publication sur Docker Hub, puis mise à jour du déploiement Kubernetes correspondant.
+
+\subsection{Réalisation}
+
+\subsubsection{Mise en œuvre}
+
+Les correctifs de fiabilisation identifiés au Sprint 4 (options Kaniko \texttt{--use-new-run}/\texttt{--snapshot-mode=redo}, redémarrage sécurisé systématique de Jenkins, réessai automatique du \textit{checkout} Git) demeurent, à l'issue de ce sprint, appliqués uniquement au pipeline du backend, qui reste le plus mature des quatre. Les pipelines du portail client et de la console d'administration, mis en place à ce sprint, permettent leur construction et leur déploiement automatisés, mais sans reprendre l'ensemble de ces mécanismes de fiabilisation. Le remplacement du fichier \texttt{backend.Dockerfile} (construction multi-étapes avec utilisateur non privilégié, non utilisé en pratique par le pipeline) au profit exclusif de \texttt{backend-kaniko.Dockerfile} (construction mono-étape effectivement utilisée) a été clarifié dans la documentation technique du projet, sans toutefois que le premier fichier, devenu du code mort, n'ait été supprimé du dépôt.
+
+\subsubsection{Configuration et limites assumées}
+
+En toute rigueur, ce sprint doit être présenté avec honnêteté au regard de son objectif initial : \textbf{l'harmonisation complète des pipelines CI/CD n'a été que partiellement atteinte}. Les points suivants, documentés par les audits menés sur la plateforme, n'ont pas été résolus dans le temps imparti du projet et sont repris comme perspectives d'amélioration au chapitre de validation :
+
+\begin{itemize}
+    \item Les pipelines du portail client et de la console d'administration n'ont \textbf{pas} été alignés sur les mécanismes de fiabilisation du pipeline backend.
+    \item Le pipeline dédié aux microservices reste le moins abouti des quatre : construction et publication d'image Docker classiques (sans Kaniko), absence d'identifiants explicites pour le \textit{checkout} Git, et absence de toute étape de déploiement Kubernetes final.
+    \item Aucun des quatre pipelines ne comporte d'étape de tests automatisés (la compilation backend est réalisée avec l'option \texttt{-DskipTests}), d'analyse statique de code, ni d'analyse de vulnérabilités des images construites.
+    \item Aucun mécanisme de \textit{rollback} automatique n'est déclenché en cas d'échec de la vérification du déploiement (\texttt{kubectl rollout status}).
+\end{itemize}
+
+Ces limites ne remettent pas en cause le fonctionnement de la plateforme, qui reste opérationnelle et déployée automatiquement à chaque évolution ; elles constituent en revanche des axes d'industrialisation identifiés mais non traités, dans un contexte de projet à ressources et délai contraints, où la priorité a été donnée à la robustesse fonctionnelle de la plateforme elle-même plutôt qu'à l'homogénéisation complète de ses quatre pipelines.
+
+Au terme de ce sprint, le pipeline backend demeure le plus robuste et le plus représentatif de la démarche CI/CD visée pour la plateforme ; les trois autres pipelines sont fonctionnels mais perfectibles. Les 3 autres pipelines (portail, admin, microservices) ne bénéficient pas des mêmes mécanismes de fiabilisation que le backend ; aucun des 4 pipelines n'exécute de tests automatisés, d'analyse statique, ni d'analyse de vulnérabilités ; aucun \textit{rollback} automatique n'est déclenché en cas d'échec de déploiement. Ces limites sont assumées comme telles, dans un contexte de ressources et de délai contraints, et reprises au chapitre de validation.
+
+\section{Conclusion}
+
+La Release 3 a consolidé la solidité technique de la plateforme sans lui ajouter de nouvelle fonctionnalité visible : durcissement de la sécurité par la restriction du RBAC, de la configuration CORS et des accès par identifiant, puis industrialisation des chaînes de déploiement continu des quatre composants du projet. Ce travail d'industrialisation, présenté ici avec la même rigueur que les fonctionnalités abouties, n'a été que partiellement mené à son terme : ce constat, assumé, alimente directement le chapitre de validation qui clôt ce mémoire.

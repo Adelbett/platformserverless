@@ -1,0 +1,100 @@
+@startuml uc_gestion_apps
+' Cas d'utilisation — cycle de vie des applications
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam usecase {
+  BackgroundColor #F7F9FC
+  BorderColor #2C3E50
+}
+skinparam actorStyle awesome
+left to right direction
+
+actor "MEMBER" as MEMBER
+actor "CLIENT_ADMIN" as CADMIN
+actor "ADMIN" as ADMIN
+actor "Knative Serving" as KNATIVE <<système>>
+actor "Ordonnanceur\nCrashLoopScheduler" as SCHED <<système>>
+
+rectangle "Gestion des applications" {
+
+  usecase "Déployer une application\nPOST /api/apps" as UC_CREATE
+  usecase "Lister ses applications\nGET /api/apps" as UC_LIST
+  usecase "Consulter le détail d'une application\nGET /api/apps/{id}" as UC_GET
+  usecase "Redéployer\nPOST /api/apps/{id}/deploy" as UC_REDEPLOY
+  usecase "Modifier et redéployer\nPUT /api/apps/{id}" as UC_UPDATE
+  usecase "Supprimer une application\nDELETE /api/apps/{id}" as UC_DELETE
+  usecase "Lister les révisions\nGET /api/apps/{id}/revisions" as UC_REV
+  usecase "Revenir à une révision\nPOST /api/apps/{id}/rollback/{revision}" as UC_ROLLBACK
+
+  usecase "Créer le namespace tenant\net la NetworkPolicy d'isolation" as UC_NS
+  usecase "Créer/Recréer le Knative Service" as UC_KSVC
+  usecase "Câbler automatiquement\nKafkaSource + Trigger" as UC_WIRE
+  usecase "Synchroniser le statut réel\ndepuis Kubernetes" as UC_SYNC
+  usecase "Détecter les CrashLoopBackOff\net alerter" as UC_CRASH
+  usecase "Journaliser l'opération\n(DeploymentLog + SSE)" as UC_LOG
+
+  usecase "Forcer la suppression d'une app\nDELETE /api/admin/apps/{id}" as UC_FORCE
+  usecase "Suspendre / restaurer une app\n(scale max=0 / restauration)" as UC_SUSPEND
+  usecase "Lister toutes les applications\nGET /api/admin/apps" as UC_ALL
+}
+
+MEMBER --> UC_CREATE
+MEMBER --> UC_LIST
+MEMBER --> UC_GET
+MEMBER --> UC_REDEPLOY
+MEMBER --> UC_UPDATE
+MEMBER --> UC_DELETE
+MEMBER --> UC_REV
+MEMBER --> UC_ROLLBACK
+CADMIN --|> MEMBER
+
+ADMIN --> UC_FORCE
+ADMIN --> UC_SUSPEND
+ADMIN --> UC_ALL
+
+SCHED --> UC_CRASH
+KNATIVE --> UC_SYNC
+
+UC_CREATE   ..> UC_NS    : <<include>>
+UC_CREATE   ..> UC_KSVC  : <<include>>
+UC_CREATE   ..> UC_LOG   : <<include>>
+UC_CREATE   ..> UC_WIRE  : <<extend>> si kafkaEnabled
+UC_UPDATE   ..> UC_KSVC  : <<include>>
+UC_REDEPLOY ..> UC_KSVC  : <<include>>
+UC_DELETE   ..> UC_LOG   : <<include>>
+UC_LIST     ..> UC_SYNC  : <<include>>
+UC_GET      ..> UC_SYNC  : <<include>>
+UC_ALL      ..> UC_SYNC  : <<include>>
+UC_CRASH    ..> UC_LOG   : <<include>>
+UC_ROLLBACK ..> UC_LOG   : <<include>>
+
+note right of UC_CREATE
+  Permission requise : DEPLOY_APP
+  (idem redeploy / update / rollback).
+  DELETE_APP pour la suppression.
+  Aucun quota bloquant sur le nombre d'apps.
+end note
+
+note right of UC_DELETE
+  Suppression logique : status = "DELETED"
+  afin de préserver l'historique de facturation ;
+  le Knative Service et les CR d'eventing
+  sont réellement supprimés du cluster.
+end note
+
+' Classes utilisées : App, AppRequest, AppResponse, DeploymentLog
+' Contrôleurs utilisés : AppController, AdminController
+' Services utilisés : AppService, AppDeploymentAsyncRunner, KnativeService, KnativeWatcher, CrashLoopScheduler, EventingService, LogSseService, UserContextService, PermissionService
+' Pourquoi ces éléments apparaissent : chaque cas correspond à une méthode publique d'AppController/AdminController ; les cas « système » correspondent au watcher, au scheduler et à syncStatusFromKubernetes().
+' Fichiers sources vérifiés :
+'   app/AppController.java:27-84 (8 endpoints, gardes DEPLOY_APP / DELETE_APP)
+'   app/AppService.java:39-73 (createApp), :77-91 (listApps/listAllApps), :99-124 (syncStatusFromKubernetes),
+'                      :136-168 (updateApp/redeploy), :172-184 (deleteApp → status DELETED), :188-200 (revisions/rollback), :207-236 (checkCrashLoops)
+'   app/CrashLoopScheduler.java:11-17 (@Scheduled fixedRate = 5 min)
+'   app/KnativeService.java:149-190 (deploy), :199 (scaleService), :245 (delete), :368 (listRevisions), :396 (rollbackToRevision)
+'   app/AppDeploymentAsyncRunner.java:48-63 (câblage Kafka automatique)
+'   admin/AdminController.java:98-116 (getAllApps, forceDeleteApp), :414 (restore), :440-472 (suspend/restore client)
+' Divergence relevée : la suppression n'efface pas la ligne en base (soft delete via status="DELETED"), et le rollback ne crée pas de log SSE différent — il réutilise addLog(type="ROLLBACK").
+@enduml

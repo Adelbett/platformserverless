@@ -181,7 +181,7 @@ Utilisateur ──HTTPS──▶ web-portal (React/Vite) ──▶ backend-api (
 - `generateServiceName()` fragile — `substring` peut lever `StringIndexOutOfBoundsException` selon le format du `userId` (reproduit en conditions réelles pendant cet audit).
 
 ## 14. Tous les problèmes Frontend
-
+--oui cest ca 
 - Duplication intégrale de code entre `web-portal` et `admin-console` (~15 fichiers : `AuthContext`, `api/client`, `ThemeContext`, `Toast`, `Layout`/`Sidebar`, `nginx.conf`, `package.json`...).
 - Authentification ROPC au lieu d'Authorization Code + PKCE (`keycloak-js` présent en dépendance mais inutilisé, `silent-check-sso.html` orphelin) — accepté comme risque produit.
 - Token/refreshToken en `localStorage` (vulnérable à toute XSS future) — ticket 016 ouvert.

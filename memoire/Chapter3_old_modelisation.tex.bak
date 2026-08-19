@@ -1,0 +1,126 @@
+\chapter*{chapitre 3}
+\markboth{Chapitre 3 }{3 Modélisation} %pour afficher l'entete
+ \addcontentsline{toc}{chapter}{3 Modélisation}
+
+\textbf{\Huge Modélisation}
+
+\setcounter{chapter}{3}
+\setcounter{section}{0}
+
+\section{Introduction}
+
+Ce chapitre présente la modélisation globale de la plateforme, indépendamment du découpage en sprints qui structurera les chapitres suivants. L'objectif est de donner au lecteur une vue d'ensemble cohérente de l'architecture logique et physique du système, des composants qui le constituent et de leurs interactions, ainsi que des processus métier les plus structurants. Les diagrammes UML propres à une fonctionnalité particulière (par exemple le diagramme de séquence détaillé de la création d'un déclencheur Kafka) seront présentés dans le chapitre de réalisation correspondant, en cohérence avec la vue d'ensemble donnée ici.
+
+\section{Architecture logique}
+
+L'architecture logique de la plateforme est organisée en quatre couches, représentées à la figure~\ref{fig:archi-logique} :
+
+\begin{itemize}
+    \item \textbf{Couche présentation} : deux applications monopage (SPA) développées en React — le \textit{portail client} (déploiement et supervision des applications, facturation, gestion d'équipe) et la \textit{console d'administration} (supervision du cluster, gestion des comptes clients, facturation globale, audit) — toutes deux servies statiquement via Nginx.
+    \item \textbf{Couche service} : une API REST unique développée en Spring Boot (module \texttt{backend-api}), organisée par domaine métier (applications, facturation, utilisateurs, Kafka, Eventing, clés d'API, journaux, administration), qui centralise l'ensemble de la logique métier et constitue le point d'entrée unique vers le cluster Kubernetes.
+    \item \textbf{Couche orchestration} : le client Kubernetes Java \textbf{Fabric8}, utilisé par la couche service pour créer, lire, modifier et surveiller les ressources Kubernetes natives ainsi que les ressources personnalisées (CRD) de Knative Serving, Knative Eventing et Strimzi.
+    \item \textbf{Couche infrastructure} : le cluster Kubernetes et les opérateurs qui y sont déployés (Knative Serving, Knative Eventing, Strimzi/Kafka), ainsi que les briques transverses — Keycloak (identité), PostgreSQL (persistance), Prometheus/Grafana (supervision), Jenkins/Kaniko (intégration et déploiement continus).
+\end{itemize}
+
+\begin{figure}[h!]
+ \centering
+    \includegraphics[width=13.5cm]{diagrammes/architecture_logique.png}
+    \caption{Architecture logique de la plateforme}
+    \label{fig:archi-logique}
+\end{figure}
+
+Un principe de conception central de cette architecture est que \textbf{le backend Spring Boot est l'unique point d'entrée autorisé vers le cluster} : ni les portails React, ni les clients externes (pipelines CI/CD via clé d'API) n'interagissent directement avec l'API Kubernetes. Ce choix garantit que toute action sur le cluster passe par les contrôles d'authentification, d'autorisation et d'appartenance (isolation multi-tenant) implémentés dans la couche service.
+
+\section{Architecture physique}
+
+La figure~\ref{fig:archi-physique} présente l'architecture physique (diagramme de déploiement) de la plateforme telle qu'exploitée sur le cluster Kubernetes de trois nœuds décrit au chapitre précédent.
+
+\begin{figure}[h!]
+ \centering
+    \includegraphics[width=13.5cm]{diagrammes/architecture_physique.png}
+    \caption{Diagramme de déploiement de la plateforme}
+    \label{fig:archi-physique}
+\end{figure}
+
+Les éléments principaux de ce déploiement sont :
+
+\begin{itemize}
+    \item Chaque \textbf{tenant} (client) dispose de son propre espace de noms (\textit{namespace}) Kubernetes, isolé des autres tenants par une ressource \texttt{NetworkPolicy} créée automatiquement à la première utilisation.
+    \item Les applications des clients sont déployées comme des ressources \texttt{Service} de Knative Serving à l'intérieur de leur espace de noms respectif ; chaque service Knative peut être instancié en zéro, une ou plusieurs révisions actives (\textit{Revision}) selon la charge.
+    \item Le backend, les deux portails React, Keycloak et PostgreSQL sont déployés dans un espace de noms dédié à la plateforme (\texttt{platform}), distinct des espaces de noms des tenants.
+    \item Un cluster Kafka, opéré par Strimzi, héberge les sujets (\textit{topics}) créés par les clients ; Knative Eventing s'interface avec ce cluster via les ressources \texttt{KafkaSource}, \texttt{Broker} et \texttt{Trigger}.
+    \item L'accès externe au cluster est assuré par MetalLB (attribution d'adresses IP de type \textit{LoadBalancer}) et par la passerelle Kourier pour le trafic à destination des services Knative.
+\end{itemize}
+
+\section{Diagramme de composants}
+
+Le diagramme de composants de la figure~\ref{fig:archi-composants} détaille les principaux modules internes du backend Spring Boot et leurs dépendances, organisés par domaine métier (\textit{package-by-feature}) : gestion des applications (\texttt{app}), facturation (\texttt{billing}), utilisateurs et permissions (\texttt{user}), sécurité (\texttt{security}), clés d'API (\texttt{apikey}), Kafka (\texttt{kafka}), Eventing (\texttt{eventing}), administration (\texttt{admin}) et journaux (\texttt{logs}). Chacun de ces modules s'appuie sur un client Fabric8 partagé pour ses interactions avec le cluster Kubernetes, et sur une base PostgreSQL commune pour la persistance de ses entités.
+
+\begin{figure}[h!]
+ \centering
+    \includegraphics[width=13.5cm]{diagrammes/diagramme_composants.png}
+    \caption{Diagramme de composants du backend}
+    \label{fig:archi-composants}
+\end{figure}
+
+\section{Diagramme de classes}
+
+Le diagramme de classes de la figure~\ref{fig:classes-global} présente les entités métier centrales du système et leurs relations : \texttt{User} (avec son rôle \texttt{UserRole} — ADMIN, CLIENT\_ADMIN, MEMBER — et ses permissions individuelles), \texttt{App} (l'application déployée par un client, avec son statut et ses paramètres de mise à l'échelle), \texttt{DeploymentLog} (historique des événements de cycle de vie d'une application), \texttt{BillingSnapshot} et \texttt{AppInvoice} (facturation), ainsi que les entités liées aux clés d'API. La classe \texttt{User} est reliée à \texttt{App} par une relation de propriété, résolue à l'exécution par le service \texttt{UserContextService} qui rattache systématiquement les ressources d'un \texttt{MEMBER} à son \texttt{CLIENT\_ADMIN} (modèle de délégation de propriété).
+
+\begin{figure}[h!]
+ \centering
+    \includegraphics[width=13.5cm]{diagrammes/diagramme_classes.png}
+    \caption{Diagramme de classe général}
+    \label{fig:classes-global}
+\end{figure}
+
+\section{Diagrammes de séquence des processus métier principaux}
+
+Cette section présente les diagrammes de séquence des processus transverses les plus structurants du système, communs à plusieurs sprints de réalisation. Les diagrammes de séquence propres à une fonctionnalité précise et localisée à un seul sprint seront, quant à eux, présentés directement dans le chapitre correspondant.
+
+\subsection{Processus de déploiement d'une application}
+
+Le processus de déploiement, illustré à la figure~\ref{fig:seq-deploiement}, se déroule selon les étapes suivantes :
+
+\begin{enumerate}
+    \item Le client renseigne le formulaire de déploiement (nom, image Docker, port, ressources, bornes de mise à l'échelle) sur le portail.
+    \item Le portail envoie une requête \texttt{POST /api/apps} au backend.
+    \item Le backend résout l'identité effective de l'appelant (délégation MEMBER $\rightarrow$ CLIENT\_ADMIN), puis génère un nom de service unique compatible DNS.
+    \item L'entité \texttt{App} est immédiatement persistée avec le statut \texttt{DEPLOYING}, un \texttt{DeploymentLog} est créé et diffusé en temps réel au portail via un flux d'événements serveur (SSE).
+    \item Le backend répond immédiatement au client, \textbf{avant} que le déploiement effectif sur le cluster ne soit terminé.
+    \item De manière asynchrone, le backend s'assure de l'existence de l'espace de noms du tenant et de sa \texttt{NetworkPolicy}, puis crée la ressource \texttt{Service} de Knative Serving correspondante.
+    \item Knative crée une \texttt{Revision} et une \texttt{Route} ; le pod applicatif démarre (ou reste à zéro instance si le minimum de réplicas est nul).
+    \item Un observateur (\textit{watcher}) Fabric8 met à jour le statut de l'application en base de données au fil de l'évolution de l'état réel du cluster, et le portail reflète ce statut en temps réel.
+\end{enumerate}
+
+\begin{figure}[h!]
+ \centering
+    \includegraphics[width=15.5cm,height=21cm]{diagrammes/sequence_deploiement.png}
+    \caption{Diagramme de séquence du processus de déploiement d'une application}
+    \label{fig:seq-deploiement}
+\end{figure}
+
+\subsection{Processus événementiel Kafka vers Knative}
+
+Le processus déclenché par la réception d'un message Kafka, illustré à la figure~\ref{fig:seq-eventing}, se déroule selon les étapes suivantes :
+
+\begin{enumerate}
+    \item Un producteur publie un message sur un sujet Kafka du cluster Strimzi.
+    \item La ressource \texttt{KafkaSource}, associée à ce sujet, consomme le message et l'encapsule au format \textit{CloudEvent}, avant de le transmettre par requête HTTP au \textit{Broker} de Knative Eventing.
+    \item Le \textit{Broker} évalue les filtres définis par les ressources \texttt{Trigger} enregistrées et transmet l'événement à l'application abonnée correspondante.
+    \item Si l'application cible est à zéro instance, l'\textit{Activator} de Knative intercepte la requête, la met en attente, et déclenche la remise à l'échelle du service.
+    \item Une fois l'instance disponible, l'application traite l'événement reçu et retourne une réponse HTTP 200.
+    \item En l'absence de nouvelle sollicitation, l'application redescend automatiquement à zéro instance après une période d'inactivité.
+\end{enumerate}
+
+\begin{figure}[h!]
+ \centering
+    \includegraphics[width=15.5cm,height=21cm]{diagrammes/sequence_eventing.png}
+    \caption{Diagramme de séquence du processus événementiel Kafka $\rightarrow$ Knative Eventing}
+    \label{fig:seq-eventing}
+\end{figure}
+
+\newpage
+\section{Conclusion}
+
+Ce chapitre a présenté la modélisation globale de la plateforme : son architecture logique en quatre couches, son architecture physique de déploiement sur le cluster Kubernetes, le découpage en composants du backend, le diagramme de classes des entités métier centrales, ainsi que les processus transverses de déploiement d'une application et de traitement événementiel Kafka/Knative Eventing. Cette vue d'ensemble constitue le cadre de référence sur lequel s'appuient les chapitres suivants, qui détaillent, sprint par sprint et release par release, la réalisation progressive de la plateforme.

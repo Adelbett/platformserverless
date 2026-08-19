@@ -1,19 +1,4 @@
-# Default-deny network isolation for a tenant namespace (audit ticket 009).
-#
-# `NAMESPACE_PLACEHOLDER` must be substituted with a real tenant namespace
-# name (e.g. user-adel) before applying — see the apply commands in
-# docs/audit-fixes/009-network-policy-tenants.md. This manifest is only
-# needed for namespaces that already existed before KnativeService.java
-# started creating this policy automatically for every new namespace
-# (see ensureNetworkPolicyExists in backend-api/.../app/KnativeService.java).
-#
-# Allowed: traffic within the same tenant namespace; ingress from Kourier
-# (public routing), knative-serving (Knative control plane probes/routing)
-# and monitoring (Prometheus scraping); egress to DNS, to the shared Kafka
-# namespace, and back to knative-serving/kourier-system. Everything else —
-# including direct pod-to-pod traffic with other tenant namespaces, or
-# with Postgres/Keycloak in the "platform" namespace — is denied by
-# default.
+
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

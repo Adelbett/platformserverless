@@ -1,0 +1,104 @@
+@startuml sequence_configurer_trigger
+' Séquence — configuration d'un KafkaSource puis d'un Trigger
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 11
+skinparam sequence {
+  ArrowColor #2C3E50
+  LifeLineBorderColor #7F8C8D
+  ParticipantBorderColor #2C3E50
+  ParticipantBackgroundColor #F7F9FC
+}
+autonumber
+title Configurer un KafkaSource et un Trigger — /api/eventing
+actor "CLIENT_ADMIN / MEMBER" as U
+participant "web-portal\nEventing.jsx" as WEB
+participant "EventingController" as CTRL
+participant "PermissionService" as PERM
+participant "UserContextService" as UCTX
+participant "EventingService" as SVC
+participant "KafkaTopicRepository" as TREPO
+participant "KafkaSourceRepository" as SREPO
+participant "TriggerRepository" as TRREPO
+participant "KubernetesClient\n(Fabric8)" as K8S
+
+== 1. Création du KafkaSource ==
+
+U -> WEB : choisit un topic, un nom de source
+WEB -> CTRL : POST /api/eventing/sources\n{kafkaTopicId, name, namespace, config}
+activate CTRL
+CTRL -> PERM : has(username,'MANAGE_EVENTING')
+PERM --> CTRL : true
+CTRL -> UCTX : resolve(auth.getName())
+UCTX --> CTRL : UserContext(effectiveUserId, namespace)
+CTRL -> SVC : createKafkaSource(userId, kafkaTopicId, name, namespace, config)
+activate SVC
+
+SVC -> TREPO : findById(kafkaTopicId) — vérifie la propriété du topic
+TREPO --> SVC : KafkaTopic
+
+SVC -> SVC : ensureBrokerExists(appNamespace)
+SVC -> K8S : get eventing.knative.dev/v1 Broker 'default'
+alt Broker absent
+  SVC -> K8S : create Broker 'default' (ns tenant)
+end
+
+SVC -> SREPO : save(KafkaSource{consumerGroup, bootstrapServers, ready=false})
+SREPO --> SVC : KafkaSource persistée
+
+SVC -> K8S : create sources.knative.dev/v1beta1 KafkaSource\nspec.bootstrapServers[], spec.topics[],\nspec.consumerGroup,\nspec.sink = {Broker "default"}
+K8S --> SVC : CR créée
+SVC --> CTRL : KafkaSourceDto
+deactivate SVC
+CTRL --> WEB : 200 OK
+deactivate CTRL
+
+== 2. Création du Trigger ==
+
+U -> WEB : saisit le type d'événement (filter)\net l'URL de l'application (action)
+WEB -> CTRL : POST /api/eventing/triggers\n{kafkaSourceId, filter, action}
+activate CTRL
+CTRL -> PERM : has(username,'MANAGE_EVENTING')
+PERM --> CTRL : true
+CTRL -> SVC : createTrigger(userId, kafkaSourceId, filter, action)
+activate SVC
+
+SVC -> SREPO : requireOwnedSource(kafkaSourceId, userId)
+SREPO --> SVC : KafkaSource
+SVC -> SVC : triggerName = source.getName() + "-trigger"\nsubscriberName = action sans schéma, normalisé
+SVC -> TRREPO : save(Trigger{filterType="exact", active=true})
+
+alt kubernetesEnabled
+  SVC -> K8S : create eventing.knative.dev/v1 Trigger\nspec.broker = "default"\nspec.filter.attributes.type = filter\nspec.subscriber.uri = action\n(ns = source.getNamespace())
+  alt échec cluster
+    K8S --> SVC : KubernetesClientException
+    SVC -> TRREPO : rollback @Transactional (ligne DB annulée)
+    SVC --> CTRL : exception → GlobalExceptionHandler
+  end
+end
+
+SVC --> CTRL : void
+deactivate SVC
+CTRL --> WEB : 200 OK
+deactivate CTRL
+WEB --> U : Trigger actif
+
+== 3. Consultation ==
+WEB -> CTRL : GET /api/eventing/sources · GET /api/eventing/triggers
+CTRL -> SVC : listKafkaSources(userId) / listTriggersForUser(userId)
+SVC -> K8S : checkReady("sources.knative.dev/v1beta1","KafkaSource", …)
+SVC --> CTRL : DTO enrichis du champ ready réel
+
+' Classes utilisées : KafkaSource, Trigger, KafkaTopic, KafkaSourceDto, TriggerDto
+' Contrôleurs utilisés : EventingController (POST /sources, POST /triggers, DELETE /triggers/{id}, GET /sources, GET /triggers)
+' Services utilisés : EventingService, PermissionService, UserContextService, KafkaTopicRepository, KafkaSourceRepository, TriggerRepository
+' Pourquoi ces éléments apparaissent : createKafkaSource() garantit d'abord l'existence du Broker (le sink), puis persiste en base et crée la CR ; createTrigger() est @Transactional pour éviter un Trigger « fantôme » en base si le cluster refuse la CR.
+' Fichiers sources vérifiés :
+'   eventing/EventingController.java:32-84
+'   eventing/EventingService.java:82-196 (createKafkaSource), :113-141 (ensureBrokerExists)
+'   eventing/EventingService.java:232-261 (createTrigger), :346-370 (createKnativeTrigger)
+'   eventing/EventingService.java:198-223 (listKafkaSources + checkReady)
+'   user/PermissionService.java:13-17 ; user/UserContextService.java:20-37
+' Divergence relevée : le nom du Trigger n'est pas choisi par l'utilisateur — il est dérivé (« <nom de la source>-trigger ») ; le filtre est toujours de type « exact » sur l'attribut CloudEvent « type ».
+@enduml

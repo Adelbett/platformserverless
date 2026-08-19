@@ -73,9 +73,16 @@ public class BillingService {
     }
 
     // ── Take a snapshot of ALL apps right now ────────────────────────────────────
+    // Excludes DELETED apps: they no longer consume any cluster resources
+    // (KnativeService.delete() already tore down their Knative Service), so
+    // no *new* cost should ever accrue for them. Their prior snapshots are
+    // untouched — billing history is preserved for anything owed before
+    // deletion (see AppService.deleteApp()).
     public void takeSnapshot() {
         LocalDateTime hour = LocalDateTime.now().withMinute(0).withSecond(0).withNano(0);
-        List<App> apps = appRepository.findAll();
+        List<App> apps = appRepository.findAll().stream()
+                .filter(a -> !"DELETED".equals(a.getStatus()))
+                .toList();
         int saved = 0;
         for (App app : apps) {
             if (snapshotRepo.existsByAppIdAndSnapshotTime(app.getId(), hour)) continue;
@@ -192,6 +199,7 @@ public class BillingService {
 
         double mtd        = snapshots.stream().mapToDouble(BillingSnapshot::getTotalCost).sum();
         double hourlyNow  = appRepository.findByUserId(userId).stream()
+                .filter(a -> !"DELETED".equals(a.getStatus()))
                 .mapToDouble(BillingService::hourlyRate).sum();
 
         return BillingHistoryResponse.builder()
@@ -228,7 +236,9 @@ public class BillingService {
                 .toList();
 
         List<App> allApps = appRepository.findAll();
-        double platformHourly = allApps.stream().mapToDouble(BillingService::hourlyRate).sum();
+        double platformHourly = allApps.stream()
+                .filter(a -> !"DELETED".equals(a.getStatus()))
+                .mapToDouble(BillingService::hourlyRate).sum();
 
         // Build per-client entries
         List<AdminBillingResponse.ClientBilling> clients = byUser.entrySet().stream()
@@ -286,6 +296,7 @@ public class BillingService {
 
         double mtd = snapshots.stream().mapToDouble(BillingSnapshot::getTotalCost).sum();
         double hourlyNow = appRepository.findByUserId(userId).stream()
+                .filter(a -> !"DELETED".equals(a.getStatus()))
                 .mapToDouble(BillingService::hourlyRate).sum();
 
         return AdminBillingResponse.ClientBilling.builder()

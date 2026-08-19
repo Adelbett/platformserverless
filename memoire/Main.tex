@@ -1,0 +1,261 @@
+\documentclass[a4paper,12pt]{book}
+
+\usepackage{tikz}
+\usetikzlibrary{positioning}
+\usepackage{float}
+\usepackage[french]{babel}
+
+% mise en page des tableaux
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage[table,xcdraw]{xcolor}
+\usepackage{wrapfig}
+\usepackage{pdfpages}
+\usepackage{pifont}
+\usepackage{enumitem}
+\usepackage{subcaption}
+\usepackage{color, colortbl}
+\definecolor{Gray}{gray}{0.9}
+\definecolor{LightCyan}{rgb}{0.88,1,1}
+\definecolor{babyblue}{rgb}{0.54, 0.81, 0.94}
+\definecolor{ao(english)}{rgb}{0.0, 0.5, 0.0}
+\definecolor{bittersweet}{rgb}{1.0, 0.44, 0.37}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{lscape}
+\usepackage{afterpage}
+\usepackage{rotating}
+\usepackage[nottoc,notlof,notlot]{tocbibind}
+\usepackage{tocloft}
+\setlength{\cftchapnumwidth}{3em}
+\setlength{\cftsecnumwidth}{3em}
+\setlength{\cftsubsecnumwidth}{4em}
+\setlength{\cftsubsubsecnumwidth}{4em}
+
+\graphicspath{{images/}{diagrammes/}{captures/}}
+\newlength\figureheight
+\newlength\figurewidth
+\usepackage{ifthen}
+\usepackage{ifpdf}
+\usepackage[hyphens]{url}
+\usepackage{ragged2e}
+\ifpdf
+\usepackage[unicode]{hyperref}
+\else
+\usepackage{hyperref}
+\fi
+\hypersetup{%
+colorlinks=true,
+linkcolor=black,
+citecolor=black,
+urlcolor=blue}
+
+\usepackage[top=2.5cm,bottom=2.5cm,right=2.5cm,left=2.5cm]{geometry}
+\usepackage{changepage}
+
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\newcolumntype{Y}{>{\RaggedRight\arraybackslash}X}
+\newcolumntype{c}[1]{>{\centering\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+\newcolumntype{l}[1]{>{\raggedright\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+\newcolumntype{r}[1]{>{\raggedleft\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+
+\usepackage{xltabular}
+\renewcommand{\tablename}{Tableau}
+\renewcommand{\figurename}{Figure}
+\raggedbottom
+\usepackage{placeins}
+
+% références bibliographiques (natbib, cohérent avec bibliography.bib existant)
+\usepackage[round]{natbib}
+
+% extraits de code (manifestes YAML, Java) — ajouté pour les chapitres de réalisation
+\usepackage{listings}
+\lstdefinestyle{codestyle}{
+    backgroundcolor=\color{Gray!30},
+    basicstyle=\ttfamily\footnotesize,
+    keywordstyle=\color{blue},
+    commentstyle=\color{ao(english)},
+    stringstyle=\color{bittersweet},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    breaklines=true,
+    breakatwhitespace=false,
+    frame=single,
+    tabsize=2,
+    showstringspaces=false
+}
+\lstset{style=codestyle}
+
+\setcounter{secnumdepth}{3}
+\setcounter{tocdepth}{3}
+
+\setlength\arrayrulewidth{1pt}
+\renewcommand{\baselinestretch}{1.05}
+
+\usepackage{minitoc}
+\mtcsetdepth{minitoc}{5}
+\dominitoc
+
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\bfseries\nouppercase{\leftmark}}
+\fancyhead[R]{\bfseries\nouppercase{\rightmark}}
+\fancyfoot[R]{\bfseries\thepage}
+\let\headruleORIG\headrule
+\renewcommand{\headrule}{\color{black}\headruleORIG}
+\renewcommand{\headrulewidth}{1.0pt}
+\arrayrulecolor{black}
+
+\fancypagestyle{plain}{
+  \fancyhead{}
+  \fancyfoot[R]{\bfseries\thepage}
+  \renewcommand{\headrulewidth}{0pt}
+}
+
+\usepackage{makecell}
+\renewcommand{\arraystretch}{1.4}
+\renewcommand\theadalign{bl}
+\renewcommand\theadfont{\bfseries}
+\renewcommand\cellalign{bl}
+\renewcommand\cellgape{\Gape[2pt]}
+
+\makeatletter
+\let\cleardoublepage\clearpage
+\makeatother
+
+\usepackage{amsthm}
+\usepackage{amssymb,amsmath,bbm}
+\usepackage{bm}
+\usepackage[footnote]{acronym}
+\usepackage[bottom]{footmisc}
+\usepackage{url}
+
+\newtheoremstyle{break}
+  {11pt}{11pt}%
+  {\itshape}{}%
+  {\bfseries}{}%
+  {\newline}{}%
+\theoremstyle{break}
+\newtheorem{definition}{Définition}[chapter]
+\newtheorem{theoreme}{Théorème}[chapter]
+\newtheorem{remarque}{Remarque}[chapter]
+\newtheorem{propriete}{Propriété}[chapter]
+\newtheorem{exemple}{Exemple}[chapter]
+
+\parskip=5pt
+
+% ---- macro de citation en exergue (fquote) ----
+\usepackage{xcolor}
+\definecolor{quotemark}{gray}{0.7}
+\makeatletter
+\def\fquote{%
+    \@ifnextchar[{\fquote@i}{\fquote@i[]}%]
+           }%
+\def\fquote@i[#1]{%
+    \def\tempa{#1}%
+    \@ifnextchar[{\fquote@ii}{\fquote@ii[]}%]
+                 }%
+\def\fquote@ii[#1]{%
+    \def\tempb{#1}%
+    \@ifnextchar[{\fquote@iii}{\fquote@iii[]}%]
+                      }%
+\def\fquote@iii[#1]{%
+    \def\tempc{#1}%
+    \vspace{1em}%
+    \noindent%
+    \begin{list}{}{%
+         \setlength{\leftmargin}{0.1\textwidth}%
+         \setlength{\rightmargin}{0.1\textwidth}%
+                  }%
+         \item[]%
+         \begin{picture}(0,0)%
+         \put(-15,-5){\makebox(0,0){\scalebox{3}{\textcolor{quotemark}{``}}}}%
+         \end{picture}%
+         \begingroup\itshape}%
+\def\endfquote{%
+ \endgroup\par%
+ \makebox[0pt][l]{%
+ \hspace{0.8\textwidth}%
+ \begin{picture}(0,0)(0,0)%
+ \put(15,15){\makebox(0,0){%
+ \scalebox{3}{\color{quotemark}''}}}%
+ \end{picture}}%
+ \ifx\tempa\empty%
+ \else%
+    \ifx\tempc\empty%
+       \hfill\rule{100pt}{0.5pt}\\\mbox{}\hfill\tempa,\ \emph{\tempb}%
+   \else%
+       \hfill\rule{100pt}{0.5pt}\\\mbox{}\hfill\tempa,\ \emph{\tempb},\ \tempc%
+   \fi\fi\par%
+   \vspace{0.5em}%
+ \end{list}%
+ }%
+\makeatother
+
+\newcommand\blankpage{%
+    \null
+    \thispagestyle{empty}%
+    \addtocounter{page}{-1}%
+    \newpage}
+
+\usepackage[page,toc,titletoc,title]{appendix}
+\addto\captionsfrench{%
+  \renewcommand\appendixname{Annexe}
+  \renewcommand\appendixpagename{Annexes}
+  \renewcommand{\appendixtocname}{Annexes}
+}
+\usepackage{etoolbox}
+\appto\appendix{\addtocontents{toc}{\protect\setcounter{tocdepth}{0}}}
+\appto\listoffigures{\addtocontents{lof}{\protect\setcounter{tocdepth}{1}}}
+\appto\listoftables{\addtocontents{lot}{\protect\setcounter{tocdepth}{1}}}
+
+\usepackage[Lenny]{fncychap}
+
+\begin{document}
+
+% -- Pages de garde --
+\includepdf[pages=-,pagecommand={\thispagestyle{empty}}]{Garde-P2.pdf}
+\includepdf[pages=-,pagecommand={\thispagestyle{empty}}]{Garde-P3.pdf}
+
+\pagenumbering{Roman}
+\include{Dedicaces}
+\include{Remerciements}
+
+\renewcommand{\cftpartleader}{\cftdotfill{\cftdotsep}}
+\renewcommand{\cftchapleader}{\cftdotfill{\cftdotsep}}
+\tableofcontents
+\clearpage
+\listoffigures
+\clearpage
+\listoftables
+
+\begin{flushleft}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Contenu du mémoire et références       %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\pagenumbering{arabic}
+\include{Introduction}
+\include{Chapter1}
+\include{Chapter2}
+\include{Chapter3}
+\include{Chapter4}
+\include{Chapter5}
+\include{Chapter6}
+\include{Chapter7}
+\include{Conclusion}
+
+\bibliographystyle{alpha}
+\bibliography{bibliography}
+\addcontentsline{toc}{chapter}{Bibliographie}
+
+\end{flushleft}
+
+\pagestyle{empty}
+%\include{Annexe1} % TODO: fichier d'annexe absent du dépôt, à créer si besoin
+
+\include{garde_fin2}
+
+\end{document}

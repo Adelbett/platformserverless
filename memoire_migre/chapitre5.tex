@@ -1,0 +1,300 @@
+\chapter{Validation}
+
+\section{Introduction}
+
+Les chapitres précédents ont présenté la réalisation progressive de la plateforme, release après release, en documentant au fil de l'eau les anomalies rencontrées et les corrections apportées. Ce chapitre, qui regroupe le Sprint 12 (tests, validation, corrections et stabilisation) et le Sprint 13 (documentation et préparation de la soutenance), a pour objectif de dresser un bilan global et honnête de l'état de la plateforme au terme du projet : la méthodologie de test suivie, les résultats obtenus, l'évolution de la posture de sécurité mesurée par deux audits successifs, et la synthèse consolidée des limites connues et des perspectives d'amélioration. Conformément à la démarche d'honnêteté académique adoptée tout au long de ce mémoire, ce chapitre ne cherche pas à masquer les points inachevés du projet mais à les documenter avec la même rigueur que les fonctionnalités abouties.
+
+\clearpage
+\section{Sprint 12 : Tests, validation, corrections et stabilisation}
+
+\subsection{Introduction}
+
+Ce sprint a pour objectif de valider, de manière transversale à l'ensemble des fonctionnalités développées depuis le Sprint 0, le comportement fonctionnel de la plateforme, et de mener un audit de sécurité formel destiné à identifier et corriger les vulnérabilités les plus critiques avant la mise en exploitation.
+
+\subsection{Objectifs du Sprint}
+
+\begin{itemize}
+    \item Exécuter une campagne de validation fonctionnelle couvrant l'ensemble des modules développés depuis le Sprint 0, avec un plan de test structuré et un résultat tracé pour chaque cas.
+    \item Mener un audit de sécurité formel de la plateforme, mesurer un score initial, corriger les vulnérabilités identifiées dans la mesure du possible, et mesurer un second score après correction.
+    \item Documenter explicitement les vulnérabilités traitées comme un risque assumé plutôt que corrigées, avec leur justification.
+\end{itemize}
+
+\subsection{Sprint Backlog}
+
+Le tableau~\ref{tab:sb-sprint12} présente le backlog détaillé du Sprint 12, obtenu en décomposant chaque User Story retenue en tâches techniques.
+
+% \needspace garantit qu'il reste assez de place sur la page : sans cela une
+% coupure peut tomber au milieu d'un groupe \multirow, dont le contenu deborde
+% alors hors du cadre et laisse une cellule vide sur la page suivante.
+\needspace{0.9\textheight}
+{
+% Le tableau deborde volontairement de 1,5 cm dans chaque marge afin de laisser
+% respirer les trois colonnes ; LTleft/LTright sont les parametres propres a
+% longtable (adjustwidth n'a aucun effet sur cet environnement).
+% Largeur totale : 18,8 cm, soit 1 cm de blanc conserve de chaque cote de la page.
+\setlength{\LTleft}{-1.5cm}
+\setlength{\LTright}{-1.5cm}
+\setlength{\tabcolsep}{8pt}
+\renewcommand{\arraystretch}{1.9}
+\begin{longtable}{|p{6.6cm}|>{\raggedright\arraybackslash}p{8.1cm}|>{\centering\arraybackslash}p{2.3cm}|}
+\hline
+User Story & Tâches & Estimation \\
+\hline
+\endfirsthead
+\hline
+User Story & Tâches & Estimation \\
+\hline
+\endhead
+\hline
+\endfoot
+
+\caption{Backlog du Sprint 12}
+\label{tab:sb-sprint12}
+\endlastfoot
+
+\multirow{1}{6.6cm}{
+\centering
+En tant qu'équipe projet, je veux disposer d'un plan de test couvrant tous les modules.
+}
+&
+Rédiger un plan de 84 cas de test répartis par module fonctionnel.
+& — \\
+\hline
+
+\multirow{2}{6.6cm}{
+\centering
+En tant qu'exploitant, je veux connaître le niveau de sécurité réel de la plateforme et mesurer son amélioration.
+}
+&
+Mener un premier audit de sécurité formel.
+& — \\
+\cline{2-3}
+
+&
+Mener un second audit après corrections.
+& — \\
+\hline
+
+\multirow{1}{6.6cm}{
+\centering
+En tant qu'exploitant, je veux que les vulnérabilités critiques soient corrigées ou explicitement assumées.
+}
+&
+Traiter chaque vulnérabilité identifiée (correction ou acceptation documentée).
+& — \\
+\hline
+
+\end{longtable}
+}
+
+\subsection{Conception}
+
+\subsubsection{Méthodologie de test}
+
+La validation fonctionnelle de la plateforme s'est appuyée sur un plan de test manuel structuré, couvrant 84 cas de test répartis sur l'ensemble des modules fonctionnels de la plateforme (authentification et gestion des comptes, gestion des applications, gestion de Kafka, configuration de l'Eventing, facturation, supervision, administration). Ce plan de test constitue le référentiel méthodologique de la campagne de validation ; en toute rigueur, il convient de préciser qu'au moment de la rédaction de ce mémoire, ce document se présente comme une grille de vérification prête à l'exécution, dont les colonnes de statut restent à renseigner de manière exhaustive au fil de son exécution complète, il ne doit donc pas être présenté comme la preuve d'une campagne de test intégralement exécutée et tracée, mais comme la méthodologie de validation retenue pour le projet.
+
+En complément de ce plan de test fonctionnel, la validation technique des fonctionnalités backend non encore exposées graphiquement au moment de leur développement (Kafka et Eventing, avant que le portail ne les expose, Sprint 5) a été réalisée par appels directs à l'API REST à l'aide de l'outil Postman.
+
+La figure~\ref{fig:sprint11-strategie-validation} synthétise la chaîne de validation retenue pour ce sprint, du plan de test à la mesure finale de la posture de sécurité.
+
+\begin{figure}[H]
+    \centering
+    \fbox{
+        \parbox{0.9\textwidth}{
+            \centering
+            [DIAGRAMME À CRÉER : Stratégie de validation de la plateforme, Plan de test (84 cas) + appels Postman $\rightarrow$ Exécution $\rightarrow$ Audit de sécurité initial (score 4/10) $\rightarrow$ Corrections (7/9 vulnérabilités) $\rightarrow$ Audit de sécurité final (score 5,2/10)]
+        }
+    }
+    \caption{Chaîne de validation fonctionnelle et technique de la plateforme}
+    \label{fig:sprint11-strategie-validation}
+\end{figure}
+
+\subsubsection{Audit de sécurité et amélioration de la posture de sécurité}
+
+Deux audits de sécurité successifs ont été menés sur la plateforme au cours de ce sprint, permettant de mesurer objectivement la progression de sa posture de sécurité.
+
+Le premier audit a établi un score de sécurité initial de 4/10, identifiant notamment les vulnérabilités suivantes, déjà évoquées au fil des chapitres précédents : accès non contrôlé à des ressources appartenant à d'autres tenants (IDOR) sur les journaux de déploiement et sur la suppression de moyens de paiement, secrets applicatifs versionnés en clair, configuration CORS trop permissive combinée à l'acceptation des identifiants de session, absence de limites de ressources par défaut sur les espaces de noms clients, rôles Kubernetes sous-déclarés, transmission du jeton d'authentification dans les paramètres d'URL du flux de journaux, absence de règles d'isolation réseau entre tenants, exécution du déploiement en apparence asynchrone mais en réalité bloquante, et incohérences du flux de journaux en temps réel selon le rôle de l'utilisateur.
+
+Un second audit, mené après correction, a établi un score de 5,2/10, sur la base du traitement suivant. Une dernière constatation s'y ajoute, issue de l'inspection de la ressource \texttt{Kafka} du cluster : l'écouteur externe exposé sur le port 9093 est déclaré \texttt{tls: false} et ne comporte aucune section d'authentification. Le bus d'événements est donc accessible depuis le réseau local sans chiffrement ni contrôle d'accès, ce que le modèle d'isolation par \texttt{NetworkPolicy} du Sprint 0 ne couvre pas, puisqu'il protège les échanges entre espaces de noms et non un service délibérément publié hors du cluster. Cette constatation est intervenue trop tard dans le projet pour être corrigée, mais la remédiation est identifiée : activer TLS et une authentification SASL sur cet écouteur, ou le supprimer si l'accès externe n'est plus nécessaire.
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{|p{7.5cm}|p{6.5cm}|}
+\hline
+Vulnérabilité identifiée & Traitement \\
+\hline
+IDOR sur les journaux de déploiement & Corrigé \\
+\hline
+IDOR sur la suppression de moyens de paiement Stripe & Corrigé \\
+\hline
+Secrets en clair dans les manifestes versionnés & Corrigé (déplacés en \texttt{Secret} Kubernetes) \\
+\hline
+Configuration CORS permissive avec identifiants de session & Corrigé (liste blanche explicite) \\
+\hline
+Absence de limites de ressources par défaut par tenant & Accepté comme risque produit (modèle \og paiement à l'usage \fg) \\
+\hline
+Rôles Kubernetes (RBAC) sous-déclarés & Corrigé (reconstruits et vérifiés) \\
+\hline
+Jeton d'authentification transmis en paramètre d'URL (SSE) & Corrigé \\
+\hline
+Écouteur Kafka externe sans TLS ni authentification (\texttt{tls: false}, port 9093) & Identifié en fin de projet ; correction planifiée (TLS et SASL, ou retrait de l'écouteur) \\
+\hline
+Authentification par mot de passe direct (ROPC) au lieu d'Authorization Code + PKCE & Accepté comme risque produit \\
+\hline
+Absence de règles d'isolation réseau entre tenants & Corrigé (création automatique par tenant) \\
+\hline
+\end{tabular}
+\caption{Synthèse du traitement des vulnérabilités identifiées lors de l'audit de sécurité}
+\label{tab:audit-securite}
+\end{table}
+
+Sept des neuf vulnérabilités critiques ou majeures identifiées ont ainsi été effectivement corrigées, et deux ont fait l'objet d'une décision explicite d'acceptation du risque plutôt que d'une correction, faute de compatibilité immédiate avec le modèle produit visé (facturation à l'usage sans plafond de ressources) ou avec les contraintes de délai du projet (migration du flux d'authentification). Cette distinction entre « corrigé » et « risque assumé » constitue, de notre point de vue, une démarche d'ingénierie plus rigoureuse qu'une simple liste de correctifs, car elle documente une décision consciente plutôt qu'un oubli.
+
+\subsection{Réalisation}
+
+\subsubsection{Mise en œuvre}
+
+Au terme de ce sprint, la plateforme a fait l'objet d'une validation fonctionnelle méthodique et d'un durcissement de sécurité mesurable, avec une progression objectivée de 4/10 à 5,2/10. La plateforme est jugée stable pour une démonstration et une exploitation pilote, sous réserve des limites explicitement documentées à la section de synthèse de ce chapitre. Le plan de test se présente, à la rédaction de ce mémoire, comme une grille prête à l'exécution plutôt que comme une campagne intégralement tracée ; deux vulnérabilités restent des risques produit assumés plutôt que corrigées.
+
+\clearpage
+\section{Sprint 13 : Documentation et préparation de la soutenance}
+
+\subsection{Introduction}
+
+Ce dernier sprint a pour objectif de consolider la documentation technique de la plateforme et de préparer sa présentation devant le jury.
+
+\subsection{Objectifs du Sprint}
+
+\begin{itemize}
+    \item Consolider l'ensemble des décisions techniques, anomalies et correctifs du projet dans une documentation technique versionnée.
+    \item Formaliser un plan de sauvegarde et de restauration des données persistantes de la plateforme.
+    \item Préparer le mémoire et le support de soutenance devant le jury.
+\end{itemize}
+
+\subsection{Sprint Backlog}
+
+Le tableau~\ref{tab:sb-sprint13} présente le backlog détaillé du Sprint 13, obtenu en décomposant chaque User Story retenue en tâches techniques.
+
+% \needspace garantit qu'il reste assez de place sur la page : sans cela une
+% coupure peut tomber au milieu d'un groupe \multirow, dont le contenu deborde
+% alors hors du cadre et laisse une cellule vide sur la page suivante.
+\needspace{0.9\textheight}
+{
+% Le tableau deborde volontairement de 1,5 cm dans chaque marge afin de laisser
+% respirer les trois colonnes ; LTleft/LTright sont les parametres propres a
+% longtable (adjustwidth n'a aucun effet sur cet environnement).
+% Largeur totale : 18,8 cm, soit 1 cm de blanc conserve de chaque cote de la page.
+\setlength{\LTleft}{-1.5cm}
+\setlength{\LTright}{-1.5cm}
+\setlength{\tabcolsep}{8pt}
+\renewcommand{\arraystretch}{1.9}
+\begin{longtable}{|p{6.6cm}|>{\raggedright\arraybackslash}p{8.1cm}|>{\centering\arraybackslash}p{2.3cm}|}
+\hline
+User Story & Tâches & Estimation \\
+\hline
+\endfirsthead
+\hline
+User Story & Tâches & Estimation \\
+\hline
+\endhead
+\hline
+\endfoot
+
+\caption{Backlog du Sprint 13}
+\label{tab:sb-sprint13}
+\endlastfoot
+
+\multirow{1}{6.6cm}{
+\centering
+En tant qu'équipe projet, je veux une documentation technique exhaustive.
+}
+&
+Rédiger guide technique, fiches de correctifs, rapports d'audit.
+& — \\
+\hline
+
+\multirow{1}{6.6cm}{
+\centering
+En tant qu'exploitant, je veux un plan de sauvegarde formalisé.
+}
+&
+Documenter la politique de sauvegarde (PostgreSQL, Elasticsearch).
+& — \\
+\hline
+
+\multirow{1}{6.6cm}{
+\centering
+En tant qu'étudiant, je veux un mémoire fidèle au projet réel.
+}
+&
+Rédiger le mémoire à partir de la documentation technique.
+& — \\
+\hline
+
+\end{longtable}
+}
+
+\subsection{Réalisation}
+
+\subsubsection{Mise en œuvre}
+
+L'ensemble des décisions techniques, anomalies identifiées et correctifs apportés tout au long du projet ont été consignés de manière détaillée dans une documentation technique versionnée avec le code (guide technique complet, fiches de correctifs individuelles, rapports d'audit), constituant la source principale de ce mémoire. Un plan de sauvegarde et de restauration de la base de données PostgreSQL et de l'index Elasticsearch a également été formalisé, avec une politique de rétention de sept sauvegardes quotidiennes et quatre sauvegardes hebdomadaires.
+
+\paragraph{Précision sur la place réelle d'Elasticsearch dans le projet.} Le plan de sauvegarde ci-dessus, ainsi qu'une tâche planifiée versionnée dans le dépôt (\texttt{k8s/backup/elasticsearch-snapshot-cronjob.yaml}), confirment qu'une instance Elasticsearch est bien prévue comme composant d'infrastructure de la plateforme. Cela ne contredit pas le constat fait au Sprint 6 : la dépendance \texttt{spring-boot-starter-data-elasticsearch} du backend n'est appelée par aucune classe du code source, et aucun manifeste de déploiement de l'instance Elasticsearch elle-même (en dehors de la tâche de sauvegarde qui suppose son existence) n'a été retrouvé dans ce dépôt. Il subsiste donc, à la rédaction de ce mémoire, une incohérence entre une infrastructure de sauvegarde préparée pour Elasticsearch et une intégration applicative de ce composant non retrouvée dans le code, point repris dans la synthèse des limites ci-après plutôt que résolu par supposition.
+
+La plateforme dispose, au terme de ce sprint, d'une documentation technique exhaustive et d'un mémoire retraçant fidèlement sa réalisation, ses choix d'architecture et ses limites, prêts à être présentés devant le jury. Le guide d'exploitation reste incomplet pour certains composants (cluster, Knative, Kafka, monitoring), où seules des commandes de validation ponctuelles sont documentées, sans procédure d'exploitation complète ; par ailleurs, une incohérence subsiste entre le plan de sauvegarde Elasticsearch et l'absence d'intégration applicative retrouvée dans le code, ainsi que l'absence de manifeste de déploiement pour l'instance Elasticsearch elle-même. Ce sprint clôt la conduite du projet selon la planification Scrum définie au premier chapitre.
+
+\section{Synthèse des limites et perspectives d'amélioration}
+
+Cette section consolide, en un point unique, l'ensemble des limites identifiées au fil des chapitres de réalisation, ainsi que les fonctionnalités explicitement non implémentées à ce stade du projet.
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{|p{6.5cm}|p{7.5cm}|}
+\hline
+Limite ou fonctionnalité absente & Statut / perspective \\
+\hline
+Infrastructure du cluster (nœuds, CNI, MetalLB, Kourier) et cluster Kafka Strimzi non versionnés en infrastructure-as-code & Provisionnés manuellement (Sprints 0 et 2) ; perspective : formalisation via Helm/Kustomize/GitOps \\
+\hline
+Absence de limites de ressources (\texttt{LimitRange}) par défaut par tenant & Risque produit assumé (modèle à l'usage) \\
+\hline
+Flux d'authentification ROPC au lieu d'Authorization Code + PKCE & Risque produit assumé \\
+\hline
+Absence d'isolation forte (SASL/mTLS/ACL) entre tenants sur le cluster Kafka partagé & Non implémenté ; perspective : \texttt{KafkaUser} par tenant avec ACL dédiées \\
+\hline
+Écouteur Kafka externe (port 9093) exposé sans TLS ni authentification & Identifié en fin de projet ; perspective : activer TLS et SASL, ou retirer l'écouteur \\
+\hline
+Cluster Kafka à un seul courtier, stockage local de 1 Gio & Dimensionnement de développement ; perspective : trois courtiers et stockage répliqué \\
+\hline
+Mode ZooKeeper déprécié, retiré à partir de Strimzi 0.46.0 & Migration vers KRaft à prévoir avant toute montée de version \\
+\hline
+Jeton et jeton de rafraîchissement stockés dans le stockage local du navigateur & Non corrigé ; perspective : migration vers un stockage plus sûr (cookie httpOnly) \\
+\hline
+Collecte Prometheus des métriques du backend potentiellement toujours inopérante (étiquette de sélection incohérente) & Anomalie identifiée, correction non confirmée en production \\
+\hline
+Console d'administration exposée sur un port réseau fixe sans protection réseau dédiée & Non corrigé ; perspective : restriction d'accès réseau ou VPN dédié \\
+\hline
+Absence d'analyse de vulnérabilités des images de conteneurs dans les pipelines CI/CD & Non implémenté ; perspective : intégration d'un scanner d'images (ex. Trivy) \\
+\hline
+Conteneurs applicatifs exécutés avec l'utilisateur root par défaut & Non corrigé ; perspective : imposition d'utilisateurs non privilégiés \\
+\hline
+Pipelines CI/CD hétérogènes (portail, console, microservices moins aboutis que le backend) & Partiellement traité au Sprint 11 ; perspective : socle Jenkins commun \\
+\hline
+Absence de tests automatisés (unitaires/intégration) dans les pipelines CI/CD & Non implémenté ; perspective : intégration d'une étape de tests et de couverture de code \\
+\hline
+Duplication de code entre le portail client et la console d'administration & Non refactorisé ; perspective : extraction d'un paquet partagé ou passage à un monorepo \\
+\hline
+Mise en cache et découpage par domaine personnalisé (traffic splitting, domain mapping), non retrouvés dans le code audité & Non implémenté ; perspective d'évolution \\
+\hline
+\end{tabular}
+\caption{Synthèse des limites connues et des perspectives d'amélioration}
+\label{tab:limites}
+\end{table}
+
+Cette synthèse illustre une caractéristique assumée de la démarche suivie tout au long du projet : privilégier, à ressources et délai constants, la robustesse fonctionnelle du parcours principal (déploiement, supervision, facturation) plutôt qu'une couverture exhaustive de toutes les dimensions non fonctionnelles souhaitables. Les limites identifiées ne remettent pas en cause la validité de la démonstration technique réalisée, mais constituent une feuille de route réaliste pour une éventuelle industrialisation ultérieure de la plateforme.
+
+\section{Conclusion}
+
+Ce chapitre a présenté la validation de la plateforme au travers d'une campagne de tests fonctionnels méthodique et d'un audit de sécurité en deux temps, ayant permis de mesurer objectivement une amélioration de la posture de sécurité du système. Il a également dressé la synthèse honnête des limites connues du projet, condition nécessaire, à notre sens, à la crédibilité scientifique et professionnelle de ce mémoire devant un jury de cycle ingénieur. La conclusion générale qui suit revient sur les apports globaux du projet au regard de la problématique posée au premier chapitre.

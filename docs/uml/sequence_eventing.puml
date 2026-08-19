@@ -1,0 +1,89 @@
+@startuml sequence_eventing
+' Séquence — acheminement d'un événement Kafka jusqu'à l'application serverless
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 11
+skinparam sequence {
+  ArrowColor #2C3E50
+  LifeLineBorderColor #7F8C8D
+  ParticipantBorderColor #2C3E50
+  ParticipantBackgroundColor #F7F9FC
+}
+autonumber
+
+title Flux événementiel — Kafka → KafkaSource → Broker → Trigger → Activator → App
+
+actor "Producteur\n(client / MEMBER)" as P
+participant "EventController\nPOST /api/events" as ECTRL
+participant "EventService" as ESVC
+participant "Kafka (Strimzi)\nmy-cluster-kafka-bootstrap:9092" as KAFKA
+participant "KafkaSource\nsources.knative.dev/v1beta1\n(ns user-<tenant>)" as KSRC
+participant "Broker 'default'\neventing.knative.dev/v1\n(ns user-<tenant>)" as BROKER
+participant "Trigger\neventing.knative.dev/v1\nfilter.attributes.type" as TRIG
+participant "Activator / Autoscaler\n(knative-serving)" as ACT
+participant "Knative Service (App)\npod [queue-proxy | user-container]" as APP
+participant "LogSseService" as SSE
+
+P -> ECTRL : POST /api/events {payload}\n(Bearer JWT, MANAGE_EVENTING)
+activate ECTRL
+ECTRL -> ESVC : publish(payload, userId)
+activate ESVC
+ESVC -> KAFKA : KafkaProducer.send(topic, JSON)
+ESVC -> SSE   : push(DeploymentLog) — trace de publication
+ESVC --> ECTRL : ok
+deactivate ESVC
+ECTRL --> P : 200 OK
+deactivate ECTRL
+
+KAFKA -> KSRC : consommation par consumerGroup
+activate KSRC
+note right of KSRC
+  spec.sink :
+    apiVersion: eventing.knative.dev/v1
+    kind: Broker
+    name: default
+  → conversion message Kafka → CloudEvent
+end note
+KSRC -> BROKER : CloudEvent (ce-type, ce-source, data)
+deactivate KSRC
+
+activate BROKER
+BROKER -> TRIG : évaluation des filtres enregistrés
+activate TRIG
+alt attributes.type == filter (ex. "order.created")
+  TRIG -> ACT : POST CloudEvent → subscriber.uri (URL du Knative Service)
+  activate ACT
+  alt Revision scalée à zéro
+    ACT -> APP : scale-from-zero, mise en file de la requête
+  end
+  ACT -> APP : POST CloudEvent
+  activate APP
+  APP --> ACT : 2xx (ack) [ou réponse = nouvel événement]
+  deactivate APP
+  ACT --> TRIG : 2xx
+  deactivate ACT
+else type non correspondant
+  TRIG --> BROKER : événement ignoré
+end
+deactivate TRIG
+deactivate BROKER
+
+group Observabilité
+  APP ->> SSE : logs conteneur (user-container) via PodLogService
+  APP ->> ACT : métriques queue-proxy scrapées par Prometheus (PodMonitor)
+end
+
+' Classes utilisées : KafkaSource (entité), Trigger (entité), KafkaTopic, DeploymentLog
+' Contrôleurs utilisés : EventController (POST /api/events)
+' Services utilisés : EventService (KafkaProducer), EventingService (création des CR KafkaSource/Broker/Trigger), LogSseService, PodLogService
+' Pourquoi ces éléments apparaissent : le chemin Kafka → Broker est imposé par le sink du KafkaSource généré en Java ; le Trigger filtre sur attributes.type et pointe vers subscriber.uri = l'URL du Knative Service.
+' Fichiers sources vérifiés :
+'   eventing/EventController.java:15-25 ; eventing/EventService.java:26-54 (KafkaProducer)
+'   eventing/EventingService.java:113-141 (ensureBrokerExists — Broker 'default' dans le namespace tenant)
+'   eventing/EventingService.java:148-190 (createKafkaSource, sink = Broker, bootstrapServers)
+'   eventing/EventingService.java:346-370 (createKnativeTrigger — filter.attributes.type, subscriber.uri)
+'   k8s/tenant/network-policy.yaml:55-65 (egress autorisé vers ns kafka / knative-serving / kourier-system)
+'   k8s/monitoring/queue-proxy-podmonitor.yaml
+' Divergence relevée : le Broker n'est pas global — EventingService.ensureBrokerExists() crée un Broker nommé « default » dans chaque namespace tenant (le commentaire lignes 264-267 évoquant un « single global Broker » est obsolète).
+@enduml

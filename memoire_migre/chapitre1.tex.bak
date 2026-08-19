@@ -1,0 +1,1196 @@
+\chapter{Release 0 : Mise en place de la plateforme Cloud Native}
+
+\section{Introduction}
+
+La Release 0 constitue le socle technique du projet. Elle regroupe les trois premiers sprints, Sprint 0, Sprint 1 et Sprint 2, dont l'objectif commun est de mettre en place les briques d'infrastructure cloud native. Ces briques serviront de base, dans les releases suivantes, à la logique métier et aux interfaces utilisateur.
+
+Aucune de ces briques n'expose de fonctionnalité à un utilisateur final. Il s'agit d'un travail de fondation : valider que le cluster Kubernetes, la mise à l'échelle serverless de Knative Serving et le bus d'événements Kafka et Strimzi sont opérationnels, avant que le backend applicatif ne s'y raccorde à partir de la Release 1.
+
+Le Chapitre II a présenté l'architecture cible de la plateforme dans son ensemble. Ce chapitre répond à une question différente : comment chacune de ces briques a-t-elle été construite et validée, sprint après sprint. Les sprints de cette release ne comportent pas de diagramme de cas d'utilisation, car aucune fonctionnalité n'est encore accessible à un acteur humain.
+
+\clearpage
+\section{Sprint 0 : Mise en place de l'infrastructure Kubernetes}
+
+\subsection{Introduction}
+
+Rien ne peut être déployé tant qu'il n'existe pas de socle capable d'accueillir des charges de travail. Le premier sprint du projet porte donc entièrement sur le cluster Kubernetes lui-même : trois machines à mettre en réseau, un plugin réseau capable d'appliquer des règles d'isolation entre locataires, un mécanisme d'attribution d'adresses IP externes puisque le cluster n'est hébergé chez aucun fournisseur cloud, et une passerelle d'entrée prête à recevoir le trafic des applications Knative du sprint suivant.
+
+Aucune de ces briques ne produit de fonctionnalité visible pour un utilisateur. Elles conditionnent en revanche la totalité de ce qui vient ensuite, et les choix faits ici, en particulier celui du plugin réseau, se répercutent jusqu'au modèle d'isolation multi-tenant de la plateforme.
+
+\subsection{Objectifs du Sprint}
+
+\begin{itemize}
+    \item Mettre en place un cluster Kubernetes à trois nœuds opérationnels, à l'état Ready.
+    \item Configurer un réseau de conteneurs (CNI) capable d'appliquer des règles NetworkPolicy entre espaces de noms.
+    \item Isoler le trafic réseau entre les futurs tenants de la plateforme.
+    \item Attribuer des adresses IP externes aux services LoadBalancer, le cluster n'étant pas hébergé chez un fournisseur cloud.
+    \item Mettre en place la passerelle d'entrée Kourier, qui recevra le trafic vers les applications Knative à partir du Sprint 1.
+    \item Définir la convention des espaces de noms, un par tenant et un pour la plateforme, ainsi que la convention d'adressage des applications.
+\end{itemize}
+
+La plateforme utilise une convention de nommage de la forme <app>.<namespace>.<ip-cluster>.sslip.io. L'adresse IP du cluster est intégrée directement dans le nom d'hôte, et sslip.io la résout automatiquement, sans zone DNS locale à administrer. Ce choix convient à un cluster on-premise en développement, au prix d'une URL moins lisible qu'un domaine dédié.
+
+\subsection{Sprint Backlog}
+
+Le tableau~\ref{tab:sb-sprint0} présente le backlog détaillé du Sprint 0, obtenu en décomposant chaque \textit{User Story} retenue en tâches techniques.
+
+% \needspace garantit qu'il reste assez de place sur la page : sans cela une
+% coupure peut tomber au milieu d'un groupe \multirow, dont le contenu deborde
+% alors hors du cadre et laisse une cellule vide sur la page suivante.
+\needspace{0.9\textheight}
+{
+% Le tableau deborde volontairement de 1,5 cm dans chaque marge afin de laisser
+% respirer les trois colonnes ; LTleft/LTright sont les parametres propres a
+% longtable (adjustwidth n'a aucun effet sur cet environnement).
+% Largeur totale : 18,8 cm, soit 1 cm de blanc conserve de chaque cote de la page.
+\setlength{\LTleft}{-1.5cm}
+\setlength{\LTright}{-1.5cm}
+\setlength{\tabcolsep}{8pt}
+\renewcommand{\arraystretch}{1.9}
+\begin{longtable}{|p{6.6cm}|>{\raggedright\arraybackslash}p{8.1cm}|>{\centering\arraybackslash}p{2.3cm}|}
+\hline
+\textbf{User Story} & \textbf{Tâches} & \textbf{Estimation} \\
+\hline
+\endfirsthead
+\hline
+\textbf{User Story} & \textbf{Tâches} & \textbf{Estimation} \\
+\hline
+\endhead
+\hline
+\endfoot
+
+\caption{Backlog du Sprint 0}
+\label{tab:sb-sprint0}
+\endlastfoot
+
+\multirow{4}{6.6cm}{
+\centering
+\textbf{En tant qu'exploitant, je veux disposer d'un cluster Kubernetes opérationnel afin d'héberger les composants de la plateforme.}
+}
+&
+Provisionner le cluster Kubernetes composé d'un control-plane et de deux workers.
+& 2 \\
+\cline{2-3}
+
+&
+Configurer les nœuds et vérifier leur intégration au cluster.
+& 1 \\
+\cline{2-3}
+
+&
+Vérifier l'état des trois nœuds et leur disponibilité pour l'exécution des workloads.
+& 1 \\
+\cline{2-3}
+
+&
+Mettre en place les namespaces nécessaires à l'organisation des workloads et des tenants.
+& 1 \\
+\hline
+
+\multirow{4}{6.6cm}{
+\centering
+\textbf{En tant qu'exploitant, je veux assurer la connectivité et l'isolation réseau entre les tenants.}
+}
+&
+Installer et configurer Cilium comme CNI du cluster Kubernetes.
+& 2 \\
+\cline{2-3}
+
+&
+Vérifier le fonctionnement du réseau entre les workloads Kubernetes.
+& 1 \\
+\cline{2-3}
+
+&
+Définir une politique réseau restrictive de type default-deny pour les namespaces tenants.
+& 2 \\
+\cline{2-3}
+
+&
+Vérifier l'isolation réseau entre deux namespaces de tenants.
+& 2 \\
+\hline
+
+\multirow{3}{6.6cm}{
+\centering
+\textbf{En tant qu'exploitant, je veux exposer les services Kubernetes vers le réseau externe.}
+}
+&
+Installer et configurer MetalLB dans le cluster on-premise.
+& 2 \\
+\cline{2-3}
+
+&
+Configurer le mécanisme d'attribution des adresses IP externes aux services de type LoadBalancer.
+& 2 \\
+\cline{2-3}
+
+&
+Vérifier l'attribution d'une adresse IP externe à un service Kubernetes.
+& 1 \\
+\hline
+
+\multirow{3}{6.6cm}{
+\centering
+\textbf{En tant qu'exploitant, je veux disposer d'une passerelle d'entrée pour les futures applications Knative.}
+}
+&
+Installer Kourier comme passerelle d'entrée pour Knative Serving.
+& 2 \\
+\cline{2-3}
+
+&
+Exposer le service Kourier à l'extérieur du cluster.
+& 1 \\
+\cline{2-3}
+
+&
+Vérifier l'accessibilité de la passerelle depuis le réseau externe.
+& 1 \\
+\hline
+
+\end{longtable}
+}
+
+\subsection{Conception}
+
+\subsubsection{Kubernetes : notions fondamentales et application au projet}
+
+Construire une plateforme capable d'exécuter les applications de plusieurs clients sans qu'ils interfèrent entre eux suppose un socle d'orchestration de conteneurs. C'est le rôle de \textbf{Kubernetes} \cite{KubernetesDoc} : automatiser le placement, le redémarrage et la mise à l'échelle des conteneurs sur un ensemble de machines, plutôt que de gérer chaque serveur individuellement.
+
+Les notions clés utilisées dans ce chapitre :
+\begin{itemize}
+    \item \textbf{Cluster} : ensemble des machines, ou nœuds, qui exécutent la plateforme.
+    \item \textbf{Control-plane} : décide où et comment exécuter chaque charge.
+    \item \textbf{Workers} : nœuds qui exécutent réellement les applications.
+    \item \textbf{Pod} : plus petit élément déployable, un ou plusieurs conteneurs partageant la même adresse réseau.
+    \item \textbf{Service} : donne à un ensemble de Pods une adresse stable.
+    \item \textbf{Namespace} : cloisonne des ressources à l'intérieur d'un même cluster.
+\end{itemize}
+
+Ce dernier point nous intéresse directement. Le cloisonnement par namespace est le mécanisme sur lequel repose toute la multi-tenance de la plateforme : chaque client obtient son propre namespace, isolé de celui des autres clients et de la plateforme elle-même.
+
+La version exacte de Kubernetes et le container runtime utilisés ne sont pas documentés de façon fiable dans le dépôt du projet. Ils ne sont donc volontairement pas mentionnés ici.
+
+\paragraph{Choix d'un cluster on-premise.}\mbox{}\par
+La plateforme est hébergée sur un cluster bare-metal propre à NextStep IT, plutôt que sur un service Kubernetes managé de type EKS, GKE ou AKS. Ce choix découle de la nature du projet : NextStep IT est un intégrateur dont l'offre Infrastructure as a Service repose sur la maîtrise de sa propre infrastructure (cf. Chapitre I), et aucun budget cloud récurrent n'était prévu pour ce projet de fin d'études. Il justifie directement la nécessité de MetalLB (section~\ref{sec:metallb}), qu'un cluster managé fournirait nativement.
+
+\subsubsection{Architecture du cluster de la plateforme}
+
+Le cluster utilisé pour le développement et l'exploitation de la plateforme compte trois nœuds. La répartition des rôles et les adresses IP ci-dessous sont confirmées par la configuration réseau du backend, notamment le fichier application-k8s.yml et sa liste blanche CORS.
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{|l|l|l|}
+\hline
+\rowcolor{gray!30}
+\textbf{Nœud} & \textbf{Rôle} & \textbf{Adresse IP} \\
+\hline
+vm01 & Plan de contrôle (control-plane) & 10.9.21.223 \\
+\hline
+vm02 & Nœud de travail (worker) & 10.9.21.224 \\
+\hline
+vm03 & Nœud de travail (worker) & 10.9.21.225 \\
+\hline
+\end{tabular}
+\caption{Nœuds du cluster Kubernetes de la plateforme}
+\label{tab:cluster-nodes}
+\end{table}
+
+Les caractéristiques matérielles et le système d'exploitation de chaque nœud ne sont pas documentés de façon fiable et ne figurent donc pas dans ce tableau. Un audit technique réalisé après une première mise en exploitation confirme cette topologie ainsi que la chaîne CNI, LoadBalancer et Ingress décrite dans ce chapitre.
+
+La figure~\ref{fig:cluster-topology} illustre cette topologie et la séparation logique entre l'espace de noms de la plateforme et ceux des tenants.
+
+\begin{figure}[H]
+\begin{adjustwidth}{-1.0cm}{-1.0cm}
+\centering
+\begin{tikzpicture}[
+  x=1cm, y=1cm,
+  every node/.style={font=\normalsize},
+  vm/.style={draw=figVert, line width=1pt, rounded corners, minimum width=4.2cm,
+             minimum height=1.6cm, align=center, fill=figVertFond},
+  cp/.style={draw=figVert, line width=1.4pt, rounded corners, minimum width=4.2cm,
+             minimum height=1.6cm, align=center, fill=figVertFond!60!white},
+  nsp/.style={draw=figBleu, line width=1pt, rounded corners, minimum width=6.4cm,
+              minimum height=2.7cm, align=center, fill=figBleuFond},
+  nst/.style={draw=figOrange, line width=1pt, dashed, rounded corners, minimum width=6.4cm,
+              minimum height=2.7cm, align=center, fill=figOrangeFond},
+  couche/.style={draw=black!40, dotted, line width=0.9pt, rounded corners, inner sep=12pt},
+  ttl/.style={font=\small\bfseries, text=black!65}
+]
+
+% ---- couche physique : le plan de controle au centre, une liaison droite vers chaque worker ----
+\node[vm] (vm02) at (0,0)    {\textbf{vm02}\\[1pt]\small worker\\\small 10.9.21.224};
+\node[cp] (vm01) at (6.2,0)  {\textbf{vm01}\\[1pt]\small plan de contrôle\\\small 10.9.21.223};
+\node[vm] (vm03) at (12.4,0) {\textbf{vm03}\\[1pt]\small worker\\\small 10.9.21.225};
+
+\draw[<->, line width=1pt, figVert] (vm02) -- (vm01)
+      node[midway, above=0pt, font=\scriptsize, fill=white, inner sep=1.5pt] {API Kubernetes};
+\draw[<->, line width=1pt, figVert] (vm01) -- (vm03)
+      node[midway, above=0pt, font=\scriptsize, fill=white, inner sep=1.5pt] {API Kubernetes};
+
+\node[couche, fit=(vm02)(vm01)(vm03)] (phys) {};
+\node[ttl, anchor=south west] at ([yshift=3pt]phys.north west) {Couche physique : trois nœuds};
+
+% ---- couche logique : partition en namespaces ----
+\node[nsp] (plat) at (2.6,-6.2)
+     {\textbf{Namespace} \texttt{platform}\\[4pt]
+      \small backend-api \quad web-portal\\\small admin-console\\\small PostgreSQL \quad Keycloak};
+\node[nst] (ten) at (10.6,-6.2)
+     {\textbf{Namespace} \texttt{user-<tenant>}\\[4pt]
+      \small applications du client\\\small NetworkPolicy \textit{default-deny}\\[2pt]
+      \footnotesize\itshape un namespace par client, créé à la volée};
+
+\node[couche, fit=(plat)(ten)] (logi) {};
+\node[ttl, anchor=south west] at ([yshift=3pt]logi.north west) {Couche logique : namespaces};
+
+% ---- articulation entre les deux couches ----
+\draw[->, line width=1pt, black!55] (6.2,-1.9) -- (6.2,-3.6);
+\node[font=\scriptsize, text=black!70, align=left, anchor=west] at (6.6,-2.75)
+     {les Pods d'un namespace s'exécutent indifféremment\\sur \texttt{vm02} ou \texttt{vm03} : la répartition est logique,\\pas physique};
+
+\end{tikzpicture}
+\caption{Architecture du cluster Kubernetes de la plateforme}
+\label{fig:cluster-topology}
+\end{adjustwidth}
+\end{figure}
+
+\begin{itemize}
+    \item \textbf{Namespace platform} : backend Spring Boot, deux frontends React, PostgreSQL, Keycloak. Ce sont les composants de la plateforme elle-même, distincts des applications des clients.
+    \item \textbf{Namespace user-<tenant>} : créé dynamiquement pour chaque tenant, il contient ses applications déployées ainsi que sa règle d'isolation réseau, détaillée ci-après.
+\end{itemize}
+
+\subsubsection{Isolation réseau des tenants : le CNI et Cilium}
+
+Isoler des namespaces sur le papier ne suffit pas. Il faut que le réseau du cluster respecte réellement cette séparation. Kubernetes ne fournit pas nativement de mise en œuvre du réseau entre Pods : cette responsabilité est déléguée à un plugin CNI, Container Network Interface, chargé d'attribuer une adresse IP à chaque Pod et d'acheminer le trafic.
+
+Le CNI retenu est \textbf{Cilium} \cite{CiliumDoc}, choisi pour sa prise en charge des règles NetworkPolicy, des règles Kubernetes natives qui restreignent, au niveau réseau, quels Pods ou namespaces peuvent communiquer entre eux. Comparé aux alternatives courantes :
+\begin{itemize}
+    \item \textbf{Flannel} : simple à déployer, mais ne supporte pas nativement les NetworkPolicy. Il est exclu d'emblée pour une plateforme dont l'isolation multi-tenant est une exigence de sécurité centrale.
+    \item \textbf{Calico} : supporte les NetworkPolicy de façon comparable à Cilium.
+    \item \textbf{Cilium} : repose sur eBPF, une technologie du noyau Linux permettant un filtrage réseau performant sans passer par les règles iptables traditionnelles, avec un potentiel d'évolution vers de l'observabilité réseau avancée.
+\end{itemize}
+
+Un audit technique de la plateforme confirme ce choix, jugé robuste, supportant pleinement les NetworkPolicy et des politiques plus avancées si besoin futur.
+
+C'est le mécanisme Cilium et NetworkPolicy qui porte concrètement l'isolation entre tenants. Sans lui, tous les Pods du cluster pourraient communiquer librement entre eux, y compris entre les applications de deux clients différents, ce qui serait inacceptable pour une plateforme multi-tenant.
+
+\paragraph{La NetworkPolicy réelle du projet.}\mbox{}\par
+Une NetworkPolicy de type default-deny est créée automatiquement pour chaque nouveau namespace tenant par le backend applicatif, un mécanisme détaillé dans le chapitre consacré au développement du backend (Release 1). Le manifeste du Listing~\ref{lst:networkpolicy}, extrait de \texttt{k8s/tenant/network-policy.yaml}, sert aussi de modèle pour les namespaces créés avant l'introduction de cette automatisation.
+
+\begin{lstlisting}[style=yamlstyle, caption={Manifeste \texttt{NetworkPolicy} — isolation par défaut d'un tenant (\texttt{k8s/tenant/network-policy.yaml})}, label={lst:networkpolicy}]
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tenant-default-isolation
+  namespace: NAMESPACE_PLACEHOLDER
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector: {}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kourier-system
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: knative-serving
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+  egress:
+    - to:
+        - podSelector: {}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kafka
+\end{lstlisting}
+
+Cette règle s'applique à tous les Pods du namespace, en entrée comme en sortie, et bloque par défaut tout trafic non explicitement autorisé. Elle ouvre ensuite sélectivement :
+\begin{itemize}
+    \item en entrée : le trafic provenant d'un autre Pod du même namespace, ainsi que celui provenant des namespaces système kourier-system, knative-serving et monitoring ;
+    \item en sortie : le trafic vers un autre Pod du même namespace, la résolution DNS via kube-system, le namespace kafka pour le bus d'événements partagé, ainsi que knative-serving et kourier-system.
+\end{itemize}
+
+Tout le reste, en particulier le trafic direct entre Pods de deux tenants différents ou vers les composants internes du namespace platform, est refusé par défaut. Ce mécanisme garantit qu'un client ne peut pas atteindre les ressources d'un autre client, même en connaissant son adresse interne. La figure~\ref{fig:cilium-isolation} illustre ce principe.
+
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=0.85\textwidth]{image/cilium_isolation.png}
+    \caption{Isolation réseau entre tenants via Cilium}
+    \label{fig:cilium-isolation}
+\end{figure}
+
+\subsubsection{Exposition externe des services : MetalLB}
+\label{sec:metallb}
+
+Sur un cluster hébergé chez un fournisseur de cloud public, un service LoadBalancer reçoit automatiquement une adresse IP publique. Ce mécanisme n'existe pas nativement sur un cluster on-premise : sans solution complémentaire, un tel service resterait indéfiniment à l'état pending.
+
+\textbf{MetalLB} \cite{MetalLBDoc} résout ce problème. Il attribue, depuis l'intérieur du cluster, des adresses IP externes puisées dans une plage réservée du réseau local, via une ressource IPAddressPool annoncée sur le réseau par L2Advertisement en l'absence de BGP.
+
+Sur la plateforme, ce mécanisme expose le portail client, platform-web, directement en LoadBalancer : il obtient l'adresse 10.9.21.238, retrouvée dans la configuration CORS du backend et dans k8s/admin/deployment.yaml. La console d'administration, platform-admin, n'est en revanche pas exposée via MetalLB : elle reste accessible en NodePort fixe, sur le port 30081, une restriction volontaire cohérente avec son accès aux fonctions d'administration globale.
+
+Le manifeste précis de MetalLB n'est pas versionné dans le dépôt. Seule son utilisation effective, via l'adresse attribuée à platform-web, est confirmée. La figure~\ref{fig:metallb-flux} illustre le flux d'attribution.
+
+\begin{figure}[H]
+\begin{adjustwidth}{-1.0cm}{-1.0cm}
+\centering
+\begin{tikzpicture}[
+  x=1cm, y=1cm,
+  every node/.style={font=\normalsize},
+  k8s/.style={draw=figVert, line width=1pt, rounded corners, minimum width=6.4cm,
+              minimum height=1.4cm, align=center, fill=figVertFond},
+  res/.style={draw=figOrange, line width=1pt, rounded corners, minimum width=6.0cm,
+              minimum height=1.15cm, align=center, fill=figOrangeFond, font=\small},
+  cli/.style={draw=figBleu, line width=1pt, rounded corners, minimum width=6.4cm,
+              minimum height=1.4cm, align=center, fill=figBleuFond},
+  note/.style={draw=black!45, dashed, line width=0.9pt, rounded corners, align=left,
+               font=\small, fill=black!3},
+  cadre/.style={draw=figOrange, dashed, line width=1.1pt, rounded corners, inner sep=11pt},
+  num/.style={circle, draw, line width=0.8pt, fill=white, inner sep=2pt, font=\small\bfseries},
+  lbl/.style={font=\small},
+  fl/.style={->, line width=1pt, figVert}
+]
+
+\node[k8s] (svc) at (0,0)
+     {\textbf{Service} \texttt{platform-web}\\[1pt]\small \texttt{type: LoadBalancer}};
+
+% Sans MetalLB : l'etat terminal sur un cluster on-premise.
+\node[note] (pend) at (8.6,0)
+     {\textbf{Sur un cluster on-premise, sans MetalLB}\\
+      \texttt{EXTERNAL-IP} reste \texttt{<pending>}\\
+      indéfiniment : aucun contrôleur n'attribue d'IP};
+\draw[->, line width=1pt, black!45, dashed] (svc.east) -- (pend.west);
+
+% Le composant MetalLB et ses deux ressources.
+\node[res] (ctrl) at (0,-3.2) {\textbf{controller} : observe les Services \texttt{LoadBalancer}};
+\node[res] (pool) at (0,-4.7) {\textbf{IPAddressPool} : plage réservée du réseau local};
+\node[cadre, fit=(ctrl)(pool)] (mlb) {};
+\node[font=\small\bfseries, text=figOrange, anchor=south west]
+      at ([yshift=3pt]mlb.north west) {MetalLB};
+
+\node[k8s] (ip) at (0,-7.5)
+     {\texttt{EXTERNAL-IP} : \textbf{10.9.21.238}\\[1pt]\small l'adresse devient joignable sur le réseau local};
+
+\node[cli] (client) at (0,-10.1)
+     {\textbf{Client externe}\\[1pt]\small atteint le portail sur \texttt{10.9.21.238}};
+
+\draw[fl] (svc.south) -- (mlb.north);
+\draw[fl] (mlb.south) -- (ip.north);
+\draw[->, line width=1pt, figBleu] (ip.south) -- (client.north);
+
+\node[num] at (0,-1.47) {1};
+\node[num] at (0,-6.23) {2};
+\node[num] at (0,-8.80) {3};
+
+\node[lbl, anchor=west] at (0.35,-1.47) {le Service demande une IP externe};
+\node[lbl, anchor=west] at (0.35,-6.23) {MetalLB attribue puis annonce l'adresse};
+\node[lbl, anchor=west] at (0.35,-8.80) {le trafic entre dans le cluster};
+
+% Le cas volontairement different de la console d'administration.
+\node[note, text=black!80] at (9.0,-8.80)
+     {\textbf{Cas de} \texttt{platform-admin}\\
+      non exposée par MetalLB : accès en\\
+      \texttt{NodePort} fixe sur le port \textbf{30081},\\
+      restriction volontaire liée à ses\\
+      fonctions d'administration globale};
+
+\end{tikzpicture}
+\caption{Attribution d'une adresse IP externe via MetalLB}
+\label{fig:metallb-flux}
+\end{adjustwidth}
+\end{figure}
+
+\subsubsection{Passerelle d'entrée pour Knative : Kourier}
+
+Une fois l'IP externe attribuée, il reste à acheminer chaque requête vers la bonne application. C'est le rôle de \textbf{Kourier} \cite{KourierDoc}, la passerelle d'entrée retenue pour le trafic HTTP vers les services Knative Serving. Kourier reçoit les requêtes destinées aux applications des clients et les route vers la bonne Revision Knative selon le nom d'hôte, qui suit la convention présentée en introduction de ce sprint.
+
+Son installation et sa configuration détaillée sont présentées au Sprint 1, indissociables du fonctionnement de Knative Serving.
+
+La figure~\ref{fig:architecture-reseau} synthétise la chaîne complète mise en place par ce sprint, pour une requête HTTP externe à destination d'une application tenant.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=1.6cm, every node/.style={font=\small}]
+\tikzstyle{box}=[draw, rounded corners, minimum width=3cm, minimum height=0.9cm, align=center, fill=Gray!20]
+\node[box] (client) {Client externe};
+\node[box, right=1.9cm of client] (metallb) {MetalLB\\(IP externe)};
+\node[box, right=1.9cm of metallb] (kourier) {Kourier\\(ingress gateway)};
+\node[box, right=1.9cm of kourier] (svc) {Service\\namespace tenant};
+\draw[->, thick] (client) -- (metallb);
+\draw[->, thick] (metallb) -- (kourier);
+\draw[->, thick] (kourier) -- (svc);
+\end{tikzpicture}
+\caption{Chemin d'une requête externe vers une application tenant}
+\label{fig:architecture-reseau}
+\end{figure}
+
+\subsection{Réalisation}
+
+\subsubsection{Mise en œuvre}
+
+Ce sprint livre quatre composants, tous opérationnels à la date de rédaction : le cluster Kubernetes à trois nœuds pour l'orchestration, Cilium pour le réseau des Pods et l'application des NetworkPolicy, MetalLB pour l'attribution d'IP externes, et Kourier comme passerelle d'entrée pour Knative Serving. Les versions précises de Kubernetes, MetalLB et Kourier ne sont pas documentées de façon fiable ; celle de Cilium a pu être confirmée par capture.
+
+La convention d'espaces de noms distingue le namespace platform, qui héberge les composants de la plateforme elle-même, des namespaces créés dynamiquement, un par tenant, lors du premier déploiement d'une application. Cette création dynamique est prise en charge par le backend applicatif et détaillée au chapitre consacré à son développement (Release 1).
+
+\begin{itemize}
+    \item \textbf{État des nœuds du cluster.}
+\end{itemize}
+
+La figure~\ref{fig:capture-nodes} confirme que les trois nœuds sont à l'état Ready. Elle révèle aussi des versions non documentées ailleurs dans le dépôt : Kubernetes v1.30.3, Ubuntu 24.04.4 LTS, containerd 2.2.1.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{image/capture_kubectl_get_nodes.png}
+\caption{État des nœuds du cluster}
+\label{fig:capture-nodes}
+\end{figure}
+
+\begin{itemize}
+    \item \textbf{État de Cilium.}
+\end{itemize}
+
+La figure~\ref{fig:capture-cilium-status} confirme que Cilium, Envoy et l'opérateur sont à l'état OK, en version 1.19.1.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{image/capture_cilium_status.png}
+\caption{État de Cilium}
+\label{fig:capture-cilium-status}
+\end{figure}
+
+\begin{itemize}
+    \item \textbf{Pods d'infrastructure réseau.}
+\end{itemize}
+
+La figure~\ref{fig:capture-pods-infra} montre les pods kube-system et metallb-system à l'état Running. On y observe une duplication non expliquée de Kourier, présent à la fois sous net-kourier-controller et sous une passerelle 3scale-kourier-gateway, dans deux namespaces distincts.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{image/capture_pods_infra.png}
+\caption{Pods d'infrastructure réseau}
+\label{fig:capture-pods-infra}
+\end{figure}
+
+\begin{itemize}
+    \item \textbf{Namespaces du cluster.}
+\end{itemize}
+
+La figure~\ref{fig:capture-ns} confirme la présence du namespace platform et de quatre namespaces tenants : user-adel, user-mohame, user-test et user-user.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{image/capture_get_namespaces.png}
+\caption{Namespaces du cluster}
+\label{fig:capture-ns}
+\end{figure}
+
+\begin{itemize}
+    \item \textbf{Politiques réseau des tenants.}
+\end{itemize}
+
+La figure~\ref{fig:capture-netpol} révèle un écart réel : seul le namespace user-user possède la règle tenant-default-isolation. Les trois autres namespaces tenants n'en ont aucune. Ce point n'est pas expliqué dans le dépôt et reste une limite constatée de ce sprint.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{image/capture_get_networkpolicy.png}
+\caption{Politiques réseau des tenants}
+\label{fig:capture-netpol}
+\end{figure}
+
+\clearpage
+\section{Sprint 1 : Déploiement de Knative Serving}
+
+\subsection{Introduction}
+
+Le cluster livré au sprint précédent sait héberger des conteneurs, mais rien n'y automatise encore leur mise à l'échelle : une application déployée conserve indéfiniment les ressources qu'on lui a allouées, qu'elle reçoive du trafic ou non. Knative Serving comble ce manque. Son installation, son raccordement à la passerelle Kourier déjà en place et sa pilotabilité depuis le backend constituent le cœur de ce sprint.
+
+Un point technique mérite d'être signalé dès maintenant, car il conditionne toute l'intégration : il n'existe pas de client Java officiel pour les ressources Knative. Le backend passe donc par l'API générique de Fabric8, avec les limites que cela implique et qui sont discutées plus loin dans ce sprint.
+
+\subsection{Objectifs du Sprint}
+
+\begin{itemize}
+    \item Installer Knative Serving et l'intégrer à la passerelle Kourier mise en place au Sprint 0.
+    \item Permettre au backend de créer une ressource Service Knative par programmation, via Fabric8.
+    \item Créer automatiquement le namespace d'un tenant et sa NetworkPolicy lors de son premier déploiement.
+\end{itemize}
+
+\subsection{Sprint Backlog}
+
+Le tableau~\ref{tab:sb-sprint1} présente le backlog détaillé du Sprint 1, obtenu en décomposant chaque \textit{User Story} retenue en tâches techniques.
+
+% \needspace garantit qu'il reste assez de place sur la page : sans cela une
+% coupure peut tomber au milieu d'un groupe \multirow, dont le contenu deborde
+% alors hors du cadre et laisse une cellule vide sur la page suivante.
+\needspace{0.9\textheight}
+{
+% Le tableau deborde volontairement de 1,5 cm dans chaque marge afin de laisser
+% respirer les trois colonnes ; LTleft/LTright sont les parametres propres a
+% longtable (adjustwidth n'a aucun effet sur cet environnement).
+% Largeur totale : 18,8 cm, soit 1 cm de blanc conserve de chaque cote de la page.
+\setlength{\LTleft}{-1.5cm}
+\setlength{\LTright}{-1.5cm}
+\setlength{\tabcolsep}{8pt}
+\renewcommand{\arraystretch}{1.9}
+\begin{longtable}{|p{6.6cm}|>{\raggedright\arraybackslash}p{8.1cm}|>{\centering\arraybackslash}p{2.3cm}|}
+\hline
+\textbf{User Story} & \textbf{Tâches} & \textbf{Estimation} \\
+\hline
+\endfirsthead
+\hline
+\textbf{User Story} & \textbf{Tâches} & \textbf{Estimation} \\
+\hline
+\endhead
+\hline
+\endfoot
+
+\caption{Backlog du Sprint 1}
+\label{tab:sb-sprint1}
+\endlastfoot
+
+\multirow{2}{6.6cm}{
+\centering
+\textbf{En tant qu'exploitant, je veux que Knative Serving soit opérationnel sur le cluster.}
+}
+&
+Installer Knative Serving et l'intégrer à la passerelle Kourier mise en place au Sprint 0.
+& — \\
+\cline{2-3}
+
+&
+Vérifier qu'un Service Knative de test atteint la condition Ready et expose une URL.
+& — \\
+\hline
+
+\multirow{3}{6.6cm}{
+\centering
+\textbf{En tant que développeur backend, je veux pouvoir créer une ressource Knative Service par programmation.}
+}
+&
+Implémenter la création d'une ressource Service Knative via l'API générique Fabric8.
+& — \\
+\cline{2-3}
+
+&
+Vérifier que le service créé est visible via kubectl get ksvc, avec l'image demandée.
+& — \\
+\cline{2-3}
+
+&
+Observer le cycle Service vers Revision et le comportement d'autoscaling.
+& — \\
+\hline
+
+\multirow{3}{6.6cm}{
+\centering
+\textbf{En tant qu'exploitant, je veux que l'espace de noms d'un tenant soit créé automatiquement au premier déploiement.}
+}
+&
+Implémenter la création automatique du namespace tenant et de sa NetworkPolicy au premier déploiement.
+& — \\
+\cline{2-3}
+
+&
+Vérifier l'existence du namespace et de la NetworkPolicy après un premier déploiement.
+& — \\
+\cline{2-3}
+
+&
+Observer le comportement de scale-to-zero natif de Knative.
+& — \\
+\hline
+
+\end{longtable}
+}
+
+\subsection{Conception}
+
+\subsubsection{Knative Serving : rôle et concepts}
+
+Le cluster du Sprint 0 sait exécuter des Pods et isoler les tenants, mais rien ne gère encore automatiquement leur nombre selon la charge. Knative Serving \cite{KnativeServingDoc} ajoute cette capacité à Kubernetes : il fait tourner une application uniquement quand elle reçoit du trafic, et coupe les instances inutilisées.
+
+Trois ressources structurent Knative Serving :
+\begin{itemize}
+    \item le \textbf{Service}, qui décrit l'application à déployer : image, port, ressources, bornes de mise à l'échelle ;
+    \item la \textbf{Revision}, un instantané figé de la configuration, créé à chaque modification du Service ;
+    \item la \textbf{Route}, qui distribue le trafic entrant vers une ou plusieurs révisions.
+\end{itemize}
+
+Knative ajuste le nombre de Pods d'une révision selon le trafic reçu, et peut le réduire jusqu'à zéro instance en l'absence de sollicitation : c'est le scale-to-zero. Une nouvelle requête réactive automatiquement une instance. Ce mécanisme, illustré figure~\ref{fig:scale-to-zero}, permet à la plateforme de ne facturer que l'usage réel des ressources.
+
+\begin{figure}[H]
+\begin{adjustwidth}{-1.3cm}{-1.3cm}
+\centering
+\begin{tikzpicture}[
+  x=1cm, y=1cm,
+  every node/.style={font=\normalsize},
+  don/.style={draw=figBleu, line width=1pt, rounded corners, minimum width=6.0cm,
+              minimum height=1.45cm, align=center, fill=figBleuFond},
+  eta/.style={draw=figVert, line width=1pt, rounded corners, minimum width=6.0cm,
+              minimum height=1.45cm, align=center, fill=figVertFond},
+  ctl/.style={draw=figOrange, line width=1pt, dashed, rounded corners, minimum width=5.0cm,
+              minimum height=1.45cm, align=center, fill=figOrangeFond},
+  num/.style={circle, draw, line width=0.8pt, fill=white, inner sep=2pt, font=\small\bfseries},
+  lbl/.style={font=\small},
+  fl/.style={->, line width=1pt, figBleu},
+  fv/.style={->, line width=1pt, figVert},
+  fc/.style={->, line width=1pt, dashed, figOrange}
+]
+
+\node[eta] (s0)  at (0,0)     {\textbf{État de repos : 0 Pod}\\[1pt]\small la Route pointe vers l'Activator};
+\node[don] (kou) at (0,-2.6)  {\textbf{Kourier}\\[1pt]\small passerelle d'entrée du cluster};
+\node[don] (act) at (0,-5.2)  {\textbf{Activator}\\[1pt]\small met la requête en file d'attente};
+\node[don] (pod) at (0,-9.4)  {\textbf{Pod} : \texttt{queue-proxy} + conteneur\\[1pt]\small l'application traite la requête};
+\node[eta] (fin) at (0,-12.2) {\textbf{Retour au repos}\\[1pt]\small les Pods sont supprimés};
+
+\node[ctl] (kpa)  at (9.4,-5.2)  {\textbf{Autoscaler} (KPA)};
+\node[ctl] (rev)  at (9.4,-7.3)  {\textbf{Revision} $\rightarrow$ Deployment\\[1pt]\small réplicas 0 $\rightarrow$ 1};
+\node[ctl] (down) at (9.4,-12.2) {\textbf{Autoscaler}\\[1pt]\small réplicas 1 $\rightarrow$ 0};
+
+\draw[fl] (s0)  -- (kou);
+\draw[fl] (kou) -- (act);
+\draw[fc] (act.east) -- (kpa.west);
+\draw[fc] (kpa) -- (rev);
+\draw[fl] (rev.south) |- ([yshift=0.35cm]pod.east);
+\draw[fl] (act) -- (pod);
+\draw[fc] ([yshift=-0.35cm]pod.east) -- (13.0,-9.75) |- (kpa.east);
+\draw[fv] (pod) -- (fin);
+\draw[fc] (fin.east) -- (down.west);
+\draw[fv] (down.east) -- (14.4,-12.2) |- (s0.east);
+
+\node[lbl, anchor=east]  at (-0.3,-1.3)  {requête HTTP};
+\node[lbl, anchor=south] at (4.7,-5.0)   {signale la demande};
+\node[lbl, anchor=south] at (6.0,-9.3)   {le Pod démarre};
+\node[lbl, anchor=east]  at (-0.3,-7.3)  {transmet la requête};
+\node[lbl, anchor=north] at (7.6,-9.95)  {métriques de concurrence};
+\node[lbl, anchor=east]  at (-0.3,-10.8) {inactivité prolongée};
+\node[lbl, anchor=south] at (8.5,0.2)    {nouveau cycle};
+
+\node[num] at (0,-1.3)    {1};
+\node[num] at (0,-3.9)    {2};
+\node[num] at (4.7,-5.2)  {3};
+\node[num] at (9.4,-6.25) {4};
+\node[num] at (6.0,-9.05) {5};
+\node[num] at (0,-7.3)    {6};
+\node[num] at (13.0,-7.5) {7};
+\node[num] at (0,-10.8)   {8};
+\node[num] at (4.7,-12.2) {9};
+
+\end{tikzpicture}
+\caption{Cycle complet de mise à zéro et de réveil automatique d'un service Knative}
+\label{fig:scale-to-zero}
+\end{adjustwidth}
+\end{figure}
+
+Ce comportement est natif à Knative et n'est pas réimplémenté par le backend. Sa preuve concrète nécessite une séquence d'observation dans le temps, non disponible à la date de rédaction.
+
+% TODO: figures réelles à ajouter — trois captures de kubectl get pods
+% -n <namespace-tenant> : (1) 1 Pod actif, (2) 0 Pod après inactivité,
+% (3) 1 Pod après une nouvelle requête (preuve du scale-to-zero, S1-V05).
+
+\subsubsection{Intégration avec Kubernetes et le backend}
+
+Une ressource Service Knative n'est pas un objet Kubernetes natif comme un namespace ou un pod : c'est une CRD, Custom Resource Definition, au même titre que les ressources ajoutées par Strimzi pour Kafka au Sprint 2. Elle suit le même modèle de namespace, ce qui permet de rattacher chaque service Knative au namespace du tenant concerné et de le faire bénéficier de la NetworkPolicy default-deny mise en place au Sprint 0.
+
+Le backend pilote cette ressource, création, lecture de statut, gestion des révisions, via la bibliothèque Fabric8 Kubernetes Client~\cite{Fabric8Doc}. L'implémentation précise de ce pilotage est présentée au chapitre consacré au développement du backend (Release 1). La figure~\ref{fig:backend-knative-integration} situe cette intégration dans la chaîne complète, du backend jusqu'au Pod applicatif.
+
+\begin{figure}[H]
+\begin{adjustwidth}{-1.3cm}{-1.3cm}
+\centering
+\begin{tikzpicture}[
+  x=1cm, y=1cm,
+  every node/.style={font=\normalsize},
+  bk/.style={draw=figBleu, line width=1pt, rounded corners, minimum width=5.6cm,
+             minimum height=1.45cm, align=center, fill=figBleuFond},
+  k8s/.style={draw=figVert, line width=1pt, rounded corners, minimum width=5.6cm,
+              minimum height=1.45cm, align=center, fill=figVertFond},
+  crd/.style={draw=figOrange, line width=1pt, dashed, rounded corners, minimum width=5.6cm,
+              minimum height=1.45cm, align=center, fill=figOrangeFond},
+  lbl/.style={font=\small},
+  fl/.style={->, line width=1pt, figBleu},
+  fo/.style={->, line width=1pt, figOrange}
+]
+
+\node[bk]  (back) at (0,0)    {\textbf{Backend} Spring Boot\\[1pt]\small paramètres saisis par le client};
+\node[bk]  (fab)  at (0,-2.6) {\textbf{Fabric8} Kubernetes Client\\[1pt]\small construit le manifeste};
+\node[k8s] (api)  at (0,-5.2) {\textbf{API Kubernetes}\\[1pt]\small \texttt{kube-apiserver}};
+
+\node[crd] (svc)  at (8.8,-5.2)  {\textbf{Service Knative} (CRD)\\[1pt]\small dans le namespace du tenant};
+\node[crd] (rev)  at (8.8,-7.8)  {\textbf{Revision}\\[1pt]\small instantané figé de la configuration};
+\node[crd] (dep)  at (8.8,-10.4) {\textbf{Deployment}\\[1pt]\small géré par Knative Serving};
+\node[k8s] (pod)  at (8.8,-13.0) {\textbf{Pod applicatif}\\[1pt]\small \texttt{queue-proxy} + conteneur client};
+
+\draw[fl] (back) -- (fab);
+\draw[fl] (fab)  -- (api);
+\draw[fl] (api)  -- (svc);
+\draw[fo] (svc)  -- (rev);
+\draw[fo] (rev)  -- (dep);
+\draw[fo] (dep)  -- (pod);
+
+\node[lbl, anchor=east, align=right] at (-0.3,-1.3) {image, port, ressources,\\bornes de mise à l'échelle};
+\node[lbl, anchor=east, align=right] at (-0.3,-3.9) {soumet la ressource\\personnalisée};
+\node[lbl, anchor=south] at (4.4,-5.0)  {crée la CRD};
+
+\node[draw=figVert, line width=1pt, rounded corners, fill=figVertFond, align=left,
+      font=\small, minimum width=6.0cm] (notes) at (1.0,-13.0)
+      {\textbf{Hérité du namespace du tenant}\\[2pt]
+       $\bullet$ NetworkPolicy \textit{default-deny} (Sprint 0)\\
+       $\bullet$ variables d'environnement Kafka\\
+       \quad injectées automatiquement (Strimzi)};
+\draw[->, line width=1pt, dashed, figVert] (notes.east) -- (pod.west);
+
+\end{tikzpicture}
+\caption{Chaîne d'intégration du backend à Knative : le backend ne crée que la ressource \textit{Service} ; \textit{Revision}, \textit{Deployment} et Pod en sont dérivés automatiquement par Knative Serving (blocs en pointillés)}
+\label{fig:backend-knative-integration}
+\end{adjustwidth}
+\end{figure}
+
+Le manifeste soumis à l'API Kubernetes reprend les paramètres fournis par le client lors du déploiement : image et tag Docker, port d'écoute (8080 par défaut), ressources demandées (100m de CPU et 128Mi de mémoire par défaut), et les annotations minScale et maxScale qui bornent l'autoscaling (0 et 10 par défaut).
+
+Un point vérifié dans le code : chaque conteneur applicatif reçoit automatiquement, sans configuration du client, des variables d'environnement pointant vers le service de bootstrap du cluster Kafka opéré par Strimzi. Toute application cliente peut ainsi se connecter directement au bus d'événements de la plateforme, sans configuration manuelle.
+
+\subsubsection{Premier déploiement d'un tenant}
+
+La figure~\ref{fig:tenant-workflow} synthétise l'enchaînement déclenché par le premier déploiement d'un tenant, depuis la création de son espace de noms jusqu'à la disponibilité de l'application. Ce namespace hérite directement de la NetworkPolicy default-deny définie au Sprint 0. L'implémentation précise de cet enchaînement côté backend est présentée en Release 1.
+
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=0.85\textwidth]{image/tenant_workflow.png}
+    \caption{Du premier déploiement à l'application disponible}
+    \label{fig:tenant-workflow}
+\end{figure}
+
+\subsection{Réalisation}
+
+\subsubsection{Mise en œuvre}
+
+Ce qui est développé et versionné dans ce sprint, c'est la capacité du backend à créer et piloter des ressources Service Knative par programmation. Son implémentation précise est présentée au chapitre consacré au backend (Release 1).
+
+L'installation de Knative Serving elle-même sur le cluster, ses composants de plan de contrôle dans le namespace knative-serving et son intégration avec Kourier, a été réalisée directement sur l'infrastructure, selon la même approche que le socle du Sprint 0.
+
+\begin{itemize}
+    \item \textbf{Plan de contrôle de Knative Serving.}
+\end{itemize}
+
+La figure~\ref{fig:capture-knative-pods} montre les composants de Knative Serving déployés dans le namespace \texttt{knative-serving}. Les sept pods sont à l'état Running : l'\texttt{activator}, qui met en attente les requêtes destinées à un service sans instance, l'\texttt{autoscaler} et son variant \texttt{autoscaler-hpa} qui pilotent la mise à l'échelle, le \texttt{controller} qui réconcilie les ressources Knative, le \texttt{webhook} qui valide les manifestes soumis, ainsi que le \texttt{net-kourier-controller} et la passerelle \texttt{3scale-kourier-gateway} qui assurent l'intégration avec Kourier installé au Sprint 0. La colonne AGE indique une exécution continue depuis dix-huit jours au moment de la capture.
+
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=0.92\textwidth]{image/capture_knative_pods.png}
+    \caption{Composants de Knative Serving déployés sur le cluster}
+    \label{fig:capture-knative-pods}
+\end{figure}
+
+\begin{itemize}
+    \item \textbf{Services Knative créés par le backend dans un namespace tenant.}
+\end{itemize}
+
+La figure~\ref{fig:capture-ksvc} liste les ressources Service Knative présentes dans le namespace \texttt{user-user}, toutes créées par le backend via Fabric8. Chaque service reçoit automatiquement une URL construite selon la convention définie au Sprint 0, de la forme \texttt{<app>.<namespace>.10.9.21.231.sslip.io}, ce qui confirme le fonctionnement de la chaîne Kourier et sslip.io sans zone DNS à administrer. Les colonnes LATESTCREATED et LATESTREADY montrent le mécanisme de révisions : \texttt{adelbettaieb-notification-service} et \texttt{adelbettaieb-order-service} en sont à leur seconde révision (\texttt{-00002}), signe d'une mise à jour appliquée après le déploiement initial.
+
+Cette capture documente également deux services à l'état \texttt{READY: False}, avec le motif \texttt{RevisionMissing}. Ce statut correspond à des déploiements dont la révision n'a pas abouti, faute d'image accessible ou de conteneur démarrant correctement. Ces cas sont conservés dans la capture plutôt qu'écartés : ils illustrent que le suivi de statut mis en place remonte fidèlement les échecs, ce qui est précisément la fonction attendue du \texttt{KnativeWatcher} développé au Sprint 5.
+
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=\textwidth]{image/capture_ksvc_tenant.png}
+    \caption{Services Knative d'un namespace tenant, créés par le backend}
+    \label{fig:capture-ksvc}
+\end{figure}
+
+\subsubsection{Configuration et déploiement}
+
+Le service Knative est créé dans le namespace du tenant concerné, avec les valeurs par défaut décrites en Conception : minScale à 0, maxScale à 10, port 8080, 100m de CPU et 128Mi de mémoire. La passerelle Kourier, déjà installée au Sprint 0, reçoit le trafic externe et le route vers la Revision active selon le nom d'hôte de la requête.
+
+Deux limites doivent être signalées. La première tient à l'installation de Knative Serving elle-même, qui n'est pas versionnée sous forme de manifestes dans le dépôt, exactement comme le socle du Sprint 0. La seconde est l'absence de client Java officiel pour les ressources Knative, qui a imposé le recours à l'API générique de Fabric8, plus verbeuse et moins sûre au niveau du typage que pour les ressources natives de Kubernetes. Ce choix a été assumé pour l'ensemble des ressources Kubernetes personnalisées du projet, afin de conserver une approche homogène.
+
+À l'issue de ce sprint, il est possible de créer, depuis le backend, une application conteneurisée exécutée par Knative Serving, capable de monter en charge selon le trafic et de redescendre à zéro instance en cas d'inactivité. Cette capacité sera exposée aux utilisateurs finaux à partir du Sprint 5.
+
+\clearpage
+\section{Sprint 2 : Mise en place de Kafka et Strimzi}
+
+\subsection{Introduction}
+
+La troisième brique d'infrastructure répond à un besoin d'une autre nature que les deux précédentes. Une plateforme serverless tire une bonne part de son intérêt de sa capacité à réagir à des événements plutôt qu'à de simples requêtes HTTP, ce qui suppose de disposer d'un bus de messages. Apache Kafka remplit ce rôle dans notre architecture, déployé et administré par l'opérateur Strimzi plutôt qu'installé et maintenu manuellement.
+
+Ce sprint se limite volontairement à la gestion des topics par le backend. La publication et la consommation effectives de messages, de même que le lien entre un topic et une application, relèvent de Knative Eventing et seront traitées au Sprint 3. Quant à l'accès des clients à leurs propres topics, il n'arrivera qu'au Sprint 6, une fois le portail disponible.
+
+\subsection{Objectifs du Sprint}
+
+\begin{itemize}
+    \item Déployer un cluster Apache Kafka opéré par l'opérateur Strimzi sur le cluster Kubernetes.
+    \item Permettre au backend de créer, lister et supprimer des topics Kafka par programmation, via AdminClient.
+\end{itemize}
+
+\subsection{Sprint Backlog}
+
+Le tableau~\ref{tab:sb-sprint2} présente le backlog détaillé du Sprint 2, obtenu en décomposant chaque \textit{User Story} retenue en tâches techniques.
+
+% \needspace garantit qu'il reste assez de place sur la page : sans cela une
+% coupure peut tomber au milieu d'un groupe \multirow, dont le contenu deborde
+% alors hors du cadre et laisse une cellule vide sur la page suivante.
+\needspace{0.9\textheight}
+{
+% Le tableau deborde volontairement de 1,5 cm dans chaque marge afin de laisser
+% respirer les trois colonnes ; LTleft/LTright sont les parametres propres a
+% longtable (adjustwidth n'a aucun effet sur cet environnement).
+% Largeur totale : 18,8 cm, soit 1 cm de blanc conserve de chaque cote de la page.
+\setlength{\LTleft}{-1.5cm}
+\setlength{\LTright}{-1.5cm}
+\setlength{\tabcolsep}{8pt}
+\renewcommand{\arraystretch}{1.9}
+\begin{longtable}{|p{6.6cm}|>{\raggedright\arraybackslash}p{8.1cm}|>{\centering\arraybackslash}p{2.3cm}|}
+\hline
+\textbf{User Story} & \textbf{Tâches} & \textbf{Estimation} \\
+\hline
+\endfirsthead
+\hline
+\textbf{User Story} & \textbf{Tâches} & \textbf{Estimation} \\
+\hline
+\endhead
+\hline
+\endfoot
+
+\caption{Backlog du Sprint 2}
+\label{tab:sb-sprint2}
+\endlastfoot
+
+\multirow{2}{6.6cm}{
+\centering
+\textbf{En tant qu'exploitant, je veux disposer d'un cluster Kafka opéré par Strimzi.}
+}
+&
+Provisionner l'opérateur Strimzi et un cluster Kafka, my-cluster, sur le cluster Kubernetes.
+& — \\
+\cline{2-3}
+
+&
+Vérifier que le service de bootstrap my-cluster-kafka-bootstrap répond aux requêtes AdminClient.
+& — \\
+\hline
+
+\multirow{3}{6.6cm}{
+\centering
+\textbf{En tant que développeur backend, je veux pouvoir créer, lister et supprimer un topic Kafka par programmation.}
+}
+&
+Implémenter la création de topics via le client Kafka natif AdminClient.
+& — \\
+\cline{2-3}
+
+&
+Implémenter le listing et la suppression de topics via AdminClient.
+& — \\
+\cline{2-3}
+
+&
+Vérifier qu'un topic créé via AdminClient apparaît dans la liste des topics, et qu'un topic supprimé en disparaît.
+& — \\
+\hline
+
+\end{longtable}
+}
+
+\subsection{Conception}
+
+\subsubsection{Kafka : rôle dans la plateforme}
+
+Knative Serving répond au besoin de faire tourner une application à la demande. Une plateforme serverless devient plus intéressante encore lorsque ce réveil peut être déclenché par un événement métier plutôt que par une simple requête HTTP. C'est le rôle d'\textbf{Apache Kafka} \cite{KafkaDoc} : un bus d'événements où des composants communiquent de manière asynchrone, en publiant et en consommant des messages plutôt qu'en s'appelant directement.
+
+Un cluster Kafka repose sur des brokers, qui stockent les messages organisés en topics, eux-mêmes subdivisés en partitions. Un producer publie des messages sur un topic, un consumer les lit. La figure~\ref{fig:kafka-concepts} résume ces rôles.
+
+\begin{figure}[H]
+\begin{adjustwidth}{-0.7cm}{-0.7cm}
+\centering
+\begin{tikzpicture}[
+  x=1cm, y=1cm, every node/.style={font=\normalsize},
+  act/.style={draw=figBleu, line width=1pt, rounded corners, minimum width=3.0cm,
+              minimum height=1.3cm, align=center, fill=figBleuFond},
+  part/.style={draw=figVert, line width=0.9pt, rounded corners, minimum width=1.6cm,
+               minimum height=0.8cm, align=center, fill=white, font=\small},
+  fl/.style={->, line width=1pt, figBleu}
+]
+\node[act] (prod) at (0,0)    {\textbf{Producer}};
+\node[act] (cons) at (14.2,0) {\textbf{Consumer}};
+
+% Cadres dessines d'abord, du plus englobant au plus interne, puis les partitions.
+\draw[draw=figVert, line width=1.2pt, rounded corners, fill=figVertFond]
+      (3.9,-1.8) rectangle (10.9,1.75);
+\draw[draw=figVert, line width=1pt, rounded corners, fill=white]
+      (4.35,-1.35) rectangle (10.45,0.65);
+
+\node[part] (p0) at (5.4,-0.7) {partition 0};
+\node[part] (p1) at (7.4,-0.7) {partition 1};
+\node[part] (p2) at (9.4,-0.7) {partition 2};
+\node[font=\small\bfseries, text=figVert] at (7.4,0.25) {Topic};
+\node[font=\small\bfseries, text=figVert] at (7.4,1.35) {Broker Kafka};
+
+\draw[fl] (prod.east) -- (3.9,0) node[midway, above, font=\small] {publie};
+\draw[fl] (10.9,0) -- (cons.west) node[midway, above, font=\small] {consomme};
+\end{tikzpicture}
+\caption{Rôles fondamentaux d'un système Kafka}
+\label{fig:kafka-concepts}
+\end{adjustwidth}
+\end{figure}
+
+Dans notre plateforme, Kafka joue le rôle de bus d'événements partagé entre les applications des clients : une application peut publier un événement sur un topic, et une autre application, potentiellement à zéro instance, peut être réveillée pour le traiter, via le mécanisme d'Eventing détaillé au Sprint 3. Ce sprint se limite à la gestion des topics ; la publication et la consommation de messages sont couvertes par le test de bout en bout du Sprint 3.
+
+\subsubsection{Strimzi : Kafka sur Kubernetes}
+
+Kafka et Strimzi ne sont pas la même chose. Kafka est la plateforme de messagerie décrite ci-dessus. \textbf{Strimzi} \cite{StrimziDoc} est l'opérateur Kubernetes qui permet de l'exécuter et de l'administrer directement sur notre infrastructure, plutôt que sur des machines dédiées.
+
+\begin{figure}[H]
+\begin{adjustwidth}{-1.0cm}{-1.0cm}
+\centering
+\begin{tikzpicture}[
+  x=1cm, y=1cm, every node/.style={font=\normalsize},
+  op/.style={draw=figOrange, line width=1pt, dashed, rounded corners, minimum width=5.6cm,
+             minimum height=1.6cm, align=center, fill=figOrangeFond},
+  br/.style={draw=figVert, line width=0.9pt, rounded corners, minimum width=2.4cm,
+             minimum height=1.0cm, align=center, fill=white, font=\small},
+  svc/.style={draw=figBleu, line width=1pt, rounded corners, minimum width=6.6cm,
+              minimum height=1.5cm, align=center, fill=figBleuFond},
+  note/.style={draw=black!45, dashed, line width=0.9pt, rounded corners, align=left,
+               font=\small, fill=black!3}
+]
+\node[op] (strimzi) at (0,0)
+     {\textbf{Opérateur Strimzi}\\[1pt]\small crée et administre le cluster Kafka};
+
+\node[br] (b1) at (7.9,0)  {broker};
+\node[br] (b2) at (10.6,0) {broker};
+\node[br] (b3) at (13.3,0) {\dots};
+\node[font=\small\bfseries, text=figVert] (klab) at (10.6,1.25) {Cluster Kafka \texttt{my-cluster}};
+
+\node[svc] (boot) at (10.6,-3.4)
+     {\textbf{Service de \textit{bootstrap}}\\[1pt]\small point d'entrée interne généré par Strimzi};
+\node[note] (nt) at (1.6,-3.4)
+     {\textbf{Écouteur interne en clair}\\ni TLS ni SASL : c'est la voie\\empruntée par le backend};
+
+\begin{scope}[on background layer]
+  \node[draw=figVert, line width=1.2pt, rounded corners, inner sep=9pt, fill=figVertFond,
+        fit=(b1)(b2)(b3)(klab)] (kafka) {};
+\end{scope}
+
+\draw[->, line width=1pt, figOrange, dashed] (strimzi.east) -- (kafka.west)
+      node[midway, above, font=\scriptsize, fill=white, inner sep=1.5pt] {déploie et pilote};
+\draw[->, line width=1pt, figVert] (kafka.south) -- (boot.north)
+      node[midway, right, font=\scriptsize] {expose};
+
+\begin{scope}[on background layer]
+  \node[draw=black!50, dotted, line width=1pt, rounded corners, inner sep=15pt,
+        fit=(strimzi)(kafka)(boot)(nt)] (ns) {};
+\end{scope}
+\node[font=\small\bfseries, text=black!65, anchor=south west]
+      at ([yshift=3pt]ns.north west) {Cluster Kubernetes — namespace \texttt{kafka}};
+\end{tikzpicture}
+\caption{Relation entre Kubernetes, Strimzi et le cluster Kafka}
+\label{fig:kafka-strimzi}
+\end{adjustwidth}
+\end{figure}
+
+Le cluster Kafka de la plateforme, nommé my-cluster et opéré dans le namespace kafka, est accessible en interne via le service de bootstrap standard généré par Strimzi. Ces noms sont confirmés par la configuration réelle des variables d'environnement injectées aux applications clientes, cf. Sprint 1.
+
+La connexion AdminClient du backend vers ce service de bootstrap ne configure ni protocole de sécurité TLS ni identifiants SASL : l'écouteur emprunté est donc en clair. Ce choix reste acceptable tant que le trafic ne quitte pas le réseau interne du cluster ; les captures présentées en Réalisation montrent cependant que d'autres écouteurs, eux exposés à l'extérieur, coexistent sur ce même cluster.
+
+\subsubsection{AdminClient, et non Fabric8}
+\label{sec:kafka-adminclient}
+
+Une distinction doit rester claire dans tout ce chapitre : Fabric8 pilote les ressources Kubernetes, Knative Serving et, au Sprint 3, Knative Eventing. Les topics Kafka, eux, ne passent pas par Fabric8. Strimzi expose bien une ressource personnalisée KafkaTopic, mais ce n'est pas le mécanisme retenu ici : créer un topic est une opération du protocole Kafka lui-même, gérée par la bibliothèque cliente AdminClient, indépendante de Kubernetes et ouverte directement vers les courtiers du cluster.
+
+AdminClient permet notamment de créer un topic, de lister les topics existants et de supprimer un topic. Le pilotage précis de cette intégration côté backend est présenté au chapitre qui lui est consacré (Release 1).
+
+Un nom du code du backend peut prêter à confusion : la classe KafkaTopic qui y représente un sujet client n'est pas la ressource Strimzi du même nom, mais une entité de persistance propre au backend, qui conserve en base les métadonnées de chaque topic créé par un client. La figure~\ref{fig:backend-kafka-adminclient} illustre la chaîne d'intégration réelle.
+
+\begin{figure}[H]
+\begin{adjustwidth}{-1.4cm}{-1.4cm}
+\centering
+\begin{tikzpicture}[
+  x=1cm, y=1cm, every node/.style={font=\normalsize},
+  acteur/.style={draw=black!65, line width=1.1pt, rounded corners, minimum width=4.4cm,
+                 minimum height=1.3cm, align=center, fill=black!6},
+  comp/.style={draw=figBleu, line width=1pt, rounded corners, minimum width=6.6cm,
+               minimum height=1.4cm, align=center, fill=figBleuFond, font=\small},
+  kfk/.style={draw=figOrange, line width=1pt, rounded corners, minimum width=6.6cm,
+              minimum height=1.4cm, align=center, fill=figOrangeFond, font=\small},
+  db/.style={draw=figVert, line width=1pt, rounded corners, minimum width=4.2cm,
+             minimum height=1.4cm, align=center, fill=figVertFond, font=\small},
+  hors/.style={draw=black!40, dotted, line width=1pt, rounded corners, align=left,
+               font=\small, fill=black!3, text=black!60},
+  zone/.style={rounded corners, inner sep=13pt, line width=1.1pt},
+  num/.style={circle, draw, line width=0.8pt, fill=white, inner sep=2pt, font=\small\bfseries},
+  et/.style={font=\small, align=left}
+]
+
+% ---------------- acteur ----------------
+\node[acteur] (act) at (0,2.6) {\textbf{CLIENT\_ADMIN}\\[1pt]\footnotesize depuis le portail};
+
+% ---------------- zone backend ----------------
+\node[comp] (ctrl) at (0,-0.6)  {\textbf{KafkaController} / \textbf{KafkaService}\\\footnotesize vérifie les droits, résout le propriétaire};
+\node[comp] (adm)  at (0,-3.1)  {\textbf{AdminClient}\\\footnotesize bibliothèque cliente du protocole Kafka};
+\node[comp] (ent)  at (9.4,-0.6){\textbf{entité \texttt{KafkaTopic}} (JPA)\\\footnotesize métadonnées du topic};
+
+\begin{scope}[on background layer]
+  \node[zone, draw=figBleu, dashed, fill=figBleu!4, fit=(ctrl)(adm)(ent)] (zbk) {};
+\end{scope}
+\node[font=\small\bfseries, text=figBleu, anchor=south west, fill=white, inner sep=2pt] at ([yshift=3pt]zbk.north west)
+     {Backend Spring Boot — namespace \texttt{platform}};
+
+% ---------------- zone cluster kafka ----------------
+\node[kfk] (boot) at (0,-7.9) {\textbf{Service de \textit{bootstrap}}\\\footnotesize point d'entrée interne du cluster};
+\node[kfk] (brok) at (0,-10.4) {\textbf{Courtiers}\\\footnotesize le topic est créé avec ses partitions};
+
+\begin{scope}[on background layer]
+  \node[zone, draw=figOrange, dashed, fill=figOrange!4, fit=(boot)(brok)] (zkf) {};
+\end{scope}
+\node[font=\small\bfseries, text=figOrange, anchor=south west, fill=white, inner sep=2pt] at ([yshift=3pt]zkf.north west)
+     {Cluster Kafka \texttt{my-cluster} — namespace \texttt{kafka}};
+
+% ---------------- base de donnees ----------------
+\node[db] (pg) at (9.4,-3.1) {\textbf{PostgreSQL}};
+
+% ---------------- fleches ----------------
+\draw[->, line width=1pt, black!65] (act) -- (ctrl);
+\draw[->, line width=1pt, figBleu]  (ctrl) -- (adm);
+\draw[->, line width=1pt, figOrange](adm.south) -- (boot.north);
+\draw[->, line width=1pt, figOrange](boot) -- (brok);
+\draw[->, line width=1pt, figVert]  (ctrl.east) -- (ent.west);
+\draw[->, line width=1pt, figVert]  (ent) -- (pg);
+
+% ---------------- numeros et etapes ----------------
+\node[num] at (0,1.45)  {1};
+\node[num] at (0,-1.85) {2};
+\node[num] at (0,-5.5)  {3};
+\node[num] at (0,-9.15) {4};
+\node[num] at (4.7,-0.6){5};
+\node[num] at (9.4,-1.85){6};
+
+\node[et, anchor=west] at (0.35,1.45)  {demande la création d'un topic};
+\node[et, anchor=west] at (0.35,-1.85) {délègue au client Kafka};
+\node[et, anchor=west, text=figOrange] at (0.35,-5.5)
+     {ouvre une connexion vers les courtiers\\\footnotesize sans passer par l'API Kubernetes};
+\node[et, anchor=west, text=figOrange] at (0.35,-9.15) {exécute \texttt{createTopics}};
+\node[et, anchor=south] at (4.7,-0.35) {\footnotesize enregistre};
+\node[et, anchor=west, text=figVert] at (9.75,-1.85) {\footnotesize persiste};
+
+% ---------------- ce qui n'intervient pas ----------------
+\node[hors] (nk) at (10.6,-9.15)
+     {\textbf{API Kubernetes}\\
+      n'intervient pas dans ce flux.\\
+      Elle sert à Fabric8 pour Knative\\
+      et l'Eventing. La ressource Strimzi\\
+      \texttt{KafkaTopic} (CRD) n'est pas\\
+      utilisée dans ce projet.};
+
+\end{tikzpicture}
+\caption{Chaîne d'intégration du backend au cluster Kafka via AdminClient}
+\label{fig:backend-kafka-adminclient}
+\end{adjustwidth}
+\end{figure}
+
+\subsection{Réalisation}
+
+\subsubsection{Mise en œuvre}
+
+Ce sprint livre le cluster Kafka opéré par Strimzi, ainsi que la capacité du backend à créer et gérer des topics sur ce cluster par programmation. L'implémentation précise de cette capacité, persistance et contrôles d'accès, est présentée au chapitre consacré au backend (Release 1). Son exposition aux clients via une interface graphique ne sera livrée qu'au Sprint 6.
+
+\begin{itemize}
+    \item \textbf{Composants du cluster Kafka.}
+\end{itemize}
+
+La figure~\ref{fig:capture-kafka-pods} montre les pods du namespace \texttt{kafka} : l'opérateur \texttt{strimzi-cluster-operator}, un courtier \texttt{my-cluster-kafka-0}, une instance ZooKeeper et l'\textit{entity-operator}. Tous sont à l'état Running depuis dix-huit jours.
+
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=0.92\textwidth]{image/capture_kafka_pods.png}
+    \caption{Composants du cluster Kafka opéré par Strimzi}
+    \label{fig:capture-kafka-pods}
+\end{figure}
+
+\begin{itemize}
+    \item \textbf{Ressource Kafka gérée par l'opérateur.}
+\end{itemize}
+
+La figure~\ref{fig:capture-kafka-cluster} affiche la ressource personnalisée \texttt{Kafka} que Strimzi réconcilie. Elle indique un courtier et une instance ZooKeeper désirés, un état \texttt{READY: True}, et un mode de métadonnées reposant sur ZooKeeper plutôt que sur KRaft.
+
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=0.92\textwidth]{image/capture_kafka_cluster.png}
+    \caption{Ressource personnalisée \texttt{Kafka} réconciliée par l'opérateur Strimzi}
+    \label{fig:capture-kafka-cluster}
+\end{figure}
+
+\begin{itemize}
+    \item \textbf{Points d'accès réseau du cluster Kafka.}
+\end{itemize}
+
+La figure~\ref{fig:capture-kafka-svc} liste les services exposés dans le namespace \texttt{kafka}. Le service \texttt{my-cluster-kafka-bootstrap}, de type \texttt{ClusterIP}, est celui que le backend contacte en interne sur le port 9092.
+
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=\textwidth]{image/capture_kafka_svc.png}
+    \caption{Services exposés par le cluster Kafka dans le namespace \texttt{kafka}}
+    \label{fig:capture-kafka-svc}
+\end{figure}
+
+\subsubsection{Configuration et déploiement}
+
+Le cluster Kafka, my-cluster, est provisionné dans le namespace kafka. Le backend s'y connecte via le service de bootstrap standard généré par Strimzi, sans authentification, sur le réseau interne du cluster. L'opérateur Strimzi et le cluster ont été installés directement sur l'infrastructure, selon la même approche que les autres briques de ce socle : ce provisionnement, stockage et configuration compris, n'est pas versionné dans le dépôt, où seule la gestion applicative des topics via AdminClient figure.
+
+L'inspection de la ressource \texttt{Kafka} précise le dimensionnement retenu, que la seule lecture du dépôt ne permettait pas d'établir. Le cluster est opéré par \textbf{Strimzi 0.45.0} et déclare un courtier et une instance ZooKeeper, chacun adossé à un volume persistant de 1 Gio de classe \texttt{local-path}. Ce dimensionnement correspond à un environnement de développement : il suffit à valider la chaîne fonctionnelle visée par cette release, un déploiement en exploitation demandant en revanche plusieurs courtiers et un stockage répliqué.
+
+Deux points d'accès de type \texttt{LoadBalancer} complètent le service de bootstrap interne, sur le port 9093, afin de permettre la connexion d'outils de développement extérieurs au cluster. Leur configuration est examinée dans le cadre de l'audit de sécurité présenté au chapitre de validation.
+
+Au terme de cette release, le cluster dispose des trois briques d'infrastructure fondamentales de la plateforme : orchestration Kubernetes isolée par tenant, exécution serverless via Knative Serving, et messagerie événementielle via Kafka et Strimzi. Conformément au périmètre de ce sprint, limité à la gestion des topics, la publication et la consommation effectives de messages sont couvertes par le test de bout en bout du Sprint 3.
+
+À l'issue de ce sprint, le backend peut créer, lister et supprimer des topics Kafka par programmation, sur un cluster opéré par Strimzi. Cette capacité sera exposée aux clients via l'interface graphique à partir du Sprint 6.
+
+\section{Synthèse de la Release 0}
+
+Le tableau~\ref{tab:synthese-release0} récapitule, pour chacun des trois sprints, le mécanisme retenu pour intégrer le backend à la brique d'infrastructure correspondante. Cette différence réapparaît explicitement au Sprint 3 (Release 1).
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{|p{2.5cm}|p{4cm}|p{6.5cm}|}
+\hline
+\rowcolor{gray!30}
+\textbf{Sprint} & \textbf{Brique} & \textbf{Mécanisme d'accès depuis le backend} \\
+\hline
+Sprint 0 & Cluster Kubernetes (nœuds, CNI, MetalLB) & Provisionné manuellement, hors backend \\
+\hline
+Sprint 1 & Knative Serving & Ressource personnalisée Kubernetes, via l'API générique de Fabric8 \\
+\hline
+Sprint 2 & Kafka (topics) & Protocole Kafka natif, via l'AdminClient, indépendant de l'API Kubernetes \\
+\hline
+\end{tabular}
+\caption{Synthèse comparative des mécanismes d'intégration de la Release 0}
+\label{tab:synthese-release0}
+\end{table}
+
+La figure~\ref{fig:release0-synthese} propose une vue d'ensemble visuelle de cette release.
+
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=0.9\textwidth]{image/release0_synthese.png}
+    \caption{Synthèse visuelle de la Release 0}
+    \label{fig:release0-synthese}
+\end{figure}
+
+\section{Conclusion}
+
+La Release 0 a permis de construire, de manière incrémentale et validée à chaque étape, le socle cloud native de la plateforme : cluster Kubernetes isolé par tenant au Sprint 0, exécution serverless via Knative Serving au Sprint 1, et bus d'événements Kafka opéré par Strimzi au Sprint 2. Cette approche progressive, conforme à la méthodologie Scrum retenue, a permis de s'assurer du bon fonctionnement de chaque brique, et d'en documenter honnêtement les mécanismes d'intégration réels, avant d'y adosser la logique métier présentée au chapitre suivant.

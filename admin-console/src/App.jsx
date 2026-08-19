@@ -6,6 +6,7 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ClusterManagement from './pages/admin/ClusterManagement';
+import AdminApps from './pages/admin/AdminApps';
 import AdminBilling from './pages/admin/AdminBilling';
 import AdminClients from './pages/admin/AdminClients';
 import AdminAuditLog from './pages/admin/AdminAuditLog';
@@ -41,6 +42,7 @@ const AppRoutes = () => {
             <Route element={<AdminRoute><Layout /></AdminRoute>}>
                 <Route path="/dashboard" element={<AdminDashboard />} />
                 <Route path="/cluster" element={<ClusterManagement />} />
+                <Route path="/apps" element={<AdminApps />} />
                 <Route path="/billing" element={<AdminBilling />} />
                 <Route path="/clients" element={<AdminClients />} />
                 <Route path="/audit-log" element={<AdminAuditLog />} />

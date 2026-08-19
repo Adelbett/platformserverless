@@ -1,0 +1,135 @@
+@startuml sequence_deploy_app_detail
+' Séquence détaillée au niveau des classes — déploiement d'une application
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 11
+skinparam sequence {
+  ArrowColor #2C3E50
+  LifeLineBorderColor #7F8C8D
+  ParticipantBorderColor #2C3E50
+  ParticipantBackgroundColor #F7F9FC
+}
+autonumber
+
+title Déploiement — vue détaillée AppController → AppService → AppDeploymentAsyncRunner → KnativeService → KnativeWatcher
+
+participant ":AppController" as C
+participant ":PermissionService" as PS
+participant ":AppService" as S
+participant ":UserContextService" as UCS
+participant ":AppRepository" as AR
+participant ":DeploymentLogRepository" as LR
+participant ":LogSseService" as SSE
+participant ":AppDeploymentAsyncRunner" as A
+participant ":KnativeService" as K
+participant ":KubernetesClient" as KC
+participant ":EventingService" as E
+participant ":KnativeWatcher" as W
+
+C -> PS  : has(authentication.name, "DEPLOY_APP")
+activate PS
+PS -> PS : userRepository.findByUsername(username)\nADMIN/CLIENT_ADMIN → true, MEMBER → permissions.contains(...)
+PS --> C : boolean
+deactivate PS
+
+C -> S : createApp(username, AppRequest)
+activate S
+
+S -> UCS : resolve(username)
+activate UCS
+UCS --> S : UserContext(effectiveUserId, namespace)
+deactivate UCS
+
+S -> S  : generateServiceName(req.getImageName(), effectiveUserId)\n[normalisation DNS-1035, max 50 car.]
+S -> S  : App.builder()… .status("DEPLOYING").build()
+S -> AR : save(app)
+S -> S  : addLog(appId, userId, "Deployment triggered", "DEPLOYMENT_START")
+S -> LR : save(DeploymentLog)
+S -> SSE: push(log)
+
+S ->> A : triggerDeploy(app, req)   <<@Async — bean distinct pour traverser le proxy Spring>>
+S --> C : AppResponse
+deactivate S
+
+activate A
+A -> K : deploy(app.getId(), app.getServiceName(), app.getNamespace(), req)
+activate K
+
+alt kubernetesEnabled == false
+  K --> A : buildMockUrl(serviceName, ns)
+else mode cluster
+  K -> K  : ensureNamespaceExists(ns)
+  K -> KC : namespaces().resource(Namespace).create()
+  K -> KC : network().v1().networkPolicies()\n.resource(tenant-default-isolation).create()
+  K -> K  : buildKnativeManifest(serviceName, ns, req)
+  K -> KC : genericKubernetesResources("serving.knative.dev/v1","Service")\n.inNamespace(ns).resource(manifest).create()
+  alt KubernetesClientException code == 409
+    K -> KC : withName(serviceName).delete()
+    K -> K  : Thread.sleep(2000)
+    K -> KC : resource(manifest).create()
+  else autre code
+    K --> A : RuntimeException("Kubernetes API error: …")
+  end
+  K -> K  : buildServiceUrl(serviceName, ns)
+  K --> A : url
+end
+deactivate K
+
+A -> A  : app.setUrl(url); app.setStatus("RUNNING"); app.setUpdatedAt(now)
+A -> AR : save(app)
+A -> A  : addLog(…, "Deployment successful. URL: " + url, "DEPLOYMENT_SUCCESS")
+A -> LR : save(DeploymentLog)
+A -> SSE: push(log)
+
+opt Boolean.TRUE.equals(req.getKafkaEnabled()) && req.getKafkaTopicId() != null
+  A -> E : createKafkaSource(userId, kafkaTopicId,\nserviceName + "-source", namespace, null)
+  activate E
+  E --> A : KafkaSourceDto
+  deactivate E
+  A -> E : createTrigger(userId, source.getId(),\nfilter ?: "order.created", url)
+  A -> A : addLog(…, "KafkaSource + Trigger created…", "KAFKA_WIRED")
+end
+
+alt Exception
+  A -> AR : save(app{status="FAILED"})
+  A -> A  : addLog(…, "Deployment failed: " + e.getMessage(), "DEPLOYMENT_FAIL")
+end
+deactivate A
+
+== Réconciliation asynchrone ==
+KC ->> W : Watcher.eventReceived(action, GenericKubernetesResource)
+activate W
+W -> W  : si namespace == null || !namespace.startsWith("user-") → ignorer
+W -> W  : resolveStatus(action, resource)\nDELETED → "DELETED" ; ADDED/MODIFIED → readReadyCondition()
+W -> W  : readReadyCondition : status.conditions[type="Ready"]\nReady=True → countActivePods() pour distinguer RUNNING / IDLE
+W -> AR : updateAppsInDb(serviceName, namespace, newStatus)
+deactivate W
+
+note over W
+  onClose(WatcherException) → reconnexion automatique après 5 s ;
+  échec d'ouverture → nouvelle tentative après 10 s.
+end note
+
+== Lecture ultérieure ==
+C -> S : listApps(username) / getApp(id, username)
+S -> K : getRealStatus(serviceName, namespace)
+K --> S : "RUNNING" | "SCALED_TO_ZERO" | "FAILED" | "NOT_FOUND" | "DEPLOYING"
+S -> S : mapping → RUNNING | IDLE | FAILED | DELETED | DEPLOYING
+S -> AR : save(app) seulement si le statut a changé
+S -> K : getReadyPods(serviceName, namespace) → AppResponse.replicas
+
+' Classes utilisées : App, AppRequest, AppResponse, DeploymentLog, KafkaSourceDto, UserContextService.UserContext, GenericKubernetesResource
+' Contrôleurs utilisés : AppController (POST /api/apps)
+' Services utilisés : PermissionService, UserContextService, AppService, AppDeploymentAsyncRunner, KnativeService, KnativeWatcher, EventingService, LogSseService, AppRepository, DeploymentLogRepository
+' Pourquoi ces éléments apparaissent : AppDeploymentAsyncRunner est un bean distinct précisément pour que @Async passe par le proxy Spring (commentaire de classe) ; KnativeWatcher assure la convergence du statut hors du chemin de requête.
+' Fichiers sources vérifiés :
+'   app/AppController.java:27-34
+'   user/PermissionService.java:13-17
+'   app/AppService.java:39-73, :99-124, :249-273 (addLog, generateServiceName), :287-314 (toResponse)
+'   app/AppDeploymentAsyncRunner.java:15-86 (javadoc @Async, triggerDeploy, addLog)
+'   app/KnativeService.java:143-190 (deploy, ensureNamespaceExists, NetworkPolicy, 409), :309-366 (getRealStatus, getReadyPods)
+'   app/KnativeWatcher.java:36-120 (openWatch, resolveStatus, readReadyCondition, onClose)
+'   eventing/EventingService.java:82,232
+' Divergence relevée : aucun appel à QuotaService dans ce chemin ; par ailleurs AppResponse.replicas n'est pas lu en base mais recalculé à chaque réponse via KnativeService.getReadyPods().
+@enduml

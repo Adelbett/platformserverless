@@ -1,0 +1,143 @@
+@startuml uc_global
+' Cas d'utilisation globaux — Plateforme PaaS Serverless Kubernetes
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam usecase {
+  BackgroundColor #F7F9FC
+  BorderColor #2C3E50
+  ArrowColor #2C3E50
+}
+skinparam actorStyle awesome
+left to right direction
+
+actor "ADMIN\n(propriétaire plateforme)" as ADMIN
+actor "CLIENT_ADMIN\n(gère son équipe)" as CADMIN
+actor "MEMBER\n(membre d'équipe)" as MEMBER
+actor "Visiteur\n(non authentifié)" as ANON
+actor "Stripe" as STRIPE <<système>>
+actor "Keycloak" as KC <<système>>
+
+rectangle "Plateforme PaaS Serverless" {
+
+  package "Applications (/api/apps)" {
+    usecase "Déployer une application" as UC_DEPLOY
+    usecase "Lister / consulter ses applications" as UC_LIST
+    usecase "Mettre à jour et redéployer" as UC_UPDATE
+    usecase "Supprimer une application" as UC_DELETE
+    usecase "Lister les révisions / Rollback" as UC_ROLLBACK
+  }
+
+  package "Kafka & Eventing" {
+    usecase "Gérer les topics Kafka" as UC_TOPIC
+    usecase "Gérer KafkaSource / Trigger" as UC_EVENTING
+    usecase "Publier un CloudEvent" as UC_PUBLISH
+  }
+
+  package "Observabilité" {
+    usecase "Consulter les logs de déploiement" as UC_LOGS
+    usecase "Streamer les logs conteneur (SSE)" as UC_PODLOGS
+    usecase "Consulter les métriques (Prometheus)" as UC_METRICS
+  }
+
+  package "Facturation" {
+    usecase "Consulter sa facturation" as UC_BILL
+    usecase "Exporter le rapport Excel" as UC_EXPORT
+    usecase "Payer une facture" as UC_PAY
+    usecase "Gérer ses moyens de paiement" as UC_PM
+  }
+
+  package "Équipe & Compte" {
+    usecase "S'enregistrer" as UC_REGISTER
+    usecase "S'authentifier" as UC_LOGIN
+    usecase "Gérer son profil (/api/users/me)" as UC_PROFILE
+    usecase "Gérer les membres de l'équipe" as UC_TEAM
+    usecase "Attribuer les permissions d'un membre" as UC_PERMS
+    usecase "Gérer ses clés d'API" as UC_APIKEY
+  }
+
+  package "Administration (/api/admin)" {
+    usecase "Superviser le cluster\n(nodes, pods, namespaces, storage)" as UC_CLUSTER
+    usecase "Gérer tous les clients" as UC_CLIENTS
+    usecase "Suspendre / restaurer un client" as UC_SUSPEND
+    usecase "Définir les quotas d'un tenant" as UC_QUOTA
+    usecase "Forcer la suppression d'une app / d'un topic" as UC_FORCE
+    usecase "Consulter et exporter le journal d'audit" as UC_AUDIT
+    usecase "Consulter la facturation globale" as UC_ADMBILL
+    usecase "Générer les factures mensuelles" as UC_GENINV
+  }
+
+  usecase "Consulter la page de statut publique\n(/api/status)" as UC_STATUS
+}
+
+ANON   --> UC_STATUS
+ANON   --> UC_REGISTER
+ANON   --> UC_LOGIN
+
+MEMBER --> UC_DEPLOY
+MEMBER --> UC_LIST
+MEMBER --> UC_UPDATE
+MEMBER --> UC_DELETE
+MEMBER --> UC_ROLLBACK
+MEMBER --> UC_TOPIC
+MEMBER --> UC_EVENTING
+MEMBER --> UC_PUBLISH
+MEMBER --> UC_LOGS
+MEMBER --> UC_PODLOGS
+MEMBER --> UC_METRICS
+MEMBER --> UC_BILL
+MEMBER --> UC_EXPORT
+MEMBER --> UC_PROFILE
+MEMBER --> UC_APIKEY
+
+CADMIN --|> MEMBER
+CADMIN --> UC_TEAM
+CADMIN --> UC_PERMS
+CADMIN --> UC_PAY
+CADMIN --> UC_PM
+
+ADMIN  --> UC_CLUSTER
+ADMIN  --> UC_CLIENTS
+ADMIN  --> UC_SUSPEND
+ADMIN  --> UC_QUOTA
+ADMIN  --> UC_FORCE
+ADMIN  --> UC_AUDIT
+ADMIN  --> UC_ADMBILL
+ADMIN  --> UC_GENINV
+ADMIN  --> UC_LIST
+
+UC_LOGIN    ..> KC     : <<include>>
+UC_REGISTER ..> KC     : <<include>>
+UC_PAY      ..> STRIPE : <<include>>
+UC_PM       ..> STRIPE : <<include>>
+
+note bottom of UC_DEPLOY
+  Aucune vérification de quota bloquante :
+  QuotaService.assertCanCreateApp() n'est plus
+  appelé par AppService.createApp()
+  (facturation à l'usage réel).
+end note
+
+' Classes utilisées : UserRole (ADMIN, CLIENT_ADMIN, MEMBER), Permission (DEPLOY_APP, DELETE_APP, MANAGE_KAFKA, MANAGE_EVENTING, VIEW_LOGS, VIEW_MONITORING, VIEW_BILLING, EXPORT_BILLING)
+' Contrôleurs utilisés : AppController, KafkaController, EventingController, EventController, LogController, MetricsController, BillingController, InvoiceController, PaymentController, AuthController, UserController, TeamController, ApiKeyController, AdminController, StatusController
+' Services utilisés : PermissionService (gate @PreAuthorize), UserContextService
+' Pourquoi ces éléments apparaissent : chaque cas d'utilisation correspond à un endpoint REST réellement exposé ; les acteurs sont exactement les 3 valeurs de l'enum UserRole ; les gardes @PreAuthorize déterminent quel acteur atteint quel cas.
+' Fichiers sources vérifiés :
+'   backend-api/src/main/java/com/platform/api/user/UserRole.java:3-8
+'   backend-api/src/main/java/com/platform/api/user/Permission.java:7-32
+'   backend-api/src/main/java/com/platform/api/app/AppController.java:27-84
+'   backend-api/src/main/java/com/platform/api/kafka/KafkaController.java:28-56
+'   backend-api/src/main/java/com/platform/api/eventing/EventingController.java:32-84
+'   backend-api/src/main/java/com/platform/api/eventing/EventController.java:23
+'   backend-api/src/main/java/com/platform/api/logs/LogController.java:21-59
+'   backend-api/src/main/java/com/platform/api/metrics/MetricsController.java:22-64
+'   backend-api/src/main/java/com/platform/api/billing/BillingController.java:30-56
+'   backend-api/src/main/java/com/platform/api/billing/InvoiceController.java:21-56
+'   backend-api/src/main/java/com/platform/api/payment/PaymentController.java:24-77
+'   backend-api/src/main/java/com/platform/api/team/TeamController.java:30-59
+'   backend-api/src/main/java/com/platform/api/admin/AdminController.java:47-572
+'   backend-api/src/main/java/com/platform/api/status/StatusController.java:23-31
+'   backend-api/src/main/java/com/platform/api/app/AppService.java:46-47 (quota retiré)
+' Divergence relevée : AuthController n'expose que POST /api/auth/register — il n'y a pas d'endpoint de login côté backend, le login se fait directement contre Keycloak depuis le frontend (voir sequence_login.puml).
+@enduml

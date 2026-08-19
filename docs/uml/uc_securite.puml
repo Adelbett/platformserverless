@@ -1,0 +1,99 @@
+@startuml uc_securite
+' Cas d'utilisation — authentification, autorisation et permissions
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam usecase {
+  BackgroundColor #F7F9FC
+  BorderColor #2C3E50
+}
+skinparam actorStyle awesome
+left to right direction
+
+actor "Visiteur" as ANON
+actor "MEMBER" as MEMBER
+actor "CLIENT_ADMIN" as CADMIN
+actor "ADMIN" as ADMIN
+actor "Client machine\n(script / CI)" as MACHINE
+actor "Keycloak\n(realm platform)" as KC <<système>>
+
+rectangle "Sécurité de la plateforme" {
+
+  usecase "S'enregistrer\n(POST /api/auth/register)" as UC_REG
+  usecase "Obtenir un jeton OIDC\n(Keycloak token endpoint)" as UC_TOKEN
+  usecase "Rafraîchir le jeton\n(grant_type=refresh_token)" as UC_REFRESH
+  usecase "Se déconnecter\n(logout endpoint Keycloak)" as UC_LOGOUT
+
+  usecase "Valider le JWT\n(Resource Server OAuth2)" as UC_JWT
+  usecase "Convertir les rôles du realm\nen GrantedAuthority" as UC_CONV
+  usecase "Synchroniser l'utilisateur\nen base à la 1re requête" as UC_SYNC
+  usecase "Autoriser un jeton SSE\n(en-tête ou paramètre)" as UC_SSE
+  usecase "Authentifier par clé d'API\n(X-API-Key)" as UC_APIK
+  usecase "Limiter le débit\ndes endpoints publics /api/status" as UC_RATE
+
+  usecase "Vérifier une permission\n@permissionService.has(...)" as UC_PERM
+  usecase "Vérifier un rôle\nhasRole('ADMIN') / hasRole('CLIENT_ADMIN')" as UC_ROLE
+  usecase "Résoudre le tenant effectif\n(MEMBER → CLIENT_ADMIN, namespace)" as UC_CTX
+
+  usecase "Générer / révoquer une clé d'API" as UC_KEYMGT
+  usecase "Accorder ou retirer les permissions\nd'un membre" as UC_GRANT
+  usecase "Changer le rôle d'un utilisateur\n(PATCH /api/users/{id}/role)" as UC_CHROLE
+  usecase "Suspendre / restaurer un client" as UC_SUSP
+  usecase "Consulter le journal d'audit admin" as UC_AUDIT
+}
+
+ANON    --> UC_REG
+ANON    --> UC_TOKEN
+MEMBER  --> UC_TOKEN
+MEMBER  --> UC_REFRESH
+MEMBER  --> UC_LOGOUT
+MEMBER  --> UC_KEYMGT
+CADMIN  --|> MEMBER
+CADMIN  --> UC_GRANT
+ADMIN   --> UC_CHROLE
+ADMIN   --> UC_SUSP
+ADMIN   --> UC_AUDIT
+MACHINE --> UC_APIK
+
+UC_REG     ..> KC        : <<include>> KeycloakAdminService.createUser()
+UC_TOKEN   ..> KC        : <<include>>
+UC_REFRESH ..> KC        : <<include>>
+UC_LOGOUT  ..> KC        : <<include>>
+
+UC_JWT   ..> UC_CONV : <<include>>
+UC_JWT   ..> UC_SYNC : <<include>>
+UC_PERM  ..> UC_JWT  : <<include>>
+UC_ROLE  ..> UC_JWT  : <<include>>
+UC_PERM  ..> UC_CTX  : <<include>>
+UC_SSE   ..> UC_JWT  : <<extend>>
+UC_APIK  ..> UC_JWT  : <<extend>> (chaîne alternative)
+UC_GRANT ..> UC_ROLE : <<include>> hasRole('CLIENT_ADMIN')
+UC_CHROLE ..> UC_ROLE : <<include>> hasRole('ADMIN')
+UC_SUSP  ..> UC_AUDIT : <<include>> AdminAuditLogService.record()
+
+note bottom
+  Endpoints publics (permitAll) :
+  /api/auth/**, /swagger-ui/**, /api-docs/**,
+  /actuator/health|info, /h2-console/**,
+  POST /api/payment/webhook, GET /api/status/**
+  Tout le reste exige un JWT valide.
+end note
+
+' Classes utilisées : User, UserRole, Permission, ApiKey, AdminAuditLog, AdminAction
+' Contrôleurs utilisés : AuthController, UserController, TeamController, ApiKeyController, AdminController, StatusController
+' Services utilisés : SecurityConfig, KeycloakJwtAuthConverter, UserSyncFilter, SseTokenFilter, ApiKeyFilter, StatusRateLimitFilter, PermissionService, UserContextService, ApiKeyService, KeycloakAdminService, AdminAuditLogService
+' Pourquoi ces éléments apparaissent : chaque cas correspond à un filtre déclaré dans la chaîne SecurityFilterChain ou à une annotation @PreAuthorize réellement présente dans le code.
+' Fichiers sources vérifiés :
+'   security/SecurityConfig.java:41-65 (permitAll + ordre des filtres)
+'   security/KeycloakJwtAuthConverter.java:17-20 ; security/UserSyncFilter.java:27-29
+'   security/SseTokenFilter.java:20-30 ; security/ApiKeyFilter.java:20-22
+'   status/StatusRateLimitFilter.java
+'   user/PermissionService.java:7-17 ; user/UserContextService.java:16-37
+'   apikey/ApiKeyService.java:23-65 (hash SHA-256, validate)
+'   auth/AuthController.java:21-23 ; auth/KeycloakAdminService.java:46,56,105
+'   team/TeamController.java:30-59 (hasRole('CLIENT_ADMIN'))
+'   user/UserController.java:44-54 (hasRole('ADMIN'))
+'   admin/AdminController.java:47 (@PreAuthorize hasRole('ADMIN') au niveau classe)
+' Divergence relevée : il n'existe aucun endpoint de login côté backend — l'obtention du jeton est faite par le frontend directement auprès de Keycloak ; AuthController n'expose que /register.
+@enduml

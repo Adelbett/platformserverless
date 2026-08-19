@@ -12,6 +12,7 @@ const routeTitles = {
     '/cluster':    { title: 'Cluster',    sub: 'Nodes, namespaces, pods, Knative, Kafka, logs' },
     '/users':      { title: 'Users',      sub: 'Global platform roles across all tenants' },
     '/clients':    { title: 'Clients',    sub: 'Suspend, restore, and set quotas per tenant' },
+    '/apps':       { title: 'Apps',       sub: 'All applications across all tenants' },
     '/billing':    { title: 'Revenue',    sub: 'Platform-wide billing and invoices' },
     '/audit-log':  { title: 'Audit Log',  sub: 'Every suspend, restore, and force-delete action' },
 };

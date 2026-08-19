@@ -1,0 +1,114 @@
+@startuml sequence_create_topic
+' Séquence — création d'un topic Kafka
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 11
+skinparam sequence {
+  ArrowColor #2C3E50
+  LifeLineBorderColor #7F8C8D
+  ParticipantBorderColor #2C3E50
+  ParticipantBackgroundColor #F7F9FC
+}
+autonumber
+
+title Créer un topic Kafka — POST /api/kafka/topics
+
+actor "CLIENT_ADMIN / MEMBER" as U
+participant "web-portal\nKafkaTopics.jsx" as WEB
+participant ":KafkaController" as C
+participant ":PermissionService" as PS
+participant ":UserContextService" as UCS
+participant ":KafkaService" as S
+participant ":KafkaTopicRepository" as R
+participant "AdminClient\n(Apache Kafka)" as ADM
+participant "Kafka (Strimzi)\nmy-cluster-kafka-bootstrap:9092" as KAFKA
+participant ":GlobalExceptionHandler" as GEH
+
+U -> WEB : saisit name, partitions (déf. 3), replicas (déf. 1), config
+WEB -> C : POST /api/kafka/topics\nCreateTopicRequest (validé @Valid)
+activate C
+
+C -> PS : has(authentication.name, "MANAGE_KAFKA")
+activate PS
+PS --> C : true
+deactivate PS
+
+C -> UCS : resolve(auth.getName())
+activate UCS
+UCS --> C : UserContext(effectiveUserId, namespace)
+deactivate UCS
+
+C -> S : createTopic(effectiveUserId, request)
+activate S
+
+S -> R : existsByNameAndUserId(name, userId)
+alt déjà présent pour ce tenant
+  S -> GEH : ConflictException("Topic already exists: …")
+  GEH --> WEB : 409 Conflict
+end
+
+S -> R : existsByName(name)
+alt nom déjà pris par un autre tenant
+  note right of S
+    Les noms de topics sont uniques
+    à l'échelle du cluster Kafka :
+    ce second contrôle évite un 500
+    (TopicExistsException) côté AdminClient.
+  end note
+  S -> GEH : ConflictException("Topic name already in use by another tenant: …")
+  GEH --> WEB : 409 Conflict
+end
+
+S -> S : KafkaTopic.builder()\n.partitions(req ?: 3).replicas(req ?: 1)\n.config(req.getConfig()).userId(userId).build()
+S -> R : save(topic)
+R --> S : KafkaTopic persistée
+
+alt kafkaEnabled == true
+  S -> ADM : AdminClient.create(bootstrapServers)
+  activate ADM
+  ADM -> KAFKA : describeCluster().nodes()
+  KAFKA --> ADM : liste des brokers
+  ADM -> ADM : replicas = min(topic.getReplicas(), nbBrokers)
+  ADM -> KAFKA : createTopics([ NewTopic(name, partitions, replicas) ])
+  alt échec côté Kafka
+    KAFKA --> ADM : exception
+    ADM --> S : RuntimeException("Failed to create Kafka topic: …")
+    S -> GEH : propagation
+    GEH --> WEB : 500
+  else succès
+    KAFKA --> ADM : topic créé
+  end
+  deactivate ADM
+else mode mock (kafkaEnabled == false)
+  S -> S : log "[MOCK] Would create Kafka topic: …"
+end
+
+S -> S : toDto(topic)
+S --> C : KafkaTopicDto
+deactivate S
+C --> WEB : 200 OK
+deactivate C
+WEB --> U : topic listé
+
+== Consultation ultérieure ==
+WEB -> C : GET /api/kafka/topics
+C -> S : listTopics(effectiveUserId)
+S -> R : findByUserId(userId)
+S -> ADM : fetchTopicMetrics(noms) —\ndescribeTopics + listOffsets + consumer lag
+S --> C : List<KafkaTopicDto> (messageCount, consumerLag)
+
+' Classes utilisées : KafkaTopic, KafkaTopicDto, CreateTopicRequest, ConflictException, UserContextService.UserContext
+' Contrôleurs utilisés : KafkaController (POST /api/kafka/topics, GET /api/kafka/topics)
+' Services utilisés : KafkaService, PermissionService, UserContextService, KafkaTopicRepository, GlobalExceptionHandler
+' Pourquoi ces éléments apparaissent : createTopic() enchaîne deux contrôles d'unicité, la persistance, puis l'appel AdminClient conditionné par la propriété app.kafka.enabled.
+' Fichiers sources vérifiés :
+'   kafka/KafkaController.java:28-36 (@PreAuthorize MANAGE_KAFKA, @Valid)
+'   kafka/KafkaService.java:36-67 (createTopic, double contrôle d'unicité, mode mock)
+'   kafka/KafkaService.java:206-217 (createTopicInKafka — AdminClient, min(replicas, brokers))
+'   kafka/KafkaService.java:118-204 (fetchTopicMetrics — describeTopics, listOffsets, lag)
+'   kafka/KafkaService.java:92-101 (deleteTopic → deleteTopicFromKafka)
+'   exception/ConflictException.java, exception/GlobalExceptionHandler.java
+'   backend-api/src/main/resources/application-k8s.yml:42-44 (bootstrap-servers Strimzi)
+' Divergence relevée : la création n'utilise pas la CRD Strimzi KafkaTopic mais l'AdminClient Kafka natif ; la persistance en base précède la création côté Kafka et la méthode n'est pas @Transactional — un échec Kafka laisse donc une ligne orpheline dans kafka_topics.
+@enduml

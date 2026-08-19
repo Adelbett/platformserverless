@@ -1,0 +1,101 @@
+@startuml uc_kafka_eventing
+' Cas d'utilisation — Kafka & Eventing côté client
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam usecase {
+  BackgroundColor #F7F9FC
+  BorderColor #2C3E50
+}
+skinparam actorStyle awesome
+left to right direction
+
+actor "MEMBER" as MEMBER
+actor "CLIENT_ADMIN" as CADMIN
+actor "ADMIN" as ADMIN
+actor "Kafka (Strimzi)" as KAFKA <<système>>
+actor "Knative Eventing" as KNE <<système>>
+
+rectangle "Kafka & Eventing" {
+
+  package "Topics (/api/kafka/topics)" {
+    usecase "Créer un topic\n(name, partitions, replicas, config)" as UC_TCREATE
+    usecase "Lister ses topics" as UC_TLIST
+    usecase "Consulter un topic" as UC_TGET
+    usecase "Supprimer un topic" as UC_TDEL
+  }
+
+  package "Eventing (/api/eventing)" {
+    usecase "Créer un KafkaSource" as UC_SCREATE
+    usecase "Lister ses KafkaSources\n(+ état ready réel)" as UC_SLIST
+    usecase "Créer un Trigger\n(filtre sur le type d'événement)" as UC_TRCREATE
+    usecase "Lister ses Triggers" as UC_TRLIST
+    usecase "Supprimer un Trigger" as UC_TRDEL
+  }
+
+  usecase "Publier un CloudEvent\nPOST /api/events" as UC_PUB
+
+  usecase "Garantir l'existence du Broker 'default'\ndans le namespace tenant" as UC_BROKER
+  usecase "Créer le topic dans Kafka\n(AdminClient.createTopics)" as UC_KTOPIC
+  usecase "Câbler automatiquement\nKafkaSource + Trigger au déploiement" as UC_AUTO
+  usecase "Supprimer en cascade les CR d'eventing\nlors de la suppression d'une app" as UC_CASCADE
+
+  usecase "Lister tous les topics de la plateforme\nGET /api/admin/kafka/topics" as UC_ATLIST
+  usecase "Forcer la suppression d'un topic\nDELETE /api/admin/kafka/topics/{id}" as UC_ATDEL
+}
+
+MEMBER --> UC_TCREATE
+MEMBER --> UC_TLIST
+MEMBER --> UC_TGET
+MEMBER --> UC_TDEL
+MEMBER --> UC_SCREATE
+MEMBER --> UC_SLIST
+MEMBER --> UC_TRCREATE
+MEMBER --> UC_TRLIST
+MEMBER --> UC_TRDEL
+MEMBER --> UC_PUB
+CADMIN --|> MEMBER
+ADMIN  --> UC_ATLIST
+ADMIN  --> UC_ATDEL
+
+UC_TCREATE  ..> UC_KTOPIC : <<include>>
+UC_SCREATE  ..> UC_BROKER : <<include>>
+UC_AUTO     ..> UC_SCREATE : <<include>>
+UC_AUTO     ..> UC_TRCREATE : <<include>>
+UC_PUB      ..> KAFKA : <<include>> KafkaProducer.send()
+UC_KTOPIC   ..> KAFKA
+UC_SCREATE  ..> KNE
+UC_TRCREATE ..> KNE
+UC_CASCADE  ..> UC_TRDEL : <<include>>
+
+note bottom of UC_TCREATE
+  Permission MANAGE_KAFKA.
+  Double contrôle d'unicité :
+  existsByNameAndUserId puis existsByName
+  (les noms de topics sont uniques cluster-wide).
+end note
+
+note bottom of UC_SCREATE
+  Permission MANAGE_EVENTING.
+  Lecture (GET /sources, /triggers) sans
+  permission spécifique : JWT valide suffisant.
+end note
+
+' Classes utilisées : KafkaTopic, KafkaTopicDto, CreateTopicRequest, KafkaSource, KafkaSourceDto, Trigger, TriggerDto
+' Contrôleurs utilisés : KafkaController, EventingController, EventController, AdminController
+' Services utilisés : KafkaService, EventingService, EventService, PermissionService, UserContextService
+' Pourquoi ces éléments apparaissent : chaque cas correspond à une méthode de KafkaController/EventingController/EventController ; les cas « système » traduisent ensureBrokerExists(), createTopicInKafka() et deleteByServiceName().
+' Fichiers sources vérifiés :
+'   kafka/KafkaController.java:19-56 (@PreAuthorize MANAGE_KAFKA sur POST et DELETE uniquement)
+'   kafka/KafkaService.java:36-99 (createTopic, listTopics, getTopic, deleteTopic, createTopicInKafka)
+'   eventing/EventingController.java:32-84 (@PreAuthorize MANAGE_EVENTING sur POST/DELETE)
+'   eventing/EventingService.java:82,113,198,232,270,309,390,398
+'   eventing/EventController.java:15-25 ; eventing/EventService.java:26-54
+'   app/AppDeploymentAsyncRunner.java:48-63 (câblage automatique)
+'   app/AppService.java:178 (eventingService.deleteByServiceName lors du delete)
+'   admin/AdminController.java:118-134
+' Divergences relevées :
+'   - Les topics ne sont PAS créés via la CRD Strimzi « kafka.strimzi.io/KafkaTopic » (pourtant autorisée dans k8s/backend/rbac.yaml:75) mais via l'AdminClient Kafka natif (KafkaService.java:206-217).
+'   - Les endpoints de lecture (GET topics, GET sources, GET triggers) ne portent pas d'annotation @PreAuthorize — la permission MANAGE_KAFKA / MANAGE_EVENTING n'est exigée qu'en écriture.
+@enduml

@@ -1,0 +1,137 @@
+@startuml architecture_physique
+' Diagramme de déploiement — infrastructure réelle
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 11
+skinparam node {
+  BackgroundColor #F7F9FC
+  BorderColor #2C3E50
+}
+skinparam database {
+  BackgroundColor #FDF6E3
+  BorderColor #B58900
+}
+skinparam cloud {
+  BackgroundColor #EEF6FF
+  BorderColor #2C6FBB
+}
+skinparam ArrowColor #2C3E50
+
+title Architecture physique — cluster Kubernetes 3 nœuds
+
+actor "Utilisateur\n(navigateur)" as U
+
+cloud "Internet" as NET
+
+node "Cluster Kubernetes (3 nœuds)" as CLUSTER {
+
+  node "vm01 — control-plane" as VM1
+  node "vm02 — worker" as VM2
+  node "vm03 — worker" as VM3
+
+  component "CNI Cilium\n(NetworkPolicy standard)" as CILIUM
+  component "MetalLB\n(pool LoadBalancer L2)" as MLB
+  component "Kourier\n(ns kourier-system — ingress Knative)" as KOURIER
+
+  package "namespace: knative-serving" as NSKS {
+    component "Controller / Autoscaler (KPA)" as KPA
+    component "Activator" as ACT
+  }
+
+  package "namespace: knative-eventing" as NSKE {
+    component "kafka-controller\n(KafkaSource)" as KSRC
+    component "MT-Channel Broker\n(filtre les Triggers)" as BROKER
+  }
+
+  package "namespace: platform" as NSP {
+    node "Deployment platform-api\n(Spring Boot 3 / Java 17)" as API
+    node "Deployment platform-web\n(web-portal — nginx + React/Vite)" as WEBD
+    node "Deployment platform-admin\n(admin-console — nginx + React/Vite)" as ADMD
+    node "Keycloak\n(realm platform)" as KC
+    database "PostgreSQL\npostgres.platform.svc:5432" as PG
+    database "Elasticsearch\nelasticsearch.platform.svc:9200" as ES
+  }
+
+  package "namespace: kafka (Strimzi)" as NSK {
+    node "Kafka Cluster\nmy-cluster-kafka-bootstrap.kafka.svc:9092" as KAFKA
+    component "Strimzi Topic Operator\n(CR KafkaTopic)" as STO
+  }
+
+  package "namespace: monitoring" as NSM {
+    node "Prometheus\n(ServiceMonitor + PodMonitor queue-proxy)" as PROM
+    node "Alertmanager" as AM
+    node "Grafana" as GRAF
+  }
+
+  package "namespaces tenants : user-<username>" as NST {
+    node "Knative Service (app tenant)\n  Revision -> Pod\n  [queue-proxy | user-container]" as APPPOD
+    component "Broker 'default'" as TBROKER
+    component "KafkaSource + Trigger" as TCR
+    component "NetworkPolicy\ntenant-default-isolation" as NP
+  }
+
+  node "Jenkins\n(agents Kaniko)" as JENKINS
+}
+
+cloud "Docker Hub\nindex.docker.io" as DHUB
+cloud "Stripe API" as STRIPE
+
+U     --> NET
+NET   --> MLB   : HTTP/HTTPS
+MLB   --> KOURIER
+MLB   --> WEBD
+KOURIER --> APPPOD : routage *.<domaine> tenant
+WEBD  --> API   : /api (proxy)
+ADMD  --> API
+API   --> PG    : JDBC
+API   --> ES
+API   --> KC    : OIDC / Admin REST
+API   --> KAFKA : AdminClient + Producer
+API   --> PROM  : HTTP query
+API   --> AM    : HTTP /api/v2/alerts
+API   --> STRIPE : HTTPS
+API   ..> CLUSTER : Fabric8 KubernetesClient\n(ServiceAccount + ClusterRole)
+API   --> APPPOD : pods/log (user-container)
+KPA   --> APPPOD : scale 0..N
+ACT   --> APPPOD : réveil scale-from-zero
+KSRC  --> KAFKA  : consume
+KSRC  --> TBROKER : CloudEvent (sink)
+TBROKER --> TCR
+TCR   --> APPPOD : subscriber URI
+STO   --> KAFKA
+PROM  --> APPPOD : scrape queue-proxy
+GRAF  --> PROM
+CILIUM .. NP     : applique
+JENKINS --> DHUB : build Kaniko + push
+JENKINS --> NSP  : kubectl set image
+DHUB  --> APPPOD : pull image applicative
+VM1 .. CLUSTER
+VM2 .. CLUSTER
+VM3 .. CLUSTER
+
+note right of DHUB
+  Registre d'images = Docker Hub
+  (auth "https://index.docker.io/v1/"
+   dans Jenkinsfile.backend).
+  Aucun Harbor dans le dépôt.
+end note
+
+' Classes utilisées : aucune (diagramme de déploiement)
+' Contrôleurs utilisés : n/a
+' Services utilisés : KnativeService, EventingService, MetricsService, AlertmanagerService, PaymentService, KeycloakAdminService (points d'intégration représentés par les flèches sortantes de platform-api)
+' Pourquoi ces éléments apparaissent : chaque nœud/namespace correspond à un manifeste ou à une URL de service réellement présente dans le dépôt.
+' Fichiers sources vérifiés :
+'   ci-cd/jenkins/pipelines/Jenkinsfile.backend:82 (index.docker.io), :96 (kubectl set image)
+'   k8s/backend/deployment.yaml:25 (postgres.platform.svc.cluster.local:5432)
+'   k8s/backend/rbac.yaml:53-113 (ClusterRole serving/eventing/sources/kafka.strimzi.io/pods-log)
+'   k8s/tenant/network-policy.yaml:18-65 (kourier-system, knative-serving, monitoring, kafka)
+'   k8s/monitoring/service-monitor.yaml, k8s/monitoring/queue-proxy-podmonitor.yaml, k8s/monitoring/alertmanager-config.yaml
+'   k8s/admin/deployment.yaml:2 (pool LoadBalancer MetalLB)
+'   k8s/backup/elasticsearch-snapshot-cronjob.yaml:26 (elasticsearch.platform.svc:9200)
+'   backend-api/src/main/resources/application-k8s.yml:36,44,47 (keycloak, kafka bootstrap Strimzi, prometheus)
+'   backend-api/src/main/java/com/platform/api/app/KnativeWatcher.java:59 (namespaces "user-*")
+' Divergences relevées :
+'   - Harbor est absent du dépôt : le registre réel est Docker Hub.
+'   - Cilium et MetalLB ne sont documentés que dans les fichiers d'audit/commentaires (AUDIT_PRODUCTION_READINESS.md:32, k8s/admin/deployment.yaml:2) ; aucune CRD Cilium ni IPAddressPool n'est versionnée dans k8s/.
+@enduml
