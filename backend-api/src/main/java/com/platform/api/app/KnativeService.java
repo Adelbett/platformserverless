@@ -481,6 +481,33 @@ public class KnativeService {
 
     // ── Helpers ───────────────────────────────────────────────────────
 
+    // Kafka connection variables are always injected automatically —
+    // the client doesn't need to configure them. Custom envVars from the
+    // request are appended on top; a custom var can't override one of
+    // these reserved names, so platform-managed Kafka wiring stays authoritative.
+    private static final List<String> RESERVED_ENV_NAMES = List.of(
+            "KAFKA_BROKERCONNECT", "KAFKA_BOOTSTRAP", "KAFKA_BOOTSTRAP_SERVERS",
+            "SPRING_KAFKA_BOOTSTRAP_SERVERS", "KAFKA_BROKERS"
+    );
+
+    private List<Map<String, String>> buildEnvVars(AppRequest req) {
+        List<Map<String, String>> env = new ArrayList<>(List.of(
+                Map.of("name", "KAFKA_BROKERCONNECT",            "value", "my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"),
+                Map.of("name", "KAFKA_BOOTSTRAP",                "value", "my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"),
+                Map.of("name", "KAFKA_BOOTSTRAP_SERVERS",        "value", "my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"),
+                Map.of("name", "SPRING_KAFKA_BOOTSTRAP_SERVERS", "value", "my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"),
+                Map.of("name", "KAFKA_BROKERS",                  "value", "my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092")
+        ));
+        if (req.getEnvVars() != null) {
+            req.getEnvVars().forEach((k, v) -> {
+                if (k != null && !k.isBlank() && !RESERVED_ENV_NAMES.contains(k)) {
+                    env.add(Map.of("name", k, "value", v != null ? v : ""));
+                }
+            });
+        }
+        return env;
+    }
+
     private GenericKubernetesResource buildKnativeManifest(String name, String namespace, AppRequest req) {
         String imageName = req.getImageName() != null ? req.getImageName().trim() : "";
         String imageTag  = req.getImageTag()  != null ? req.getImageTag().trim()  : "";
@@ -510,14 +537,7 @@ public class KnativeService {
                                 "ports", List.of(Map.of(
                                     "containerPort", req.getPort() != null ? req.getPort() : 8080
                                 )),
-                                "env", List.of(
-                                    // Injectés automatiquement — le client n'a pas besoin de les configurer
-                                    Map.of("name", "KAFKA_BROKERCONNECT",         "value", "my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"),
-                                    Map.of("name", "KAFKA_BOOTSTRAP",             "value", "my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"),
-                                    Map.of("name", "KAFKA_BOOTSTRAP_SERVERS",     "value", "my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"),
-                                    Map.of("name", "SPRING_KAFKA_BOOTSTRAP_SERVERS", "value", "my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"),
-                                    Map.of("name", "KAFKA_BROKERS",               "value", "my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092")
-                                ),
+                                "env", buildEnvVars(req),
                                 "resources", Map.of(
                                     "requests", Map.of(
                                         "cpu",    req.getCpuRequest()    != null ? req.getCpuRequest()    : "100m",
