@@ -101,6 +101,33 @@ public class KeycloakAdminService {
         }
     }
 
+    /** Updates a Keycloak user's email — used when a user changes their own email in Settings. */
+    public void updateEmail(String username, String newEmail) {
+        String adminToken = getAdminToken();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(adminToken);
+
+        String searchUrl = keycloakUrl + "/admin/realms/" + realm + "/users?username=" + username + "&exact=true";
+        ResponseEntity<List<Map<String, Object>>> searchRes = restTemplate.exchange(
+                searchUrl, HttpMethod.GET, new HttpEntity<>(headers),
+                new ParameterizedTypeReference<>() {});
+
+        if (searchRes.getBody() == null || searchRes.getBody().isEmpty()) {
+            throw new com.platform.api.exception.NotFoundException("Keycloak user not found: " + username);
+        }
+
+        String userId = (String) searchRes.getBody().get(0).get("id");
+        try {
+            Map<String, Object> update = Map.of("email", newEmail, "emailVerified", true);
+            restTemplate.exchange(
+                    keycloakUrl + "/admin/realms/" + realm + "/users/" + userId,
+                    HttpMethod.PUT, new HttpEntity<>(update, headers), Void.class);
+        } catch (HttpClientErrorException.Conflict e) {
+            throw new ConflictException("Cet email est déjà utilisé par un autre compte.");
+        }
+    }
+
     /** Deletes a Keycloak user by username — used when a CLIENT_ADMIN removes a team member. */
     public void deleteUser(String username) {
         String adminToken = getAdminToken();

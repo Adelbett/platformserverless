@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     LayoutDashboard, Box, Rocket, Activity, Zap,
     Globe, CreditCard, Settings,
-    LogOut, ChevronLeft, ChevronRight, Hexagon,
+    LogOut, ChevronLeft, ChevronRight,
     Terminal, UserPlus, ExternalLink
 } from 'lucide-react';
 
@@ -124,14 +124,15 @@ const Sidebar = ({ collapsed, onToggle }) => {
                 overflow: 'hidden',
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                    <div style={{
-                        width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-                        background: 'linear-gradient(135deg, #00D4FF, #0066FF)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        boxShadow: '0 0 16px rgba(0,212,255,0.3)',
-                    }}>
-                        <Hexagon size={15} color="white" fill="white" />
-                    </div>
+                    <img
+                        src="/logo.png"
+                        alt="NextStep"
+                        style={{
+                            width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                            objectFit: 'contain',
+                            boxShadow: '0 0 16px rgba(0,212,255,0.3)',
+                        }}
+                    />
                     <AnimatePresence initial={false}>
                         {!collapsed && (
                             <motion.div

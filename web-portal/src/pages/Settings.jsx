@@ -175,16 +175,6 @@ const ApiKeysSection = () => {
                     })}
                 </div>
             )}
-
-            <div style={{ marginTop: 16, padding: '12px 16px', borderRadius: 8, background: 'rgba(168,85,247,0.05)', border: '1px solid rgba(168,85,247,0.15)' }}>
-                <p style={{ fontSize: 11, color: '#A855F7', margin: '0 0 4px', fontWeight: 700 }}>Utilisation dans Service A (Producer)</p>
-                <code style={{ fontSize: 11, color: '#9CA3AF', fontFamily: "'JetBrains Mono', monospace", display: 'block', marginBottom: 4 }}>
-                    X-Api-Key: plat_xxxxxxxxxxxx...
-                </code>
-                <p style={{ fontSize: 10, color: '#6B7280', margin: 0 }}>
-                    Passe cette clé comme variable d'environnement <code style={{ color: '#A855F7' }}>PLATFORM_API_KEY</code> dans ton service déployé
-                </p>
-            </div>
         </Section>
     );
 };
@@ -196,7 +186,6 @@ const Settings = () => {
     const navigate = useNavigate();
 
     const username = user?.username || 'user';
-    const email    = user?.email || '';
     const initials = username.slice(0, 2).toUpperCase();
     const role     = user?.role || 'MEMBER';
 
@@ -223,6 +212,26 @@ const Settings = () => {
         localStorage.setItem('display_name', displayName);
         setDisplaySaved(true);
         setTimeout(() => setDisplaySaved(false), 2000);
+    };
+
+    // Email — editable, synced to both the local DB and Keycloak (source of
+    // truth for login) via PATCH /api/users/me → UserService.updateMe().
+    const [email, setEmail]           = useState(user?.email || '');
+    const [emailSaving, setEmailSaving] = useState(false);
+    const [emailSaved, setEmailSaved]   = useState(false);
+    const [emailError, setEmailError]   = useState('');
+    const saveEmail = async () => {
+        setEmailSaving(true);
+        setEmailError('');
+        try {
+            await api.patch('/users/me', { email });
+            setEmailSaved(true);
+            setTimeout(() => setEmailSaved(false), 2000);
+        } catch (e) {
+            setEmailError(e.response?.data?.message || 'Failed to update email');
+        } finally {
+            setEmailSaving(false);
+        }
     };
 
     const handlePwChange = (e) => {
@@ -274,13 +283,19 @@ const Settings = () => {
 
                 <FieldRow
                     label="Email"
-                    hint={<span>Managed by <strong>Keycloak</strong> — cannot be changed here. Contact your admin to update.</span>}
+                    hint={emailError ? <span style={{ color: '#EF4444' }}>{emailError}</span> : 'Also updates your Keycloak login identity'}
                 >
                     <div style={{ display: 'flex', gap: 8 }}>
-                        <input className="ns-input" value={email || '—'} disabled style={{ flex: 1, color: '#6B7280', cursor: 'not-allowed' }} />
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 10px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 11, color: '#F59E0B', whiteSpace: 'nowrap' }}>
-                            <Lock size={11} /> Read only
-                        </div>
+                        <input
+                            type="email"
+                            className="ns-input"
+                            value={email}
+                            onChange={e => setEmail(e.target.value)}
+                            style={{ flex: 1 }}
+                        />
+                        <button className="btn-primary" disabled={emailSaving} style={{ fontSize: 12, whiteSpace: 'nowrap' }} onClick={saveEmail}>
+                            {emailSaving ? 'Saving…' : emailSaved ? <><Check size={13} /> Saved</> : 'Save'}
+                        </button>
                     </div>
                 </FieldRow>
 

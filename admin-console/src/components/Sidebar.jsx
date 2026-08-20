@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    LogOut, ChevronLeft, ChevronRight, Hexagon,
+    LogOut, ChevronLeft, ChevronRight,
     Server, BarChart2, DollarSign, Ban, ScrollText, Users, Box
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -85,14 +85,15 @@ const Sidebar = ({ collapsed, onToggle }) => {
                 overflow: 'hidden',
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                    <div style={{
-                        width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-                        background: 'linear-gradient(135deg, #EF4444, #991B1B)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        boxShadow: '0 0 16px rgba(239,68,68,0.3)',
-                    }}>
-                        <Hexagon size={15} color="white" fill="white" />
-                    </div>
+                    <img
+                        src="/logo.png"
+                        alt="NextStep"
+                        style={{
+                            width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                            objectFit: 'contain',
+                            boxShadow: '0 0 16px rgba(239,68,68,0.3)',
+                        }}
+                    />
                     <AnimatePresence initial={false}>
                         {!collapsed && (
                             <motion.div

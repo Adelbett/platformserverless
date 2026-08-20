@@ -1,5 +1,6 @@
 package com.platform.api.user;
 
+import com.platform.api.auth.KeycloakAdminService;
 import com.platform.api.exception.NotFoundException;
 import com.platform.api.user.dto.UpdateUserRequest;
 import com.platform.api.user.dto.UserDto;
@@ -17,6 +18,7 @@ import java.util.stream.Collectors;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final KeycloakAdminService keycloakAdminService;
 
     public UserDto getMe(String username) {
         User user = userRepository.findByUsername(username)
@@ -29,7 +31,13 @@ public class UserService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new NotFoundException("User not found: " + username));
         if (req.getUsername() != null) user.setUsername(req.getUsername());
-        if (req.getEmail() != null)    user.setEmail(req.getEmail());
+        if (req.getEmail() != null && !req.getEmail().equals(user.getEmail())) {
+            // Keycloak is the source of truth for login/identity — update it
+            // there too, not just the local mirror, otherwise the JWT's
+            // email claim would keep disagreeing with what's shown here.
+            keycloakAdminService.updateEmail(user.getUsername(), req.getEmail());
+            user.setEmail(req.getEmail());
+        }
         return toDto(userRepository.save(user));
     }
 

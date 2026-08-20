@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Bell, Sun, Moon, ChevronDown, LogOut, Settings, User } from 'lucide-react';
+import { Search, Bell, Sun, Moon, ChevronDown, LogOut, Settings } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../context/NotificationContext';
@@ -180,6 +180,7 @@ const UserMenu = ({ user, onLogout }) => {
     const [open, setOpen] = useState(false);
     const ref = useRef(null);
     const { dark } = useTheme();
+    const navigate = useNavigate();
 
     const email    = user?.email || user?.username || 'user@nextstep.io';
     const username = email.split('@')[0];
@@ -236,11 +237,13 @@ const UserMenu = ({ user, onLogout }) => {
                             <p style={{ fontSize: 11, margin: '2px 0 0', color: '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email}</p>
                         </div>
                         <div style={{ padding: '6px' }}>
-                            {[{ icon: <User size={14}/>, label: 'Profile' }, { icon: <Settings size={14}/>, label: 'Settings' }].map(item => (
-                                <button key={item.label} className="btn-ghost" style={{ width: '100%', justifyContent: 'flex-start', fontSize: 13 }}>
-                                    {item.icon} {item.label}
-                                </button>
-                            ))}
+                            <button
+                                className="btn-ghost"
+                                style={{ width: '100%', justifyContent: 'flex-start', fontSize: 13 }}
+                                onClick={() => { setOpen(false); navigate('/settings'); }}
+                            >
+                                <Settings size={14} /> Settings
+                            </button>
                         </div>
                         <div style={{ padding: '6px', borderTop: '1px solid rgba(0,0,0,0.07)' }}>
                             <button onClick={onLogout} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#EF4444', transition: 'background 150ms' }}
