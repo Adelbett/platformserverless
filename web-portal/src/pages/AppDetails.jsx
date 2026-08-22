@@ -6,9 +6,9 @@ import {
     ArrowLeft, ExternalLink, RefreshCw, Trash2, Edit3,
     ChevronDown, Eye, EyeOff, Search, Copy, Check,
     Minus, Plus, Sliders, Terminal, GitBranch,
-    Shield, AlertTriangle
+    Shield, AlertTriangle, Zap
 } from 'lucide-react';
-import { appsApi, logsApi, metricsApi, adminApi } from '../api';
+import { appsApi, logsApi, metricsApi, adminApi, kafkaApi, eventingApi } from '../api';
 import { openSseStream } from '../api/sse';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -428,6 +428,120 @@ const ContainerLogViewer = ({ appId, dark, appStatus }) => {
     );
 };
 
+// ── Kafka trigger card (add eventing to an already-deployed app) ───────────────
+
+const KafkaTriggerCard = ({ app, onWired }) => {
+    const alreadyWired = Boolean(app.kafkaTopic || app.kafkaSourceName);
+    const [open, setOpen]         = useState(false);
+    const [topics, setTopics]     = useState([]);
+    const [topicsLoading, setTopicsLoading] = useState(false);
+    const [topicId, setTopicId]   = useState('');
+    const [filter, setFilter]     = useState('order.created');
+    const [saving, setSaving]     = useState(false);
+    const [error, setError]       = useState(null);
+
+    const openForm = async () => {
+        setOpen(true);
+        setError(null);
+        setTopicsLoading(true);
+        try {
+            const res = await kafkaApi.list();
+            const list = Array.isArray(res.data) ? res.data : [];
+            setTopics(list);
+            if (list.length > 0) setTopicId(list[0].id);
+        } catch {
+            setError('Impossible de charger la liste des sujets Kafka.');
+        } finally {
+            setTopicsLoading(false);
+        }
+    };
+
+    const submit = async () => {
+        if (!topicId) { setError('Choisis un sujet Kafka.'); return; }
+        if (!app.url)  { setError("Cette application n'a pas encore d'URL — attends qu'elle soit RUNNING."); return; }
+        setSaving(true);
+        setError(null);
+        try {
+            const sourceName = `${app.serviceName}-source`;
+            const sourceRes = await eventingApi.createSource({
+                kafkaTopicId: topicId,
+                name: sourceName,
+                namespace: app.namespace,
+            });
+            await eventingApi.createTrigger({
+                kafkaSourceId: sourceRes.data.id,
+                filter,
+                action: app.url,
+            });
+            setOpen(false);
+            onWired?.();
+        } catch (e) {
+            setError(e?.response?.data?.message || "Échec de la création du déclencheur.");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="ns-card" style={{ padding: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <Zap size={15} style={{ color: '#9CA3AF' }} />
+                    <div>
+                        <h3 style={{ fontSize: 14, fontWeight: 800, fontFamily: "'Outfit', sans-serif", margin: 0 }} className="text-primary">Kafka Eventing</h3>
+                        <p style={{ fontSize: 11, margin: '2px 0 0' }} className="text-secondary">
+                            {alreadyWired
+                                ? `Connectée au sujet ${app.kafkaTopic || app.kafkaTopicId} — filtre "${app.triggerFilter || '—'}"`
+                                : "Cette application n'écoute encore aucun sujet Kafka."}
+                        </p>
+                    </div>
+                </div>
+                {!alreadyWired && !open && (
+                    <button className="btn-secondary" style={{ fontSize: 12 }} onClick={openForm}>
+                        <Zap size={13} /> Ajouter un déclencheur Kafka
+                    </button>
+                )}
+            </div>
+
+            {open && (
+                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(0,0,0,0.07)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {topicsLoading ? (
+                        <p style={{ fontSize: 12, color: '#6B7280', margin: 0 }}>Chargement des sujets Kafka…</p>
+                    ) : topics.length === 0 ? (
+                        <p style={{ fontSize: 12, color: '#6B7280', margin: 0 }}>Aucun sujet Kafka disponible — crée-en un d'abord depuis la page Kafka Topics.</p>
+                    ) : (
+                        <>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                <label style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Sujet Kafka</label>
+                                <select className="ns-input" value={topicId} onChange={e => setTopicId(e.target.value)}>
+                                    {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                </select>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                <label style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Type d'événement (filtre)</label>
+                                <input className="ns-input" value={filter} onChange={e => setFilter(e.target.value)}
+                                    placeholder="order.created" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13 }} />
+                            </div>
+                            <p style={{ fontSize: 11, color: '#6B7280', margin: 0 }}>
+                                L'événement sera envoyé vers l'URL de cette application ({app.url || '—'}) dès qu'un message correspondant au filtre est publié sur ce sujet.
+                            </p>
+                        </>
+                    )}
+
+                    {error && <p style={{ fontSize: 12, color: '#EF4444', margin: 0 }}>{error}</p>}
+
+                    <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                        <button className="btn-secondary" onClick={() => setOpen(false)} disabled={saving}>Annuler</button>
+                        <button className="btn-primary" onClick={submit} disabled={saving || topics.length === 0} style={{ opacity: saving ? 0.6 : 1 }}>
+                            {saving ? 'Création…' : 'Connecter'}
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 // ── Delete modal ───────────────────────────────────────────────────────────────
 
 const DeleteModal = ({ appName, onConfirm, onClose }) => {
@@ -708,6 +822,12 @@ const AppDetails = () => {
                     </button>
                 </div>
             </div>
+
+            {/* Kafka Eventing — wire a trigger onto an already-deployed app */}
+            <KafkaTriggerCard app={appData} onWired={async () => {
+                const res = await appsApi.get(id);
+                setApp(res.data);
+            }} />
 
             {/* App Metadata & Environment Variables */}
             <div className="ns-card" style={{ overflow: 'hidden' }}>

@@ -441,7 +441,7 @@ User Story & Tâches & Estimation \\
 
 \subsection{Diagramme de cas d'utilisation du Sprint 5}
 
-Le diagramme réunit CLIENT\_ADMIN et MEMBER (sous permission \texttt{MANAGE\_KAFKA}/\texttt{MANAGE\_EVENTING}), ADMIN, et un acteur Système externe pour la publication d'événements via clé d'API, avec l'ensemble des fonctionnalités du sprint.
+Le diagramme réunit CLIENT\_ADMIN et MEMBER (sous permission \texttt{MANAGE\_KAFKA}/\texttt{MANAGE\_EVENTING}), ainsi qu'ADMIN, avec l'ensemble des fonctionnalités du sprint.
 
 \EmplacementFigure{13cm}{8cm}{Diagramme de cas d'utilisation du Sprint 5 — Gestion de la messagerie événementielle}{fig:uc-sprint5}
 
@@ -469,7 +469,7 @@ Service Web & Description \\
 \texttt{POST /api/eventing/triggers} & Créer un déclencheur (Trigger). \\ \hline
 \texttt{GET /api/eventing/triggers} & Lister ses déclencheurs. \\ \hline
 \texttt{DELETE /api/eventing/triggers/\{id\}} & Supprimer un déclencheur. \\ \hline
-\texttt{POST /api/events} & Publier un événement (CloudEvent), par jeton ou par clé d'API. \\ \hline
+\texttt{POST /api/events} & Publier un événement (CloudEvent). \\ \hline
 \texttt{GET /api/admin/kafka/topics} & Lister tous les sujets, tous locataires confondus (ADMIN). \\ \hline
 \texttt{DELETE /api/admin/kafka/topics/\{id\}} & Suppression forcée d'un sujet (ADMIN). \\ \hline
 \texttt{GET /api/admin/eventing/sources}, \texttt{/triggers} & Vue globale des sources et déclencheurs (ADMIN). \\ \hline
@@ -648,7 +648,7 @@ La figure~\ref{fig:capture-eventing-kafkasource} affiche la KafkaSource correspo
     \label{fig:capture-eventing-kafkasource}
 \end{figure}
 
-Fonctionnalité : Publier un événement. Un utilisateur, ou un système externe muni d'une clé d'API, publie un événement directement sur un sujet.
+Fonctionnalité : Publier un événement. Un CLIENT\_ADMIN ou un MEMBER publie un événement directement sur un sujet.
 
 \EmplacementFigure{13cm}{8cm}{Publication d'un événement}{fig:capture-publish}
 
