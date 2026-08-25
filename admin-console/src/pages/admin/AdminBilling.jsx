@@ -4,7 +4,7 @@ import {
     AreaChart, Area, BarChart, Bar,
     XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
-import { appsApi, kafkaApi, billingApi } from '../../api';
+import { appsApi, kafkaApi, billingApi, invoiceApi } from '../../api';
 import {
     CreditCard, TrendingUp, Users, Cpu, Database,
     RefreshCw, ChevronDown, ChevronRight, DollarSign,
@@ -198,6 +198,22 @@ const AdminBilling = () => {
     const [adminBilling, setAdminBilling] = useState(null); // real backend data
     const [loading,     setLoading]     = useState(true);
     const [tab,         setTab]         = useState('clients');
+    const [generating,  setGenerating]  = useState(false);
+    const [generateMsg, setGenerateMsg] = useState(null);
+
+    const handleGenerateInvoices = async () => {
+        if (!window.confirm('Generate monthly invoices now, for all clients? This is normally done automatically on the 1st of each month.')) return;
+        setGenerating(true);
+        setGenerateMsg(null);
+        try {
+            await invoiceApi.generate();
+            setGenerateMsg({ ok: true, text: 'Invoices generated successfully.' });
+        } catch (err) {
+            setGenerateMsg({ ok: false, text: err.response?.data?.detail || (err.response?.status ? `HTTP ${err.response.status}` : 'Network error — check your connection.') });
+        } finally {
+            setGenerating(false);
+        }
+    };
 
     const load = async () => {
         setLoading(true);
@@ -301,10 +317,26 @@ const AdminBilling = () => {
                             What each client owes · {now.toLocaleDateString('en', { month: 'long', year: 'numeric' })} · day {dayOfMonth}/{daysInMonth}
                         </p>
                     </div>
-                    <button onClick={load} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                        <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <button onClick={handleGenerateInvoices} disabled={generating} style={{
+                            display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 8,
+                            border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.1)',
+                            color: '#3B82F6', cursor: generating ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 700,
+                            opacity: generating ? 0.6 : 1,
+                        }}>
+                            <Zap size={13} style={{ animation: generating ? 'spin 1s linear infinite' : 'none' }} />
+                            {generating ? 'Generating…' : 'Generate Monthly Invoices'}
+                        </button>
+                        <button onClick={load} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                            <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+                        </button>
+                    </div>
                 </div>
+                {generateMsg && (
+                    <p style={{ fontSize: 12, margin: '10px 0 0', color: generateMsg.ok ? '#10B981' : '#EF4444' }}>
+                        {generateMsg.text}
+                    </p>
+                )}
             </div>
 
             {/* KPIs */}

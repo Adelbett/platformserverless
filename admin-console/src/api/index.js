@@ -116,4 +116,5 @@ export const invoiceApi = {
     pay:          (id, paymentMethodId)     => api.post(`/invoices/${id}/pay`, { paymentMethodId }),
     suspend:      (appId)                   => api.post(`/invoices/apps/${appId}/suspend`),
     adminOverdue: ()                        => api.get('/invoices/admin/overdue'),
+    generate:     ()                        => api.post('/invoices/generate'),
 }
