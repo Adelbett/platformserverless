@@ -11,11 +11,6 @@ spring:
       port: 6379
       
 
-  elaqsticsearch:
-    rest:
-      uris: http://localhost:9200
-      
-
   datasource:
     url: jdbc:postgresql://localhost:5432/platformserverless
     username: postgres

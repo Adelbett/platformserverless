@@ -25,44 +25,65 @@ const inputStyle = {
     fontFamily: "'JetBrains Mono', monospace",
 };
 
+const DetailField = ({ label, value }) => (
+    <div>
+        <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#475569', margin: '0 0 4px' }}>{label}</p>
+        <pre style={{
+            margin: 0, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: '#CBD5E1',
+            whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+        }}>{value || '—'}</pre>
+    </div>
+);
+
 const LogRow = ({ entry }) => {
     const [expanded, setExpanded] = useState(false);
     return (
-        <motion.tr
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer' }}
-            onClick={() => setExpanded(v => !v)}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.025)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-        >
-            <td style={{ padding: '12px 20px', fontSize: 11, color: '#64748B', whiteSpace: 'nowrap' }}>
-                {entry.createdAt ? new Date(entry.createdAt).toLocaleString() : '—'}
-            </td>
-            <td style={{ padding: '12px 20px' }}>
-                <p style={{ fontSize: 12, fontWeight: 700, color: '#F1F5F9', margin: 0 }}>{entry.actorUsername}</p>
-            </td>
-            <td style={{ padding: '12px 20px' }}>
-                <span style={{
-                    fontSize: 10, fontWeight: 800, padding: '3px 10px', borderRadius: 20,
-                    color: ACTION_COLOR(entry.action),
-                    background: `${ACTION_COLOR(entry.action)}1F`,
-                    border: `1px solid ${ACTION_COLOR(entry.action)}40`,
-                    fontFamily: "'JetBrains Mono', monospace",
-                    textTransform: 'uppercase', letterSpacing: '0.06em',
-                }}>{entry.action}</span>
-            </td>
-            <td style={{ padding: '12px 20px', fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: '#94A3B8' }}>
-                {entry.targetType} / {entry.targetId}
-            </td>
-            <td style={{ padding: '12px 20px', fontSize: 11, color: '#475569' }}>{entry.ipAddress || '—'}</td>
-            <td style={{ padding: '12px 20px', fontSize: 11, color: '#64748B', textAlign: 'right' }}>
-                {expanded ? 'Hide' : 'Details'}
-            </td>
+        <>
+            <motion.tr
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                style={{ borderBottom: expanded ? 'none' : '1px solid rgba(255,255,255,0.04)', cursor: 'pointer' }}
+                onClick={() => setExpanded(v => !v)}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.025)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+                <td style={{ padding: '12px 20px', fontSize: 11, color: '#64748B', whiteSpace: 'nowrap' }}>
+                    {entry.createdAt ? new Date(entry.createdAt).toLocaleString() : '—'}
+                </td>
+                <td style={{ padding: '12px 20px' }}>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: '#F1F5F9', margin: 0 }}>{entry.actorUsername}</p>
+                </td>
+                <td style={{ padding: '12px 20px' }}>
+                    <span style={{
+                        fontSize: 10, fontWeight: 800, padding: '3px 10px', borderRadius: 20,
+                        color: ACTION_COLOR(entry.action),
+                        background: `${ACTION_COLOR(entry.action)}1F`,
+                        border: `1px solid ${ACTION_COLOR(entry.action)}40`,
+                        fontFamily: "'JetBrains Mono', monospace",
+                        textTransform: 'uppercase', letterSpacing: '0.06em',
+                    }}>{entry.action}</span>
+                </td>
+                <td style={{ padding: '12px 20px', fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: '#94A3B8' }}>
+                    {entry.targetType} / {entry.targetId}
+                </td>
+                <td style={{ padding: '12px 20px', fontSize: 11, color: '#475569' }}>{entry.ipAddress || '—'}</td>
+                <td style={{ padding: '12px 20px', fontSize: 11, color: '#64748B', textAlign: 'right' }}>
+                    {expanded ? 'Hide' : 'Details'}
+                </td>
+            </motion.tr>
             {expanded && (
-                <td colSpan={6} style={{ display: 'none' }} />
+                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <td colSpan={6} style={{ padding: '4px 20px 18px', background: 'rgba(255,255,255,0.015)' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                            <DetailField label="Payload before" value={entry.payloadBefore} />
+                            <DetailField label="Payload after" value={entry.payloadAfter} />
+                            <DetailField label="Reason" value={entry.reason} />
+                            <DetailField label="Log ID" value={entry.id} />
+                        </div>
+                    </td>
+                </tr>
             )}
-        </motion.tr>
+        </>
     );
 };
 

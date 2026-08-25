@@ -1055,7 +1055,7 @@ Le cluster Kafka \texttt{my-cluster} est provisionné dans le namespace \texttt{
 
 L'inspection de la ressource \texttt{Kafka} précise le dimensionnement retenu : Strimzi 0.45.0, un courtier et une instance ZooKeeper, chacun adossé à un volume persistant de 1 Gio (\texttt{local-path}) — un dimensionnement d'environnement de développement, suffisant pour valider la chaîne fonctionnelle de cette release, qu'une exploitation réelle demanderait de renforcer (plusieurs courtiers, stockage répliqué).
 
-Deux points d'accès \texttt{LoadBalancer} complètent le service de bootstrap interne, sur le port 9093, pour permettre la connexion d'outils de développement externes ; leur configuration est examinée dans l'audit de sécurité du chapitre de validation.
+Deux points d'accès \texttt{LoadBalancer} complètent le service de bootstrap interne, sur le port 9093, pour permettre la connexion d'outils de développement externes ; leur exposition constitue un risque assumé dans le périmètre de développement de ce projet.
 
 Au terme de cette release, le cluster dispose des trois briques d'infrastructure fondamentales de la plateforme : orchestration Kubernetes isolée par tenant, exécution serverless via Knative Serving, et messagerie événementielle via Kafka et Strimzi. Le backend peut créer, lister et supprimer des topics Kafka par programmation ; cette capacité sera exposée aux clients via l'interface graphique à partir du Sprint 6.
 

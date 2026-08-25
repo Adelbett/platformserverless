@@ -219,7 +219,7 @@ Rédiger guide technique, fiches de correctifs, rapports d'audit.
 En tant qu'exploitant, je veux un plan de sauvegarde formalisé.
 }
 &
-Documenter la politique de sauvegarde (PostgreSQL, Elasticsearch).
+Documenter la politique de sauvegarde de la base de données PostgreSQL.
 & — \\
 \hline
 
@@ -239,11 +239,9 @@ Rédiger le mémoire à partir de la documentation technique.
 
 \subsubsection{Mise en œuvre}
 
-L'ensemble des décisions techniques, anomalies identifiées et correctifs apportés tout au long du projet ont été consignés de manière détaillée dans une documentation technique versionnée avec le code (guide technique complet, fiches de correctifs individuelles, rapports d'audit), constituant la source principale de ce mémoire. Un plan de sauvegarde et de restauration de la base de données PostgreSQL et de l'index Elasticsearch a également été formalisé, avec une politique de rétention de sept sauvegardes quotidiennes et quatre sauvegardes hebdomadaires.
+L'ensemble des décisions techniques, anomalies identifiées et correctifs apportés tout au long du projet ont été consignés de manière détaillée dans une documentation technique versionnée avec le code (guide technique complet, fiches de correctifs individuelles, rapports d'audit), constituant la source principale de ce mémoire. Un plan de sauvegarde et de restauration de la base de données PostgreSQL a également été formalisé, avec une politique de rétention de sept sauvegardes quotidiennes et quatre sauvegardes hebdomadaires.
 
-\paragraph{Précision sur la place réelle d'Elasticsearch dans le projet.} Le plan de sauvegarde ci-dessus, ainsi qu'une tâche planifiée versionnée dans le dépôt (\texttt{k8s/backup/elasticsearch-snapshot-cronjob.yaml}), confirment qu'une instance Elasticsearch est bien prévue comme composant d'infrastructure de la plateforme. Cela ne contredit pas le constat fait au Sprint 6 : la dépendance \texttt{spring-boot-starter-data-elasticsearch} du backend n'est appelée par aucune classe du code source, et aucun manifeste de déploiement de l'instance Elasticsearch elle-même (en dehors de la tâche de sauvegarde qui suppose son existence) n'a été retrouvé dans ce dépôt. Il subsiste donc, à la rédaction de ce mémoire, une incohérence entre une infrastructure de sauvegarde préparée pour Elasticsearch et une intégration applicative de ce composant non retrouvée dans le code, point repris dans la synthèse des limites ci-après plutôt que résolu par supposition.
-
-La plateforme dispose, au terme de ce sprint, d'une documentation technique exhaustive et d'un mémoire retraçant fidèlement sa réalisation, ses choix d'architecture et ses limites, prêts à être présentés devant le jury. Le guide d'exploitation reste incomplet pour certains composants (cluster, Knative, Kafka, monitoring), où seules des commandes de validation ponctuelles sont documentées, sans procédure d'exploitation complète ; par ailleurs, une incohérence subsiste entre le plan de sauvegarde Elasticsearch et l'absence d'intégration applicative retrouvée dans le code, ainsi que l'absence de manifeste de déploiement pour l'instance Elasticsearch elle-même. Ce sprint clôt la conduite du projet selon la planification Scrum définie au premier chapitre.
+La plateforme dispose, au terme de ce sprint, d'une documentation technique exhaustive et d'un mémoire retraçant fidèlement sa réalisation, ses choix d'architecture et ses limites, prêts à être présentés devant le jury. Le guide d'exploitation reste incomplet pour certains composants (cluster, Knative, Kafka, monitoring), où seules des commandes de validation ponctuelles sont documentées, sans procédure d'exploitation complète. Ce sprint clôt la conduite du projet selon la planification Scrum définie au premier chapitre.
 
 \section{Synthèse des limites et perspectives d'amélioration}
 

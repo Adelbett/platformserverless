@@ -2,14 +2,14 @@
 
 \section{Introduction}
 
-Les releases précédentes ont livré l'ensemble des capacités fonctionnelles de la plateforme, backend et interfaces graphiques confondus, pour les trois acteurs identifiés (CLIENT\_ADMIN, MEMBER, ADMIN). Cette dernière release, avant le chapitre de validation, ne porte plus sur des fonctionnalités nouvelles mais sur la solidité technique de la plateforme : consolider les mesures de sécurité mises en place au fil des sprints précédents (Sprint 10), puis harmoniser et fiabiliser les chaînes d'intégration continue de l'ensemble de ses composants (Sprint 11).
+Les releases précédentes ont livré l'ensemble des capacités fonctionnelles de la plateforme, backend et interfaces graphiques confondus, pour les trois acteurs identifiés (CLIENT\_ADMIN, MEMBER, ADMIN). Cette dernière release ne porte plus sur des fonctionnalités nouvelles mais sur la solidité technique de la plateforme : consolider les mesures de sécurité mises en place au fil des sprints précédents (Sprint 10), puis harmoniser et fiabiliser les chaînes d'intégration continue de l'ensemble de ses composants (Sprint 11).
 
 \clearpage
 \section{Sprint 10 : Durcissement et sécurité}
 
 \subsection{Introduction}
 
-Ce sprint a pour objectif de consolider, en un point unique, les mesures de sécurité mises en place au fil des sprints précédents, et d'en ajouter quelques-unes supplémentaires identifiées lors d'une relecture transversale du projet, en amont de l'audit de sécurité formel présenté au chapitre de validation. Il ne s'agit pas d'un audit noté, mais d'un travail de durcissement technique mené par l'équipe de développement elle-même.
+Ce sprint a pour objectif de consolider, en un point unique, les mesures de sécurité mises en place au fil des sprints précédents, et d'en ajouter quelques-unes supplémentaires identifiées lors d'une relecture transversale du projet. Il ne s'agit pas d'un audit noté, mais d'un travail de durcissement technique mené par l'équipe de développement elle-même.
 
 \subsection{Objectifs du Sprint}
 
@@ -17,7 +17,7 @@ Ce sprint a pour objectif de consolider, en un point unique, les mesures de séc
     \item Vérifier et compléter les rôles Kubernetes (RBAC) du backend, au-delà des extensions déjà apportées ponctuellement (Sprint 3, Sprint 9).
     \item Restreindre la configuration CORS du backend à une liste explicite d'origines autorisées.
     \item Identifier et corriger les accès non contrôlés à des ressources appartenant à d'autres tenants (IDOR) sur les points d'accès les plus sensibles.
-    \item Documenter, sans les corriger si le délai du projet ne le permet pas, les risques résiduels identifiés, pour reprise explicite au chapitre de validation.
+    \item Documenter, sans les corriger si le délai du projet ne le permet pas, les risques résiduels identifiés.
 \end{itemize}
 
 \subsection{Sprint Backlog}
@@ -55,7 +55,7 @@ User Story & Tâches & Estimation \\
 
 \multirow{1}{6.6cm}{
 \centering
-En tant qu'exploitant, je veux que le \texttt{ClusterRole} du backend soit limité aux permissions réellement nécessaires.
+En tant qu'ADMIN, je veux que le \texttt{ClusterRole} du backend soit limité aux permissions réellement nécessaires.
 }
 &
 Reconstruire le \texttt{ClusterRole} à partir des ressources effectivement manipulées, vérifier avec \texttt{kubectl auth can-i}.
@@ -64,7 +64,7 @@ Reconstruire le \texttt{ClusterRole} à partir des ressources effectivement mani
 
 \multirow{1}{6.6cm}{
 \centering
-En tant qu'exploitant, je veux restreindre les origines autorisées à appeler l'API.
+En tant qu'ADMIN, je veux restreindre les origines autorisées à appeler l'API.
 }
 &
 Configurer \texttt{app.cors.allowed-origins} en liste explicite.
@@ -73,7 +73,7 @@ Configurer \texttt{app.cors.allowed-origins} en liste explicite.
 
 \multirow{1}{6.6cm}{
 \centering
-En tant qu'exploitant, je veux qu'un client ne puisse pas accéder aux ressources d'un autre tenant par manipulation d'identifiant.
+En tant qu'ADMIN, je veux qu'un client ne puisse pas accéder aux ressources d'un autre tenant par manipulation d'identifiant.
 }
 &
 Auditer et corriger les accès directs par identifiant sur les points d'accès sensibles (journaux, moyens de paiement).
@@ -87,23 +87,228 @@ Auditer et corriger les accès directs par identifiant sur les points d'accès s
 
 \subsubsection{Synthèse des mesures de durcissement}
 
-Plusieurs mesures de sécurité ont déjà été introduites au fil des sprints précédents, à mesure que les anomalies correspondantes étaient identifiées : reconstruction du \texttt{ClusterRole} du backend (Sprint 3), migration du jeton d'authentification hors des paramètres d'URL du flux de journaux (Sprint 3), correction de la référence au rôle ADMIN dans la facturation (Sprint 7), extension du \texttt{ClusterRole} à la lecture des nœuds et événements pour la console d'administration (Sprint 9). Ce sprint reprend ces mesures dans une démarche volontairement transversale, plutôt que de les laisser dispersées au fil des sprints fonctionnels, et y ajoute la restriction CORS et la revue des accès directs par identifiant (IDOR).
+Plusieurs mesures de sécurité ont été introduites au fil des sprints précédents, à mesure que les anomalies correspondantes étaient identifiées : reconstruction du \texttt{ClusterRole} du backend (Sprint 3), migration du jeton d'authentification hors des paramètres d'URL du flux de journaux (Sprint 3), correction de la référence au rôle ADMIN dans la facturation (Sprint 7), extension du \texttt{ClusterRole} à la lecture des nœuds et événements pour la console d'administration (Sprint 9). Ce sprint les reprend dans une démarche transversale et y ajoute la restriction CORS ainsi que la revue des accès directs par identifiant.
+
+\subsubsection{Workflow global de sécurisation d'une requête}
+
+Toute requête adressée à l'API traverse une chaîne de contrôles ordonnée, dont chaque étage peut interrompre le traitement. Ces contrôles se répartissent en deux natures distinctes, qu'il importe de ne pas confondre : l'\emph{authentification} établit l'identité de l'appelant, l'\emph{autorisation} détermine ce que cette identité a le droit de faire. La figure~\ref{fig:workflow-securite} représente cette chaîne.
+
+\begin{figure}[H]
+\begin{adjustwidth}{-1.2cm}{-1.2cm}
+\centering
+\begin{tikzpicture}[
+  x=1cm, y=1cm,
+  every node/.style={font=\normalsize},
+  cli/.style={draw=black!60, line width=1pt, rounded corners, minimum width=5.4cm,
+              minimum height=1.15cm, align=center, fill=black!5},
+  auth/.style={draw=figBleu, line width=1pt, rounded corners, minimum width=5.4cm,
+               minimum height=1.15cm, align=center, fill=figBleuFond},
+  autz/.style={draw=figVert, line width=1pt, rounded corners, minimum width=5.4cm,
+               minimum height=1.15cm, align=center, fill=figVertFond},
+  res/.style={draw=figVert, line width=1.3pt, rounded corners, minimum width=5.4cm,
+              minimum height=1.15cm, align=center, fill=figVertFond!60!white},
+  refus/.style={draw=bittersweet!80!black, line width=1pt, rounded corners,
+                minimum width=4.2cm, minimum height=1.0cm, align=center,
+                fill=bittersweet!20, font=\small},
+  zone/.style={rounded corners, inner sep=13pt, line width=1.1pt},
+  fl/.style={->, line width=1pt, figBleu},
+  fv/.style={->, line width=1pt, figVert},
+  fr/.style={->, line width=1pt, dashed, bittersweet!80!black},
+  lbl/.style={font=\footnotesize}
+]
+
+\node[cli]  (user) at (0,0)     {Utilisateur (portail ou console)};
+\node[auth] (kc)   at (0,-2.1)  {Authentification \textbf{Keycloak}\\[1pt]\small obtention du jeton JWT};
+\node[auth] (req)  at (0,-4.2)  {Requête vers l'API\\[1pt]\small en-tête \texttt{Authorization: Bearer}};
+\node[auth] (val)  at (0,-6.3)  {Validation du jeton\\[1pt]\small signature, expiration};
+\node[auth] (idt)  at (0,-8.4)  {Identification de l'utilisateur\\[1pt]\small extraction du rôle applicatif};
+
+\node[autz] (perm) at (0,-11.4) {Vérification du rôle\\et des permissions};
+\node[autz] (own)  at (0,-13.5) {Vérification de la propriété\\[1pt]\small la ressource appartient-elle à l'appelant ?};
+\node[res]  (ok)   at (0,-15.6) {\textbf{Accès à la ressource}};
+
+\node[refus] (r1) at (8.6,-6.3)  {\textbf{401} Non authentifié\\jeton invalide ou expiré};
+\node[refus] (r2) at (8.6,-11.4) {\textbf{403} Interdit\\permission insuffisante};
+\node[refus] (r3) at (8.6,-13.5) {\textbf{403} Interdit\\ressource d'un autre tenant};
+
+\draw[fl] (user) -- (kc);
+\draw[fl] (kc)   -- (req);
+\draw[fl] (req)  -- (val);
+\draw[fl] (val)  -- (idt);
+\draw[fv] (idt)  -- (perm);
+\draw[fv] (perm) -- (own);
+\draw[fv] (own)  -- (ok);
+
+\draw[fr] (val.east)  -- (r1.west);
+\draw[fr] (perm.east) -- (r2.west);
+\draw[fr] (own.east)  -- (r3.west);
+
+\begin{scope}[on background layer]
+  \node[zone, draw=figBleu, dashed, fill=figBleu!4, fit=(kc)(req)(val)(idt)] (zauth) {};
+  \node[zone, draw=figVert, dashed, fill=figVert!4, fit=(perm)(own)(ok)] (zautz) {};
+\end{scope}
+\node[font=\small\bfseries, text=figBleu, anchor=west, fill=white, inner sep=2pt]
+      at ([xshift=6pt]zauth.north west) {AUTHENTIFICATION — qui es-tu ?};
+\node[font=\small\bfseries, text=figVert, anchor=west, fill=white, inner sep=2pt]
+      at ([xshift=6pt]zautz.north west) {AUTORISATION — qu'as-tu le droit de faire ?};
+
+\node[lbl, text=bittersweet!80!black, anchor=south] at (4.7,-6.1)  {refus};
+\node[lbl, text=bittersweet!80!black, anchor=south] at (4.7,-11.2) {refus};
+\node[lbl, text=bittersweet!80!black, anchor=south] at (4.7,-13.3) {refus};
+
+\end{tikzpicture}
+\caption{Workflow global de sécurisation d'une requête}
+\label{fig:workflow-securite}
+\end{adjustwidth}
+\end{figure}
+
+Le backend ne gère ni mot de passe ni session : configuré en mode \texttt{STATELESS}, il agit comme serveur de ressources OAuth2 et se contente de valider les jetons émis par Keycloak. Un filtre de synchronisation crée l'utilisateur local à sa première requête, ce qui rattache l'identité Keycloak au modèle de rôles de la plateforme.
 
 \subsubsection{Configuration CORS}
 
-Le backend restreint les origines autorisées à une liste explicite, portée par la propriété \texttt{app.cors.allowed-origins}, plutôt qu'un caractère générique. Cette configuration autorise l'envoi des identifiants de session (\texttt{allowCredentials}) uniquement pour les origines listées, et limite les méthodes HTTP acceptées à celles réellement utilisées par l'API (\texttt{GET}, \texttt{POST}, \texttt{PUT}, \texttt{PATCH}, \texttt{DELETE}, \texttt{OPTIONS}).
+Le navigateur autorise par défaut une page à appeler uniquement son propre domaine. Sans configuration CORS explicite, le portail ne pourrait pas contacter l'API ; avec une configuration trop permissive, n'importe quel site pourrait le faire à la place de l'utilisateur.
+
+Le backend restreint donc les origines autorisées à une liste explicite, portée par la propriété \texttt{app.cors.allowed-origins}, plutôt qu'un caractère générique. Cette configuration n'autorise l'envoi des identifiants de session (\texttt{allowCredentials}) que pour les origines listées, et limite les méthodes HTTP acceptées à celles réellement utilisées par l'API (\texttt{GET}, \texttt{POST}, \texttt{PUT}, \texttt{PATCH}, \texttt{DELETE}, \texttt{OPTIONS}).
 
 \subsection{Réalisation}
 
-\subsubsection{Mise en œuvre}
+\subsubsection{Workflow de contrôle des rôles et permissions}
 
-La revue des points d'accès manipulant une ressource par identifiant (journaux de déploiement, moyens de paiement enregistrés) a permis de vérifier, ou le cas échéant de corriger, que chaque accès est bien filtré par l'identité effective de l'appelant, résolue par \texttt{UserContextService}, plutôt que par le seul identifiant transmis dans l'URL.
+Le modèle d'autorisation comporte deux niveaux. Les rôles ADMIN et CLIENT\_ADMIN sont autorisés sans condition sur les fonctionnalités de leur périmètre ; seul le rôle MEMBER est soumis à une vérification de permission individuelle, accordée par le CLIENT\_ADMIN qui l'a ajouté à son équipe. La figure~\ref{fig:workflow-permissions} détaille ce chemin de décision.
 
-\subsubsection{Configuration et limites assumées}
+\begin{figure}[H]
+\begin{adjustwidth}{-1.2cm}{-1.2cm}
+\centering
+\begin{tikzpicture}[
+  x=1cm, y=1cm,
+  every node/.style={font=\normalsize},
+  ent/.style={draw=figBleu, line width=1pt, rounded corners, minimum width=5.6cm,
+              minimum height=1.1cm, align=center, fill=figBleuFond},
+  rol/.style={draw=figOrange, line width=1pt, rounded corners, minimum width=4.0cm,
+              minimum height=1.1cm, align=center, fill=figOrangeFond, font=\small},
+  tst/.style={draw=figOrange, line width=1.2pt, rounded corners, minimum width=6.2cm,
+              minimum height=1.3cm, align=center, fill=figOrangeFond!70!white},
+  ok/.style={draw=figVert, line width=1.2pt, rounded corners, minimum width=4.0cm,
+             minimum height=1.1cm, align=center, fill=figVertFond},
+  ko/.style={draw=bittersweet!80!black, line width=1.2pt, rounded corners,
+             minimum width=4.0cm, minimum height=1.1cm, align=center, fill=bittersweet!20},
+  fl/.style={->, line width=1pt, figBleu},
+  fo/.style={->, line width=1pt, figOrange},
+  fv/.style={->, line width=1.1pt, figVert},
+  fr/.style={->, line width=1.1pt, bittersweet!80!black},
+  lbl/.style={font=\small}
+]
 
-Ce sprint ne prétend pas clore la question de la sécurité de la plateforme : il s'agit d'une étape de durcissement technique, dont le résultat mesuré (score de sécurité avant/après) est présenté formellement au chapitre de validation, avec la liste complète des vulnérabilités traitées ou assumées comme risque produit. Certains points, en particulier l'absence de limite de ressources par défaut par tenant et le flux d'authentification Resource Owner Password Credentials du portail (Sprint 3), ne sont pas traités dans ce sprint et restent des risques assumés.
+\node[ent] (u) at (3.4,0) {Utilisateur authentifié};
 
-Au terme de ce sprint, les principales mesures de durcissement identifiées au fil du projet sont consolidées ; le chapitre de validation qui suit en mesure formellement l'effet sur la posture de sécurité globale de la plateforme. Ce sprint ne couvre pas l'ensemble des vulnérabilités possibles : l'absence de limite de ressources par défaut par tenant et le flux d'authentification ROPC du portail restent des risques produit assumés, documentés au chapitre de validation.
+\node[rol] (adm) at (-0.6,-2.7) {\textbf{ADMIN}};
+\node[rol] (cad) at (3.9,-2.7)  {\textbf{CLIENT\_ADMIN}};
+\node[rol] (mem) at (8.4,-2.7)  {\textbf{MEMBER}};
+
+\draw[fl] (u) -- (adm);
+\draw[fl] (u) -- (cad);
+\draw[fl] (u) -- (mem);
+\node[lbl, anchor=south, fill=white, inner sep=2pt] at (3.4,-1.45) {identification du rôle};
+
+\node[tst] (chk) at (8.4,-5.8)
+      {La permission requise figure-t-elle\\parmi celles accordées au membre ?};
+\draw[fo] (mem) -- (chk);
+
+\node[ok] (accept) at (1.6,-9.4) {\textbf{Accès autorisé}};
+\node[ko] (deny)   at (8.4,-9.4) {\textbf{Accès refusé} (403)};
+
+% ADMIN et CLIENT_ADMIN : autorises sans condition
+\draw[fv] (adm.south) -- (-0.6,-7.6) -| (accept.north);
+\draw[fv] (cad.south) -- (3.9,-7.6)  -| (accept.north);
+
+% MEMBER : selon le resultat du test
+\draw[fv] (chk.west) -| (accept.north);
+\draw[fr] (chk.south) -- (deny.north);
+
+\node[lbl, text=figVert, anchor=south]             at (4.6,-7.75) {oui};
+\node[lbl, text=bittersweet!80!black, anchor=west] at (8.6,-7.6)  {non};
+\node[lbl, text=figVert, align=center, fill=white, inner sep=3pt] at (1.65,-7.6)
+     {\footnotesize autorisés sans condition};
+
+\end{tikzpicture}
+\caption{Workflow de contrôle des rôles et des permissions}
+\label{fig:workflow-permissions}
+\end{adjustwidth}
+\end{figure}
+
+Les permissions accordées individuellement à un membre couvrent le déploiement et la suppression d'applications, la gestion des sujets Kafka et de l'\textit{Eventing}, la consultation des journaux et du monitoring, ainsi que la consultation et l'export de la facturation.
+
+\subsubsection{Revue des accès directs par identifiant}
+
+L'authentification et la vérification de permission ne suffisent pas à elles seules : un client authentifié, disposant du droit de supprimer une application, pourrait tenter d'agir sur celle d'un autre client en manipulant l'identifiant transmis dans l'URL. C'est le troisième étage de contrôle représenté sur la figure~\ref{fig:workflow-securite}.
+
+La revue des points d'accès manipulant une ressource par identifiant (journaux de déploiement, moyens de paiement enregistrés) a permis de vérifier, ou le cas échéant de corriger, que chaque accès est bien filtré par l'identité effective de l'appelant, résolue par \texttt{UserContextService}, plutôt que par le seul identifiant transmis dans l'URL. Pour un membre d'équipe, cette identité effective est celle de son CLIENT\_ADMIN, ce qui lui donne accès aux ressources de son équipe sans lui ouvrir celles des autres locataires.
+
+\subsection{Sécurisation de l'infrastructure}
+
+Les contrôles précédents protègent l'API. Ils ne disent rien de ce que les applications déployées peuvent faire entre elles une fois en exécution sur le cluster : deux conteneurs appartenant à deux clients différents pourraient, sans mesure complémentaire, communiquer directement. L'isolation réseau mise en place au Sprint 0 répond à ce risque, et la figure~\ref{fig:workflow-isolation} en rappelle le principe.
+
+\begin{figure}[H]
+\begin{adjustwidth}{-1.2cm}{-1.2cm}
+\centering
+\begin{tikzpicture}[
+  x=1cm, y=1cm,
+  every node/.style={font=\normalsize},
+  app/.style={draw=figVert, line width=1pt, rounded corners, minimum width=4.6cm,
+              minimum height=1.1cm, align=center, fill=figVertFond, font=\small},
+  sys/.style={draw=figBleu, line width=1pt, rounded corners, minimum width=4.2cm,
+              minimum height=1.1cm, align=center, fill=figBleuFond, font=\small},
+  ns/.style={draw=figOrange, dashed, line width=1.2pt, rounded corners, inner sep=12pt},
+  fv/.style={->, line width=1.1pt, figVert},
+  fr/.style={->, line width=1.3pt, bittersweet!80!black},
+  lbl/.style={font=\small}
+]
+
+\node[app] (a1) at (0,0)     {Application du client A};
+\node[app] (b1) at (9.4,0)   {Application du client B};
+
+\begin{scope}[on background layer]
+  \node[ns, fill=figOrange!4, fit=(a1)] (nsa) {};
+  \node[ns, fill=figOrange!4, fit=(b1)] (nsb) {};
+\end{scope}
+\node[font=\small\bfseries, text=figOrange, anchor=south] at (nsa.north) {Namespace \texttt{user-a}};
+\node[font=\small\bfseries, text=figOrange, anchor=south] at (nsb.north) {Namespace \texttt{user-b}};
+
+% trafic inter-tenant bloque
+\draw[fr] (nsa.east) -- (nsb.west);
+\node[draw=bittersweet!80!black, line width=1.2pt, fill=white, inner sep=3pt,
+      font=\small\bfseries, text=bittersweet!80!black] at (4.7,0) {BLOQUÉ};
+\node[lbl, text=bittersweet!80!black, anchor=north, align=center,
+      fill=white, inner sep=3pt] at (4.7,-3.0)
+     {\footnotesize NetworkPolicy \textit{default-deny}\\\footnotesize appliquée par Cilium};
+
+% flux autorises
+\node[sys] (kou) at (0,-4.6)   {Kourier — trafic entrant};
+\node[sys] (dns) at (9.4,-4.6) {DNS, Kafka, Knative Serving};
+
+\draw[fv] (kou) -- (nsa.south -| kou);
+\draw[fv] (nsb.south -| dns) -- (dns);
+
+\node[lbl, text=figVert, anchor=west] at (0.35,-2.4) {autorisé (entrée)};
+\node[lbl, text=figVert, anchor=west] at (9.75,-2.4) {autorisé (sortie)};
+
+\end{tikzpicture}
+\caption{Workflow d'isolation et de sécurisation des tenants}
+\label{fig:workflow-isolation}
+\end{adjustwidth}
+\end{figure}
+
+Cilium n'est pas un mécanisme d'authentification : c'est le plugin réseau (CNI) du cluster, chargé d'appliquer les règles \texttt{NetworkPolicy}. La politique retenue est de type \textit{default-deny} : tout trafic non explicitement autorisé est refusé, en entrée comme en sortie. Seuls sont ouverts les flux nécessaires au fonctionnement de la plateforme — passerelle d'entrée, plan de contrôle Knative, supervision, résolution DNS et bus Kafka partagé. Le trafic direct entre deux namespaces de locataires reste refusé.
+
+Une limite doit être signalée : cette création automatique ayant été introduite en cours de projet, les namespaces créés antérieurement ne portent pas la politique, faute de reprise rétroactive.
+
+\subsection{Limites assumées}
+
+Ce sprint ne prétend pas clore la question de la sécurité de la plateforme : il s'agit d'une étape de durcissement technique, non d'un audit exhaustif. Deux risques en particulier ne sont pas traités et restent assumés : l'absence de limite de ressources par défaut par tenant, et le flux d'authentification \textit{Resource Owner Password Credentials} du portail (Sprint 3), moins sûr qu'un flux \textit{Authorization Code} avec PKCE.
+
+\subsection{Conclusion}
+
+Au terme de ce sprint, les mesures de durcissement identifiées au fil du projet sont consolidées et présentées comme une chaîne cohérente : authentification par jeton, autorisation par rôle et permission, vérification de propriété des ressources, restriction des origines autorisées, et isolation réseau des locataires. Les risques résiduels sont documentés plutôt que passés sous silence.
 
 \clearpage
 \section{Sprint 11 : Pipeline CI/CD complet}
@@ -156,7 +361,7 @@ User Story & Tâches & Estimation \\
 
 \multirow{2}{6.6cm}{
 \centering
-En tant qu'exploitant, je veux que le portail client et la console d'administration soient construits et déployés automatiquement.
+En tant qu'ADMIN, je veux que le portail client et la console d'administration soient construits et déployés automatiquement.
 }
 &
 Mettre en place le pipeline Jenkins portail (\texttt{npm run build}, Kaniko, Docker Hub).
@@ -170,7 +375,7 @@ Mettre en place le pipeline Jenkins admin-console.
 
 \multirow{2}{6.6cm}{
 \centering
-En tant qu'exploitant, je veux fiabiliser l'exécution du pipeline backend.
+En tant qu'ADMIN, je veux fiabiliser l'exécution du pipeline backend.
 }
 &
 Ajouter un réessai automatique à l'étape Checkout.
@@ -184,7 +389,7 @@ Ajouter \texttt{--use-new-run}/\texttt{--snapshot-mode=redo} + redémarrage syst
 
 \multirow{1}{6.6cm}{
 \centering
-En tant qu'exploitant, je veux un pipeline unique et cohérent pour tous les composants.
+En tant qu'ADMIN, je veux un pipeline unique et cohérent pour tous les composants.
 }
 &
 Aligner les 4 pipelines sur le socle backend (non réalisé).
@@ -193,7 +398,7 @@ Aligner les 4 pipelines sur le socle backend (non réalisé).
 
 \multirow{1}{6.6cm}{
 \centering
-En tant qu'exploitant, je veux une étape de tests automatisés dans les pipelines.
+En tant qu'ADMIN, je veux une étape de tests automatisés dans les pipelines.
 }
 &
 Retirer \texttt{-DskipTests} et ajouter une étape de test (non réalisé).
@@ -202,7 +407,7 @@ Retirer \texttt{-DskipTests} et ajouter une étape de test (non réalisé).
 
 \multirow{1}{6.6cm}{
 \centering
-En tant qu'exploitant, je veux une analyse de sécurité des images construites.
+En tant qu'ADMIN, je veux une analyse de sécurité des images construites.
 }
 &
 Intégrer un scanner de vulnérabilités dans le pipeline (non réalisé).
@@ -212,87 +417,180 @@ Intégrer un scanner de vulnérabilités dans le pipeline (non réalisé).
 \end{longtable}
 }
 
-\subsection{Conception}
+\subsection{Conception du pipeline}
 
-La figure~\ref{fig:cicd-pipeline} illustre le pipeline backend, le plus complet des quatre à l'issue de ce sprint. L'étape Test y est représentée en pointillés : elle n'est pas réellement exécutée, la compilation Maven étant lancée avec l'option \texttt{-DskipTests} (cf. Réalisation ci-après), elle figure ici comme étape cible non atteinte, pas comme un fait acquis.
+Le pipeline backend, \texttt{platform-backend}, est le plus complet des quatre. Il enchaîne quatre étapes déclarées dans son \textit{Jenkinsfile} — \texttt{Cleanup}, \texttt{Checkout}, \texttt{Build JAR}, \texttt{Docker Build \& Push + Deploy} — et conduit du commit Git jusqu'à la mise à jour effective du déploiement Kubernetes. La figure~\ref{fig:cicd-pipeline} en donne la vue complète.
 
 \begin{figure}[H]
+\begin{adjustwidth}{-1.4cm}{-1.4cm}
 \centering
-\begin{tikzpicture}[node distance=1.1cm, every node/.style={font=\footnotesize}]
-\tikzstyle{box}=[draw, rounded corners, minimum width=1.7cm, minimum height=0.8cm, align=center, fill=Gray!20]
-\tikzstyle{boxdash}=[box, dashed, fill=Gray!5]
-\node[box] (dev) {Developer};
-\node[box, right=0.9cm of dev] (git) {Git};
-\node[box, right=0.9cm of git] (jenkins) {Jenkins};
-\node[box, right=0.9cm of jenkins] (checkout) {Checkout};
-\node[box, right=0.9cm of checkout] (build) {Build\\(Maven)};
-\node[boxdash, right=0.9cm of build] (test) {Test\\(non exécuté)};
-\node[box, below=1.3cm of build] (kaniko) {Kaniko};
-\node[box, right=0.9cm of kaniko] (registry) {Docker Hub};
-\node[box, right=0.9cm of registry] (k8s) {Kubernetes};
-\node[box, right=0.9cm of k8s] (rollout) {Rollout};
-\node[box, right=0.9cm of rollout] (app) {Application};
-\draw[->, thick] (dev) -- (git);
-\draw[->, thick] (git) -- (jenkins);
-\draw[->, thick] (jenkins) -- (checkout);
-\draw[->, thick] (checkout) -- (build);
-\draw[->, thick] (build) -- (test);
-\draw[->, thick] (build) -- (kaniko);
-\draw[->, thick] (kaniko) -- (registry);
-\draw[->, thick] (registry) -- (k8s);
-\draw[->, thick] (k8s) -- (rollout);
-\draw[->, thick] (rollout) -- (app);
+\begin{tikzpicture}[
+  x=1cm, y=1cm,
+  every node/.style={font=\normalsize},
+  src/.style={draw=black!55, line width=1pt, rounded corners, minimum width=4.6cm,
+              minimum height=1.25cm, align=center, fill=black!6},
+  plat/.style={draw=figBleu, line width=1.1pt, rounded corners, minimum width=4.6cm,
+               minimum height=1.25cm, align=center, fill=figBleuFond},
+  bld/.style={draw=figOrange, line width=1.1pt, rounded corners, minimum width=4.6cm,
+              minimum height=1.25cm, align=center, fill=figOrangeFond},
+  okb/.style={draw=figVert, line width=1.3pt, rounded corners, minimum width=4.6cm,
+              minimum height=1.25cm, align=center, fill=figVertFond},
+  kw/.style={font=\scriptsize\ttfamily, align=left, text=black!70},
+  fl/.style={->, line width=1.2pt, black!60},
+  lbl/.style={font=\footnotesize}
+]
+
+\node[src]  (git)  at (0,0)     {\textbf{Git Repository}\\[1pt]\small branche \texttt{main}};
+\node[plat] (jk)   at (0,-2.5)  {\textbf{Jenkins}\\[1pt]\small pipeline \texttt{platform-backend}};
+\node[plat] (chk)  at (0,-5.0)  {\textbf{Checkout}};
+\node[bld]  (mvn)  at (0,-7.5)  {\textbf{Maven Build}};
+\node[bld]  (kan)  at (0,-10.0) {\textbf{Kaniko}};
+\node[plat] (hub)  at (0,-12.5) {\textbf{Docker Hub}};
+\node[plat] (k8s)  at (0,-15.0) {\textbf{Kubernetes}};
+\node[okb]  (rol)  at (0,-17.5) {\textbf{Rollout validé}\\[1pt]\small application mise à jour};
+
+\draw[fl] (git) -- (jk);
+\draw[fl] (jk)  -- (chk);
+\draw[fl] (chk) -- (mvn);
+\draw[fl] (mvn) -- (kan);
+\draw[fl] (kan) -- (hub);
+\draw[fl] (hub) -- (k8s);
+\draw[fl] (k8s) -- (rol);
+
+% ---- mots-cles techniques, colonne de droite ----
+\node[kw, anchor=west] at (2.8,-2.5)
+     {stages : Cleanup, Checkout,\\Build JAR,\\Docker Build \& Push + Deploy};
+\node[kw, anchor=west] at (2.8,-5.0)
+     {\textbf{retry(3)} — fiabilisation\\credentials \texttt{github-credentials}};
+\node[kw, anchor=west] at (2.8,-7.5)
+     {mvn clean package\\-DskipTests\\JDK 21 $\rightarrow$ backend.jar};
+\node[kw, anchor=west] at (2.8,-10.0)
+     {backend-kaniko.Dockerfile\\--use-new-run\\--snapshot-mode=redo};
+\node[kw, anchor=west] at (2.8,-12.5)
+     {credentials \texttt{dockerhub-credentials}\\adelbettaieb/platform-api\\v\$\{BUILD\_NUMBER\} + latest};
+\node[kw, anchor=west] at (2.8,-15.0)
+     {kubectl set image\\deployment/platform-api -n platform};
+\node[kw, anchor=west] at (2.8,-17.5)
+     {kubectl rollout status};
+
+% ---- mise en evidence du retry ----
+\node[draw=figOrange, line width=1pt, rounded corners, fill=figOrangeFond,
+      font=\scriptsize\bfseries, inner sep=3pt, text=figOrange] at (-3.6,-5.0) {retry(3)};
+\draw[->, line width=0.9pt, figOrange] (-3.0,-5.0) -- (chk.west);
+
+% ---- legende ----
+\node[draw=black!35, line width=0.8pt, rounded corners, fill=black!2, inner sep=7pt,
+      align=left, font=\scriptsize, anchor=north west] at (-4.3,-19.3)
+     {\textcolor{black!60}{$\blacksquare$} source \quad
+      \textcolor{figBleu}{$\blacksquare$} plateforme / registre \quad
+      \textcolor{figOrange}{$\blacksquare$} build et containerisation \quad
+      \textcolor{figVert}{$\blacksquare$} déploiement validé};
+
 \end{tikzpicture}
-\caption{Pipeline CI/CD backend : Developer $\rightarrow$ Git $\rightarrow$ Jenkins $\rightarrow$ Checkout $\rightarrow$ Build $\rightarrow$ Kaniko $\rightarrow$ Docker Hub $\rightarrow$ Kubernetes $\rightarrow$ Rollout $\rightarrow$ Application}
+\caption{Workflow complet de la pipeline CI/CD du backend}
 \label{fig:cicd-pipeline}
+\end{adjustwidth}
 \end{figure}
 
-\begin{table}[H]
-\centering
-\setlength{\tabcolsep}{4pt}
-\renewcommand{\arraystretch}{1.5}
-\begin{tabular}{|>{\raggedright\arraybackslash}p{2.3cm}|>{\raggedright\arraybackslash}p{2.4cm}|>{\raggedright\arraybackslash}p{3.1cm}|>{\raggedright\arraybackslash}p{3.1cm}|>{\raggedright\arraybackslash}p{3.4cm}|}
-\hline
-Étape & Outil & Entrée & Sortie & Validation \\
-\hline
-Checkout & Jenkins + Git (avec réessai) & Dépôt Git & Code source local & Réessai automatique si échec transitoire \\
-\hline
-Build & Maven (\texttt{mvn clean package}, \texttt{-DskipTests}) & Code source & Archive \texttt{.jar} & Compilation sans erreur (tests non exécutés) \\
-\hline
-Construction image & Kaniko (\texttt{--use-new-run}, \texttt{--snapshot-mode=redo}) & \texttt{.jar} + \texttt{backend-kaniko.Dockerfile} & Image de conteneur & Build Kaniko réussi \\
-\hline
-Publication & Docker Hub & Image construite & Image taguée disponible & Push réussi \\
-\hline
-Déploiement & \texttt{kubectl set image} & Nouvelle image publiée & Déploiement Kubernetes mis à jour & \texttt{kubectl rollout status} réussi \\
-\hline
-\end{tabular}
-\caption{Étapes du pipeline CI/CD backend}
-\label{tab:cicd-steps}
-\end{table}
+Aucune étape de test n'apparaît dans ce workflow : la compilation est lancée avec \texttt{-DskipTests}, et l'ajout d'une étape de tests automatisés reste une perspective non réalisée.
 
-Les pipelines du portail client et de la console d'administration reprennent le même squelette, adapté à une application front-end : construction (\texttt{npm run build}) produisant les fichiers statiques, construction de l'image de conteneur (Nginx servant ces fichiers statiques) via Kaniko, publication sur Docker Hub, puis mise à jour du déploiement Kubernetes correspondant.
+\subsection{Implémentation de la pipeline}
+
+Le pipeline est décrit en syntaxe déclarative dans le fichier \textit{Jenkinsfile} versionné avec le code source. L'extrait~\ref{lst:jenkinsfile} en présente les parties essentielles.
+
+\begin{lstlisting}[style=yamlstyle, language={}, basicstyle=\ttfamily\scriptsize,
+  caption={Extrait du \textit{Jenkinsfile} du pipeline \texttt{platform-backend}},
+  label={lst:jenkinsfile}]
+pipeline {
+    agent any
+    options { retry(2) }            // relance le pipeline sur echec transitoire
+    tools   { maven 'maven-3'; jdk 'jdk-21' }
+
+    environment {
+        IMAGE_NAME = 'adelbettaieb/platform-api'
+        IMAGE_TAG  = "v${BUILD_NUMBER}"
+        NAMESPACE  = 'platform'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                retry(3) {          // fiabilisation du clone Git
+                    git branch: 'main',
+                        credentialsId: 'github-credentials',
+                        url: 'https://github.com/Adelbett/platformserverless.git'
+                }
+            }
+        }
+
+        stage('Build JAR') {
+            steps {
+                dir('backend-api') { sh 'mvn clean package -DskipTests' }
+            }
+        }
+
+        stage('Docker Build & Push + Deploy') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-credentials',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS')]) {
+
+                    sh "/kaniko/executor \
+                        --context=dir://$(pwd)/backend-api \
+                        --dockerfile=$(pwd)/ci-cd/docker/backend-kaniko.Dockerfile \
+                        --destination=${IMAGE_NAME}:${IMAGE_TAG} \
+                        --destination=${IMAGE_NAME}:latest \
+                        --use-new-run --snapshot-mode=redo"
+
+                    sh "kubectl set image deployment/platform-api \
+                        platform-api=${IMAGE_NAME}:${IMAGE_TAG} -n ${NAMESPACE}"
+                    sh "kubectl rollout status deployment/platform-api -n ${NAMESPACE}"
+                }
+            }
+        }
+    }
+}
+\end{lstlisting}
+
+Quelques éléments méritent d'être soulignés dans cet extrait.
+
+Le bloc \texttt{retry} apparaît à deux niveaux : sur le pipeline entier et sur l'étape de clone Git, la plus sujette aux échecs transitoires. Les identifiants, qu'il s'agisse de GitHub ou de Docker Hub, ne figurent jamais en clair : ils sont injectés depuis le magasin de \textit{credentials} de Jenkins.
+
+L'image est construite par \textbf{Kaniko}, qui produit une image de conteneur depuis l'intérieur d'un pod, sans démon Docker ni privilège root — une exigence pour construire à l'intérieur d'un cluster Kubernetes. Elle est publiée sous deux étiquettes : une version immuable \texttt{v\$\{BUILD\_NUMBER\}} et \texttt{latest}.
+
+Le déploiement utilise l'étiquette versionnée, et non \texttt{latest} : Kubernetes ne détecterait aucun changement si le nom de l'image restait identique, et aucun \textit{rollout} ne serait déclenché. La commande \texttt{kubectl rollout status} clôt le pipeline en vérifiant que les nouveaux pods deviennent réellement disponibles ; le build échoue dans le cas contraire.
 
 \subsection{Réalisation}
 
-\subsubsection{Mise en œuvre}
+\subsubsection{Exécution du pipeline}
 
-Les correctifs de fiabilisation identifiés au Sprint 4 (options Kaniko \texttt{--use-new-run}/\texttt{--snapshot-mode=redo}, redémarrage sécurisé systématique de Jenkins, réessai automatique du checkout Git) demeurent, à l'issue de ce sprint, appliqués uniquement au pipeline du backend, qui reste le plus mature des quatre. Les pipelines du portail client et de la console d'administration, mis en place à ce sprint, permettent leur construction et leur déploiement automatisés, mais sans reprendre l'ensemble de ces mécanismes de fiabilisation. Le remplacement du fichier \texttt{backend.Dockerfile} (construction multi-étapes avec utilisateur non privilégié, non utilisé en pratique par le pipeline) au profit exclusif de \texttt{backend-kaniko.Dockerfile} (construction mono-étape effectivement utilisée) a été clarifié dans la documentation technique du projet, sans toutefois que le premier fichier, devenu du code mort, n'ait été supprimé du dépôt.
+La vue Jenkins du projet \texttt{platform-backend} rassemble l'historique des exécutions et les étapes traversées à chaque build.
 
-\subsubsection{Configuration et limites assumées}
+\EmplacementFigure{15cm}{9cm}{Historique d'exécution de la pipeline \texttt{platform-backend} dans Jenkins}{fig:jenkins-historique}
 
-En toute rigueur, ce sprint doit être présenté avec honnêteté au regard de son objectif initial : l'harmonisation complète des pipelines CI/CD n'a été que partiellement atteinte. Les points suivants, documentés par les audits menés sur la plateforme, n'ont pas été résolus dans le temps imparti du projet et sont repris comme perspectives d'amélioration au chapitre de validation :
+Elle confirme l'exécution répétée du pipeline et la succession des étapes déclarées : \texttt{Cleanup}, \texttt{Checkout}, \texttt{Build JAR} et \texttt{Docker Build \& Push + Deploy}, encadrées par les étapes automatiques de Jenkins.
 
-\begin{itemize}
-    \item Les pipelines du portail client et de la console d'administration n'ont pas été alignés sur les mécanismes de fiabilisation du pipeline backend.
-    \item Le pipeline dédié aux microservices reste le moins abouti des quatre : construction et publication d'image Docker classiques (sans Kaniko), absence d'identifiants explicites pour le checkout Git, et absence de toute étape de déploiement Kubernetes final.
-    \item Aucun des quatre pipelines ne comporte d'étape de tests automatisés (la compilation backend est réalisée avec l'option \texttt{-DskipTests}), d'analyse statique de code, ni d'analyse de vulnérabilités des images construites.
-    \item Aucun mécanisme de rollback automatique n'est déclenché en cas d'échec de la vérification du déploiement (\texttt{kubectl rollout status}).
-\end{itemize}
+\EmplacementFigure{15cm}{9cm}{Détail des étapes d'exécution d'un build Jenkins}{fig:jenkins-build}
 
-Ces limites ne remettent pas en cause le fonctionnement de la plateforme, qui reste opérationnelle et déployée automatiquement à chaque évolution ; elles constituent en revanche des axes d'industrialisation identifiés mais non traités, dans un contexte de projet à ressources et délai contraints, où la priorité a été donnée à la robustesse fonctionnelle de la plateforme elle-même plutôt qu'à l'homogénéisation complète de ses quatre pipelines.
+Le détail d'un build permet de suivre chaque étape individuellement et d'en mesurer la durée.
 
-Au terme de ce sprint, le pipeline backend demeure le plus robuste et le plus représentatif de la démarche CI/CD visée pour la plateforme ; les trois autres pipelines sont fonctionnels mais perfectibles. Les 3 autres pipelines (portail, admin, microservices) ne bénéficient pas des mêmes mécanismes de fiabilisation que le backend ; aucun des 4 pipelines n'exécute de tests automatisés, d'analyse statique, ni d'analyse de vulnérabilités ; aucun rollback automatique n'est déclenché en cas d'échec de déploiement. Ces limites sont assumées comme telles, dans un contexte de ressources et de délai contraints, et reprises au chapitre de validation.
+\subsubsection{Publication de l'image}
+
+Les images produites par le pipeline sont publiées sur le registre Docker Hub.
+
+\EmplacementFigure{15cm}{8cm}{Étiquettes publiées de l'image \texttt{adelbettaieb/platform-api} sur Docker Hub}{fig:dockerhub-tags}
+
+La succession des étiquettes versionnées atteste que chaque build produit une image distincte et traçable, condition nécessaire à tout retour à une version antérieure.
+
+\subsubsection{Déploiement sur le cluster}
+
+La dernière étape du pipeline met à jour le déploiement Kubernetes puis en vérifie l'aboutissement.
+
+\EmplacementFigure{15cm}{7cm}{Résultat du déploiement sur le cluster Kubernetes}{fig:deploiement-k8s}
+
+Cette vérification confirme que l'image déployée correspond bien à la dernière version publiée et que les pods correspondants sont disponibles.
 
 \section{Conclusion}
 
-La Release 3 a consolidé la solidité technique de la plateforme sans lui ajouter de nouvelle fonctionnalité visible : durcissement de la sécurité par la restriction du RBAC, de la configuration CORS et des accès par identifiant, puis industrialisation des chaînes de déploiement continu des quatre composants du projet. Ce travail d'industrialisation, présenté ici avec la même rigueur que les fonctionnalités abouties, n'a été que partiellement mené à son terme : ce constat, assumé, alimente directement le chapitre de validation qui clôt ce mémoire.
+La Release 3 a consolidé la solidité technique de la plateforme sans lui ajouter de nouvelle fonctionnalité visible : durcissement de la sécurité par la restriction du RBAC, de la configuration CORS et des accès par identifiant, puis industrialisation des chaînes de déploiement continu des quatre composants du projet. Ce travail d'industrialisation, présenté ici avec la même rigueur que les fonctionnalités abouties, n'a été que partiellement mené à son terme : ce constat est assumé et repris dans les perspectives de la conclusion générale.

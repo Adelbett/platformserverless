@@ -443,7 +443,13 @@ User Story & Tâches & Estimation \\
 
 Le diagramme réunit CLIENT\_ADMIN et MEMBER (sous permission \texttt{MANAGE\_KAFKA}/\texttt{MANAGE\_EVENTING}), ainsi qu'ADMIN, avec l'ensemble des fonctionnalités du sprint.
 
-\EmplacementFigure{13cm}{8cm}{Diagramme de cas d'utilisation du Sprint 5 — Gestion de la messagerie événementielle}{fig:uc-sprint5}
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=\textwidth]{image/Sprint5usescase.png}
+    \caption{Diagramme de cas d'utilisation du Sprint 5 — Gestion de la messagerie événementielle}
+    \label{fig:uc-sprint5}
+\end{figure}
+
 
 \subsection{Services Web}
 
@@ -477,36 +483,7 @@ Service Web & Description \\
 
 \subsection{Conception}
 
-Deux fonctionnalités sont détaillées : la création d'un sujet Kafka, brique de base du domaine ; la configuration d'un déclencheur, la plus riche techniquement puisqu'elle relie deux briques indépendantes du socle (Kafka et Knative).
-
-\subsubsection{Cas d'utilisation : « Créer un sujet Kafka »}
-
-\subsubsection*{Description textuelle}
-
-\renewcommand{\arraystretch}{1.5}
-\begin{longtable}{|p{4cm}|p{11cm}|}
-\hline
-Nom & Créer un sujet Kafka \\
-\hline
-Acteur & CLIENT\_ADMIN, MEMBER (avec permission de gestion Kafka) \\
-\hline
-Pré-condition & L'utilisateur est authentifié et dispose de la permission requise \\
-\hline
-Scénario nominal & 1. L'utilisateur soumet un nom de sujet depuis la page de gestion Kafka. 2. Le backend crée la ressource correspondante, rattachée au cluster Kafka du tenant. 3. Le sujet créé est renvoyé à l'utilisateur, affiché dans la liste, et devient disponible pour la configuration d'un déclencheur. \\
-\hline
-Post-condition & Le sujet est disponible pour publication et pour association à une application. \\
-\hline
-\caption{Description textuelle du cas d'utilisation « Créer un sujet Kafka »}
-\label{tab:uc-create-topic}
-\end{longtable}
-
-\subsubsection*{Diagramme de séquence système}
-
-\EmplacementFigure{13cm}{6cm}{Diagramme de séquence système — Créer un sujet Kafka}{fig:seqsys-createtopic}
-
-\subsubsection*{Diagramme de séquence objet}
-
-\EmplacementFigure{13cm}{7cm}{Diagramme de séquence objet — Créer un sujet Kafka}{fig:seqobj-createtopic}
+Une fonctionnalité est détaillée : la configuration d'un déclencheur, la plus riche techniquement puisqu'elle relie deux briques indépendantes du socle (Kafka et Knative).
 
 \subsubsection{Cas d'utilisation : « Configurer un déclencheur d'événement »}
 
@@ -603,23 +580,27 @@ Ce processus, du message Kafka au réveil et au traitement par l'application, es
 \end{adjustwidth}
 \end{figure}
 
-\subsubsection*{Diagramme de séquence système}
+\subsubsection*{Diagramme de séquence}
 
-\EmplacementFigure{13cm}{6cm}{Diagramme de séquence système — Configurer un déclencheur d'événement}{fig:seqsys-eventing}
-
-\subsubsection*{Diagramme de séquence objet}
-
-\EmplacementFigure{15cm}{9cm}{Diagramme de séquence objet — Configurer un déclencheur d'événement}{fig:seqobj-eventing}
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=\textwidth,height=0.85\textheight,keepaspectratio]{image/seq-eventing-trigger.png}
+    \caption{Diagramme de séquence — Configurer un déclencheur d'événement}
+    \label{fig:seq-eventing-trigger}
+\end{figure}
 
 \subsection{Réalisation du Sprint 5}
 
 Fonctionnalité : Créer et gérer des sujets Kafka. La page de gestion Kafka du portail permet de créer, lister et supprimer les sujets du compte.
 
-\EmplacementFigure{13cm}{8cm}{Interface de gestion des sujets Kafka}{fig:capture-kafkatopics}
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=0.9\textwidth]{image/Interface de gestion des sujets Kafka.png}
+    \caption{Interface de gestion des sujets Kafka}
+    \label{fig:capture-kafkatopics}
+\end{figure}
 
-Fonctionnalité : Configurer un déclencheur d'événement. La page de configuration des déclencheurs permet de sélectionner un sujet Kafka et une application, puis de créer le déclencheur associé.
 
-\EmplacementFigure{13cm}{8cm}{Interface de configuration d'un déclencheur}{fig:capture-eventing-ui}
 
 Les trois ressources techniques que ce déclencheur assemble (Broker, KafkaSource, Trigger) sont visibles directement sur le cluster. La figure~\ref{fig:capture-eventing-broker} montre le Broker du tenant, à l'état prêt.
 
@@ -650,11 +631,21 @@ La figure~\ref{fig:capture-eventing-kafkasource} affiche la KafkaSource correspo
 
 Fonctionnalité : Publier un événement. Un CLIENT\_ADMIN ou un MEMBER publie un événement directement sur un sujet.
 
-\EmplacementFigure{13cm}{8cm}{Publication d'un événement}{fig:capture-publish}
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=0.9\textwidth]{image/Publication d’un événement.png}
+    \caption{Publication d'un événement}
+    \label{fig:capture-publish}
+\end{figure}
 
 Fonctionnalité : Vue globale et suppression forcée (ADMIN). L'ADMIN consulte, depuis la console d'administration, l'ensemble des sujets, sources et déclencheurs de tous les clients, et peut supprimer un sujet de force.
 
-\EmplacementFigure{13cm}{8cm}{Vue administrateur des sujets, sources et déclencheurs}{fig:capture-admineventing}
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=0.9\textwidth]{image/ue administrateur des sujets, sources et déclencheurs.png}
+    \caption{Vue administrateur des sujets, sources et déclencheurs}
+    \label{fig:capture-admineventing}
+\end{figure}
 
 Le déploiement d'une application (Sprint 4) peut également câbler automatiquement un déclencheur, dans le même mouvement que la création de l'application, si le formulaire de déploiement renseigne un sujet Kafka.
 
@@ -720,7 +711,12 @@ User Story & Tâches & Estimation \\
 
 Le diagramme réunit CLIENT\_ADMIN et MEMBER (sous permission \texttt{VIEW\_LOGS}/\texttt{VIEW\_MONITORING}) et ADMIN, avec l'ensemble des fonctionnalités du sprint.
 
-\EmplacementFigure{13cm}{8cm}{Diagramme de cas d'utilisation du Sprint 6 — Gestion de l'observabilité applicative}{fig:uc-sprint6}
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=\textwidth]{image/uc-sprint6.png}
+    \caption{Diagramme de cas d'utilisation du Sprint 6 — Gestion de l'observabilité applicative}
+    \label{fig:uc-sprint6}
+\end{figure}
 
 \subsection{Services Web}
 
@@ -771,63 +767,47 @@ Post-condition & L'utilisateur dispose d'une vue à jour de l'activité de son a
 \label{tab:uc-logs}
 \end{longtable}
 
-\subsubsection*{Diagramme de séquence système}
+\subsubsection*{Diagramme de séquence}
 
-\EmplacementFigure{13cm}{6cm}{Diagramme de séquence système — Consulter les journaux en temps réel}{fig:seqsys-logs}
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=\textwidth,height=0.85\textheight,keepaspectratio]{image/seq-logs.png}
+    \caption{Diagramme de séquence — Consulter les journaux en temps réel}
+    \label{fig:seq-logs}
+\end{figure}
 
-\subsubsection*{Diagramme de séquence objet}
 
-\EmplacementFigure{15cm}{8cm}{Diagramme de séquence objet — Consulter les journaux en temps réel}{fig:seqobj-logs}
-
-\subsubsection{Cas d'utilisation : « Consulter les métriques d'une application »}
-
-\subsubsection*{Description textuelle}
-
-\renewcommand{\arraystretch}{1.5}
-\begin{longtable}{|p{4cm}|p{11cm}|}
-\hline
-Nom & Consulter les métriques d'une application \\
-\hline
-Acteur & CLIENT\_ADMIN, MEMBER (avec permission de consultation du monitoring) \\
-\hline
-Pré-condition & L'application appartient au compte de l'utilisateur (ou de son CLIENT\_ADMIN) \\
-\hline
-Scénario nominal & 1. L'utilisateur ouvre la page de monitoring de son application. 2. Le backend interroge Prometheus pour les métriques de la révision Knative concernée. 3. Les métriques (requêtes par seconde, latence, CPU, mémoire) sont affichées et actualisées en continu. \\
-\hline
-Post-condition & L'utilisateur dispose d'une vue à jour de la charge de son application. \\
-\hline
-\caption{Description textuelle du cas d'utilisation « Consulter les métriques d'une application »}
-\label{tab:uc-metrics}
-\end{longtable}
-
-\subsubsection*{Diagramme de séquence système}
-
-\EmplacementFigure{13cm}{6cm}{Diagramme de séquence système — Consulter les métriques d'une application}{fig:seqsys-metrics}
-
-\subsubsection*{Diagramme de séquence objet}
-
-\EmplacementFigure{13cm}{7cm}{Diagramme de séquence objet — Consulter les métriques d'une application}{fig:seqobj-metrics}
 
 \subsection{Réalisation du Sprint 6}
 
 Fonctionnalité : Consulter les journaux de déploiement. La page de journaux affiche, pour une application donnée, ses journaux de déploiement filtrables par niveau.
 
-\EmplacementFigure{13cm}{8cm}{Interface de consultation des journaux de déploiement}{fig:capture-deploylogs}
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=0.9\textwidth]{image/Interface de consultation des journaux de déploiemen.png}
+    \caption{Interface de consultation des journaux de déploiement}
+    \label{fig:capture-deploylogs}
+\end{figure}
 
 Fonctionnalité : Suivre les journaux en temps réel. La même page diffuse en continu les journaux applicatifs bruts du conteneur.
 
-\EmplacementFigure{13cm}{8cm}{Flux temps réel des journaux applicatifs}{fig:capture-livelogs}
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=0.9\textwidth]{image/Flux temps réel des journaux applicatifs.png}
+    \caption{Flux temps réel des journaux applicatifs}
+    \label{fig:capture-livelogs}
+\end{figure}
 
-Fonctionnalité : Consulter les métriques d'une application. La page de monitoring affiche les métriques CPU, mémoire et requêtes par seconde de l'application, issues de Prometheus.
 
-\EmplacementFigure{13cm}{8cm}{Interface de monitoring d'une application}{fig:capture-monitoring}
 
 Fonctionnalité : Consulter les journaux de tous les locataires (ADMIN). L'ADMIN consulte, depuis la console d'administration, les journaux de déploiement de l'ensemble des clients.
 
-\EmplacementFigure{13cm}{8cm}{Vue administrateur des journaux}{fig:capture-adminlogs}
-
-\paragraph{Précision sur les journaux et Elasticsearch.}\mbox{}\par
-La bibliothèque \texttt{spring-boot-starter-data-elasticsearch} figure parmi les dépendances du backend, mais aucune classe du code source ne l'utilise réellement (pas de dépôt, d'entité indexée ni d'appel à un client Elasticsearch) : les journaux applicatifs ne transitent donc pas par Elasticsearch dans ce projet, contrairement à ce que la présence de cette dépendance pourrait laisser supposer. Le chemin réel est direct : API Kubernetes $\rightarrow$ service de journaux $\rightarrow$ diffusion en temps réel $\rightarrow$ portail client.
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=0.9\textwidth]{image/Vue administrateur des journau.png}
+    \caption{Vue administrateur des journaux}
+    \label{fig:capture-adminlogs}
+\end{figure}
 
 \subsection{Conclusion}
 
@@ -835,4 +815,4 @@ Ce sprint livre l'observabilité applicative côté client : journaux et métriq
 
 \section{Conclusion}
 
-La Release 1 a transformé le socle technique de la Release 0 en un cœur applicatif cohérent, organisé par domaine de gestion plutôt que par brique livrée : accès et identité, cycle de vie des applications, messagerie événementielle, observabilité. Chaque sprint réunit tous les acteurs concernés par son domaine, du visiteur à l'ADMIN, et livre conjointement la brique backend et l'écran du portail qui l'expose. Plusieurs anomalies de cohérence et de sécurité identifiées au fil de ces sprints sont reprises dans les limites du chapitre de validation.
+La Release 1 a transformé le socle technique de la Release 0 en un cœur applicatif cohérent, organisé par domaine de gestion plutôt que par brique livrée : accès et identité, cycle de vie des applications, messagerie événementielle, observabilité. Chaque sprint réunit tous les acteurs concernés par son domaine, du visiteur à l'ADMIN, et livre conjointement la brique backend et l'écran du portail qui l'expose. Plusieurs anomalies de cohérence et de sécurité identifiées au fil de ces sprints sont assumées comme limites du projet.

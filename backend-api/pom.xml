@@ -81,12 +81,6 @@
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
 
-        <!-- ── Elasticsearch ─────────────────────────────────────── -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-elasticsearch</artifactId>
-        </dependency>
-
         <!-- ── WebSocket ─────────────────────────────────────────── -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

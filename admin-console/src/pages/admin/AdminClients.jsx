@@ -97,6 +97,7 @@ const QuotaPanel = ({ client }) => {
 const ClientRow = ({ client, onSuspend, onRestore }) => {
     const [loading, setLoading] = useState(false);
     const [quotaOpen, setQuotaOpen] = useState(false);
+    const [error, setError] = useState(null);
 
     const handleToggle = async () => {
         if (loading) return;
@@ -108,8 +109,11 @@ const ClientRow = ({ client, onSuspend, onRestore }) => {
         );
         if (!confirm) return;
         setLoading(true);
+        setError(null);
         try {
             await action(client.id);
+        } catch (err) {
+            setError(err.response?.data?.detail || (err.response?.status ? `HTTP ${err.response.status}` : 'Network error — check your connection.'));
         } finally {
             setLoading(false);
         }
@@ -200,6 +204,9 @@ const ClientRow = ({ client, onSuspend, onRestore }) => {
                         }
                     </button>
                 </div>
+                {error && (
+                    <p style={{ fontSize: 11, color: '#EF4444', margin: '6px 0 0', textAlign: 'right' }}>{error}</p>
+                )}
             </td>
         </motion.tr>
         {quotaOpen && <QuotaPanel client={client} />}

@@ -59,8 +59,6 @@ management:
   health:
     redis:
       enabled: false
-    elasticsearch:
-      enabled: false
   endpoints:
     web:
       exposure:

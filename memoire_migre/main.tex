@@ -6,12 +6,12 @@
 
 \usepackage{polyglossia}
 \setmainlanguage{french}
-\setotherlanguage{arabic}
 
-\newfontfamily\arabicfont[
-    Script=Arabic,
-    Scale=1.3
-]{Scheherazade}
+% ATTENTION : \setotherlanguage{arabic} charge le package bidi, qui reecrit
+% \@tabular. bidi DOIT etre charge en dernier, sinon array/longtable/colortbl/
+% multirow le cassent et le premier tableau du document echoue avec
+% « Undefined control sequence \UseMathForPositioningText ».
+% La declaration de l'arabe est donc reportee a la fin du preambule.
 
 % Guillemets français — redéfinis explicitement au cas où polyglossia
 % ne les fournirait pas automatiquement en combinaison avec le module
@@ -62,7 +62,7 @@
 \newcommand{\EmplacementFigure}[4]{%
 \begin{figure}[H]
 \centering
-\fbox{\begin{minipage}[c][#2][c]{#1}\centeringEmplacement réservé à l'image\end{minipage}}
+\fbox{\begin{minipage}[c][#2][c]{#1}\centering Emplacement réservé à l'image\end{minipage}}
 \caption{#3}
 \label{#4}
 \end{figure}}
@@ -533,6 +533,24 @@
 
 
 % ============================================================
+% ARABE — DESACTIVE
+% ============================================================
+% \setotherlanguage{arabic} charge le package bidi, qui reecrit \@tabular et
+% entre en conflit avec array/longtable/colortbl/multirow : tous les tableaux
+% du document echouaient alors avec
+%   « Undefined control sequence \UseMathForPositioningText ».
+%
+% L'arabe n'est utilise que dans Images/intro.tex, qui n'est PAS inclus dans
+% ce document (seul introduction.tex l'est). La declaration est donc retiree.
+%
+% Si un jour du texte arabe doit etre ajoute, decommenter les deux blocs
+% ci-dessous EN LES LAISSANT ICI, en toute fin de preambule :
+%
+% \setotherlanguage{arabic}
+% \newfontfamily\arabicfont[Script=Arabic, Scale=1.3]{Amiri}
+
+
+% ============================================================
 % DOCUMENT
 % ============================================================
 
@@ -613,8 +631,6 @@
 \include{chapitre3}
 
 \include{chapitre4}
-
-\include{chapitre5}
 
 \include{concultiongenarale}
 
