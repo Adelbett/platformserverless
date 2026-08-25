@@ -302,10 +302,6 @@ Cilium n'est pas un mécanisme d'authentification : c'est le plugin réseau (CNI
 
 Une limite doit être signalée : cette création automatique ayant été introduite en cours de projet, les namespaces créés antérieurement ne portent pas la politique, faute de reprise rétroactive.
 
-\subsection{Limites assumées}
-
-Ce sprint ne prétend pas clore la question de la sécurité de la plateforme : il s'agit d'une étape de durcissement technique, non d'un audit exhaustif. Deux risques en particulier ne sont pas traités et restent assumés : l'absence de limite de ressources par défaut par tenant, et le flux d'authentification \textit{Resource Owner Password Credentials} du portail (Sprint 3), moins sûr qu'un flux \textit{Authorization Code} avec PKCE.
-
 \subsection{Conclusion}
 
 Au terme de ce sprint, les mesures de durcissement identifiées au fil du projet sont consolidées et présentées comme une chaîne cohérente : authentification par jeton, autorisation par rôle et permission, vérification de propriété des ressources, restriction des origines autorisées, et isolation réseau des locataires. Les risques résiduels sont documentés plutôt que passés sous silence.
@@ -567,19 +563,25 @@ Le déploiement utilise l'étiquette versionnée, et non \texttt{latest} : Kuber
 
 La vue Jenkins du projet \texttt{platform-backend} rassemble l'historique des exécutions et les étapes traversées à chaque build.
 
-\EmplacementFigure{15cm}{9cm}{Historique d'exécution de la pipeline \texttt{platform-backend} dans Jenkins}{fig:jenkins-historique}
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=\textwidth]{image/capture_jenkins_historique.png}
+    \caption{Historique d'exécution de la pipeline \texttt{platform-backend} dans Jenkins}
+    \label{fig:jenkins-historique}
+\end{figure}
 
 Elle confirme l'exécution répétée du pipeline et la succession des étapes déclarées : \texttt{Cleanup}, \texttt{Checkout}, \texttt{Build JAR} et \texttt{Docker Build \& Push + Deploy}, encadrées par les étapes automatiques de Jenkins.
-
-\EmplacementFigure{15cm}{9cm}{Détail des étapes d'exécution d'un build Jenkins}{fig:jenkins-build}
-
-Le détail d'un build permet de suivre chaque étape individuellement et d'en mesurer la durée.
 
 \subsubsection{Publication de l'image}
 
 Les images produites par le pipeline sont publiées sur le registre Docker Hub.
 
-\EmplacementFigure{15cm}{8cm}{Étiquettes publiées de l'image \texttt{adelbettaieb/platform-api} sur Docker Hub}{fig:dockerhub-tags}
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=\textwidth]{image/capture_dockerhub_tags.png}
+    \caption{Étiquettes publiées de l'image \texttt{adelbettaieb/platform-api} sur Docker Hub}
+    \label{fig:dockerhub-tags}
+\end{figure}
 
 La succession des étiquettes versionnées atteste que chaque build produit une image distincte et traçable, condition nécessaire à tout retour à une version antérieure.
 
@@ -587,7 +589,12 @@ La succession des étiquettes versionnées atteste que chaque build produit une 
 
 La dernière étape du pipeline met à jour le déploiement Kubernetes puis en vérifie l'aboutissement.
 
-\EmplacementFigure{15cm}{7cm}{Résultat du déploiement sur le cluster Kubernetes}{fig:deploiement-k8s}
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=\textwidth]{image/capture_deploiement_k8s.png}
+    \caption{Résultat du déploiement sur le cluster Kubernetes}
+    \label{fig:deploiement-k8s}
+\end{figure}
 
 Cette vérification confirme que l'image déployée correspond bien à la dernière version publiée et que les pods correspondants sont disponibles.
 

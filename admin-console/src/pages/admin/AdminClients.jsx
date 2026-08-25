@@ -218,6 +218,8 @@ const AdminClients = () => {
     const [clients,          setClients]          = useState([]);
     const [overdueInvoices,  setOverdueInvoices]  = useState([]);
     const [loading,          setLoading]          = useState(true);
+    const [suspendAppError,  setSuspendAppError]  = useState(null);
+    const [suspendingAppId,  setSuspendingAppId]  = useState(null);
 
     const load = async () => {
         setLoading(true);
@@ -245,8 +247,16 @@ const AdminClients = () => {
     };
 
     const handleSuspendApp = async (appId, invoiceId) => {
-        await invoiceApi.suspend(appId);
-        setOverdueInvoices(prev => prev.map(i => i.id === invoiceId ? { ...i, status: 'SUSPENDED' } : i));
+        setSuspendingAppId(invoiceId);
+        setSuspendAppError(null);
+        try {
+            await invoiceApi.suspend(appId);
+            setOverdueInvoices(prev => prev.map(i => i.id === invoiceId ? { ...i, status: 'SUSPENDED' } : i));
+        } catch (err) {
+            setSuspendAppError(err.response?.data?.detail || (err.response?.status ? `HTTP ${err.response.status}` : 'Network error — check your connection.'));
+        } finally {
+            setSuspendingAppId(null);
+        }
     };
 
     const suspendedCount = clients.filter(c => c.suspended).length;
@@ -293,6 +303,11 @@ const AdminClients = () => {
                         <CreditCard size={14} color="#EF4444" />
                         <span style={{ fontSize: 13, fontWeight: 700, color: '#FCA5A5' }}>Overdue Invoices — Services at risk</span>
                     </div>
+                    {suspendAppError && (
+                        <div style={{ padding: '10px 18px', background: 'rgba(239,68,68,0.06)', borderBottom: '1px solid rgba(239,68,68,0.15)' }}>
+                            <p style={{ fontSize: 12, color: '#FCA5A5', margin: 0 }}>{suspendAppError}</p>
+                        </div>
+                    )}
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead><tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                             {['Service', 'Client', 'Amount', 'Due Date', 'Status', ''].map((h, i) => (
@@ -313,8 +328,9 @@ const AdminClients = () => {
                                     </td>
                                     <td style={{ padding: '11px 16px', textAlign: 'right' }}>
                                         <button onClick={() => handleSuspendApp(inv.appId, inv.id)}
-                                            style={{ padding: '5px 12px', borderRadius: 7, border: '1px solid rgba(239,68,68,0.35)', background: 'rgba(239,68,68,0.08)', color: '#EF4444', cursor: 'pointer', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
-                                            <Ban size={11} /> Suspend
+                                            disabled={suspendingAppId === inv.id}
+                                            style={{ padding: '5px 12px', borderRadius: 7, border: '1px solid rgba(239,68,68,0.35)', background: 'rgba(239,68,68,0.08)', color: '#EF4444', cursor: suspendingAppId === inv.id ? 'not-allowed' : 'pointer', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, opacity: suspendingAppId === inv.id ? 0.5 : 1 }}>
+                                            <Ban size={11} /> {suspendingAppId === inv.id ? 'Suspending…' : 'Suspend'}
                                         </button>
                                     </td>
                                 </tr>

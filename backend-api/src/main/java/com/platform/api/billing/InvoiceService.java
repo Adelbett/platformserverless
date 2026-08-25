@@ -196,14 +196,17 @@ public class InvoiceService {
     // ── Admin: manually suspend a service ───────────────────────────────────────
     @Transactional
     public void adminSuspendApp(String appId) {
-        App app = appRepo.findById(appId)
-                .orElseThrow(() -> new RuntimeException("App not found"));
-        app.setStatus("SUSPENDED");
-        appRepo.save(app);
+        // The app may already be gone (e.g. force-deleted by an admin) while
+        // its invoice is still pending/overdue — that's not an error case,
+        // there's just nothing left to suspend on the cluster side.
+        appRepo.findById(appId).ifPresentOrElse(app -> {
+            app.setStatus("SUSPENDED");
+            appRepo.save(app);
+        }, () -> log.warn("adminSuspendApp: app {} no longer exists (already deleted) — marking its invoices only", appId));
 
         // Mark all pending invoices for this app as OVERDUE
-        invoiceRepo.findByUserIdOrderByDueDateDesc(app.getUserId()).stream()
-                .filter(inv -> inv.getAppId().equals(appId) && "PENDING".equals(inv.getStatus()))
+        invoiceRepo.findByStatusIn(List.of("PENDING")).stream()
+                .filter(inv -> appId.equals(inv.getAppId()))
                 .forEach(inv -> {
                     inv.setStatus("OVERDUE");
                     invoiceRepo.save(inv);
