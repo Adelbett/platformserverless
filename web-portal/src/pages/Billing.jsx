@@ -145,13 +145,12 @@ const PayInvoiceForm = ({ amount, methods, onSuccess, onCancel, onDirectPay, pay
         setPaying(true); setError(null);
         try {
             if (selectedMethod !== 'new') {
-                const { data } = await paymentApi.pay({
-                    amount,
-                    paymentMethodId: selectedMethod,
-                    description: `Platform invoice — ${new Date().toLocaleDateString('en', { month: 'long', year: 'numeric' })}`,
-                });
-                if (data.status === 'succeeded') { setDone(true); onSuccess(data); }
-                else setError(`Payment status: ${data.status}`);
+                // Pay via the invoice endpoint so the invoice is actually
+                // marked PAID (and the app reactivated if it was suspended) —
+                // paymentApi.pay() only records a generic Stripe charge.
+                // handlePayInvoice() reloads the invoice list and clears
+                // payingId itself, which unmounts this form on success.
+                await onDirectPay();
             } else {
                 // new card flow
                 const { data: intentData } = await paymentApi.pay({
