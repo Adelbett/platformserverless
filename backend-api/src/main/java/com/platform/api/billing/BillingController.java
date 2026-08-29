@@ -12,8 +12,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -29,10 +27,9 @@ public class BillingController {
     // ── Client: get my billing history ──────────────────────────────────────────
     @GetMapping("/me")
     @PreAuthorize("@permissionService.has(authentication.name, 'VIEW_BILLING')")
-    public ResponseEntity<BillingHistoryResponse> getMyBilling(
-            @AuthenticationPrincipal Jwt jwt) {
-        String username = jwt.getSubject();
-        return ResponseEntity.ok(billingService.getMyBilling(username));
+    public ResponseEntity<BillingHistoryResponse> getMyBilling(Authentication auth) {
+        UserContextService.UserContext ctx = userContextService.resolve(auth.getName());
+        return ResponseEntity.ok(billingService.getMyBilling(ctx.effectiveUserId()));
     }
 
     // ── Admin: get all clients billing ──────────────────────────────────────────

@@ -1,5 +1,6 @@
 package com.platform.api.billing;
 
+import com.platform.api.user.UserContextService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -15,13 +16,13 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class InvoiceController {
 
-    private final InvoiceService invoiceService;
+    private final InvoiceService     invoiceService;
+    private final UserContextService userContextService;
 
     // GET /api/invoices — current user's invoices
     @GetMapping
     public ResponseEntity<List<AppInvoice>> getMyInvoices(@AuthenticationPrincipal Jwt jwt) {
-        String userId = jwt.getSubject();
-        return ResponseEntity.ok(invoiceService.getUserInvoices(userId));
+        return ResponseEntity.ok(invoiceService.getUserInvoices(resolveUserId(jwt)));
     }
 
     // POST /api/invoices/{id}/pay
@@ -30,7 +31,7 @@ public class InvoiceController {
             @PathVariable String id,
             @RequestBody Map<String, String> body,
             @AuthenticationPrincipal Jwt jwt) throws Exception {
-        String userId          = jwt.getSubject();
+        String userId          = resolveUserId(jwt);
         String paymentMethodId = body.get("paymentMethodId");
         return ResponseEntity.ok(invoiceService.payInvoice(id, userId, paymentMethodId));
     }
@@ -56,5 +57,11 @@ public class InvoiceController {
     public ResponseEntity<Map<String, String>> suspendApp(@PathVariable String appId) {
         invoiceService.adminSuspendApp(appId);
         return ResponseEntity.ok(Map.of("status", "suspended"));
+    }
+
+    // ── Helper: resolve the local (Postgres) user id from the JWT username ──────
+    private String resolveUserId(Jwt jwt) {
+        String username = jwt != null ? jwt.getClaimAsString("preferred_username") : null;
+        return userContextService.resolve(username).effectiveUserId();
     }
 }

@@ -127,18 +127,58 @@ Plusieurs solutions existent aujourd'hui sur le marché pour répondre, partiell
 \subsubsection*{Heroku}
 Pionnier du PaaS, Heroku propose une expérience de déploiement très simplifiée (git push pour déployer), mais reste une plateforme propriétaire et fermée, offrant peu de contrôle sur l'infrastructure sous-jacente et dont les coûts croissent rapidement à l'échelle.
 
-\subsubsection*{AWS Lambda / Google Cloud Run / Azure Container Apps}
-Solutions serverless managées par les principaux fournisseurs de cloud public. Elles offrent une excellente mise à l'échelle automatique, mais imposent un verrouillage fort vis-à-vis du fournisseur (vendor lock-in) et ne peuvent pas être hébergées sur une infrastructure privée ou on-premise, ce qui pose un problème pour un intégrateur comme NextStep IT souhaitant proposer une offre maîtrisée sur son propre cluster.
+\subsubsection*{Google Cloud Run}
+Représentative des offres serverless managées des fournisseurs de cloud public, au même titre qu'AWS Lambda ou Azure Container Apps. Cloud Run offre une excellente mise à l'échelle automatique, y compris le retour à zéro instance, mais impose un verrouillage fort vis-à-vis du fournisseur (vendor lock-in) et ne peut pas être hébergée sur une infrastructure privée ou on-premise, ce qui pose un problème pour un intégrateur comme NextStep IT souhaitant proposer une offre maîtrisée sur son propre cluster.
 
 \subsubsection*{OpenShift (Red Hat)}
 Plateforme PaaS complète bâtie sur Kubernetes, très robuste mais lourde à opérer et sous licence commerciale, avec un coût d'entrée élevé peu compatible avec une offre destinée à des PME.
 
-\subsubsection*{Knative (projet open source, CNCF)}
-Brique logicielle bâtie au-dessus de Kubernetes, apportant nativement les fonctionnalités de scale-to-zero et d'autoscaling par requêtes (Knative Serving), ainsi qu'un modèle événementiel standardisé (Knative Eventing). Contrairement aux solutions précédentes, Knative est open source, peut être déployé sur n'importe quel cluster Kubernetes (y compris on-premise), et ne fournit pas de portail utilisateur ni de couche de gestion multi-tenant, de facturation ou d'administration : il s'agit d'une brique d'infrastructure, pas d'une plateforme clé en main.
+\subsection*{Comparaison des solutions existantes}
+
+Le tableau~\ref{tab:comparaison_paas} confronte ces trois solutions aux critères issus de la problématique.
+
+\needspace{0.8\textheight}
+\renewcommand{\arraystretch}{1.4}
+\begin{table}[h!]
+\centering
+\begin{tabular}{|p{5.2cm}|c|c|c|}
+\hline
+Critères & Heroku & Cloud Run & OpenShift \\
+\hline
+Déploiement sans expertise Kubernetes & Oui & Oui & Partiel \\
+\hline
+Mise à l'échelle automatique & Oui & Oui & Oui \\
+\hline
+Retour à zéro instance & Partiel & Oui & Oui \\
+\hline
+Hébergement sur infrastructure privée & Non & Non & Oui \\
+\hline
+Isolation multi-tenant & Oui & Oui & Oui \\
+\hline
+Intégration événementielle native & Partiel & Oui & Oui \\
+\hline
+Facturation à l'usage intégrée & Oui & Oui & Non \\
+\hline
+Portail client dédié & Oui & Oui & Oui \\
+\hline
+Console d'administration & Non & Non & Oui \\
+\hline
+Code source ouvert & Non & Non & Partiel \\
+\hline
+Indépendance vis-à-vis du fournisseur & Faible & Faible & Moyenne \\
+\hline
+Modèle économique & Payant & Payant (à l'usage) & Payant (licence) \\
+\hline
+\end{tabular}
+\caption{Comparaison des solutions PaaS et serverless existantes}
+\label{tab:comparaison_paas}
+\end{table}
 
 \subsubsection*{Conclusion de l'étude de l'existant}
 
-Cette étude de l'existant met en évidence un vide entre, d'une part, les briques open source performantes mais non finies (Knative, Strimzi) et, d'autre part, les plateformes commerciales complètes mais fermées ou coûteuses (Heroku, OpenShift, offres serverless propriétaires des hyperscalers). C'est précisément cet espace que notre projet vise à occuper : construire, au-dessus de briques open source éprouvées, une plateforme PaaS serverless complète, multi-tenant, avec portail applicatif, facturation à l'usage et console d'administration, hébergeable sur l'infrastructure propre de l'intégrateur.
+La lecture du tableau~\ref{tab:comparaison_paas} fait apparaître qu'aucune des trois solutions ne réunit simultanément les deux exigences centrales du projet : l'hébergement sur l'infrastructure propre de l'intégrateur, et une facturation à l'usage intégrée. Heroku et Cloud Run offrent le modèle économique recherché mais imposent un hébergement chez le fournisseur ; OpenShift autorise l'hébergement privé mais ne comporte aucun mécanisme de facturation des locataires, et son coût de licence reste peu compatible avec une offre destinée à des PME.
+
+Cette étude met ainsi en évidence un vide entre, d'une part, les briques open source performantes mais non finies (Knative, Strimzi), qui apportent le scale-to-zero et le modèle événementiel sans fournir ni portail, ni gestion multi-tenant, ni facturation, et d'autre part les plateformes commerciales complètes mais fermées ou coûteuses. C'est précisément cet espace que notre projet vise à occuper : construire, au-dessus de briques open source éprouvées, une plateforme PaaS serverless complète, multi-tenant, avec portail applicatif, facturation à l'usage et console d'administration, hébergeable sur l'infrastructure propre de l'intégrateur.
 
 \subsection{Solution proposée}
 

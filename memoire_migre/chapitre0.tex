@@ -183,17 +183,6 @@ Les éléments principaux de ce déploiement sont :
     \item L'accès externe au cluster est assuré par MetalLB (attribution d'adresses IP de type LoadBalancer) et par la passerelle Kourier pour le trafic à destination des services Knative.
 \end{itemize}
 
-\subsubsection{Diagramme de composants}
-
-Le diagramme de composants de la figure~\ref{fig:archi-composants} détaille les principaux modules internes du backend Spring Boot et leurs dépendances, organisés par domaine métier (package-by-feature) : gestion des applications (\texttt{app}), facturation (\texttt{billing}), utilisateurs et permissions (\texttt{user}), sécurité (\texttt{security}), clés d'API (\texttt{apikey}), Kafka (\texttt{kafka}), Eventing (\texttt{eventing}), administration (\texttt{admin}) et journaux (\texttt{logs}). Chacun de ces modules s'appuie sur un client Fabric8 partagé pour ses interactions avec le cluster Kubernetes, et sur une base PostgreSQL commune pour la persistance de ses entités.
-
-\begin{figure}[h!]
- \centering
-    \includegraphics[width=13.5cm]{image/diagramme_composants.png}
-    \caption{Diagramme de composants du backend}
-    \label{fig:archi-composants}
-\end{figure}
-
 \section{Pilotage du projet avec SCRUM}
 \label{sec:scrum}
 
@@ -223,81 +212,81 @@ ID & Module & ID US & User Story & Complexité\\
 
 \endlastfoot
 
-\multirow{5}{*}{M1} & \multirow{5}{2.9cm}{\centering Authentification \& Sécurité} & M1.1 & En tant qu'utilisateur, je souhaite me connecter à la plateforme via Keycloak. & Moyenne\\
+\multirow{5}{*}{M1} & \multirow{5}{2.9cm}{\centering Authentification \& Sécurité} & M1.1 & En tant qu'ADMIN, CLIENT\_ADMIN ou MEMBER, je souhaite me connecter à la plateforme via Keycloak. & Moyenne\\
 \cline{3-5}
-&& M1.2 & En tant qu'utilisateur, je souhaite me déconnecter du système. & Faible\\
+&& M1.2 & En tant qu'ADMIN, CLIENT\_ADMIN ou MEMBER, je souhaite me déconnecter du système. & Faible\\
 \cline{3-5}
-&& M1.3 & En tant qu'utilisateur, je souhaite que mon jeton d'authentification (JWT) soit automatiquement rafraîchi. & Moyenne\\
+&& M1.3 & En tant qu'ADMIN, CLIENT\_ADMIN ou MEMBER, je souhaite que mon jeton d'authentification (JWT) soit automatiquement rafraîchi. & Moyenne\\
 \cline{3-5}
-&& M1.4 & En tant qu'administrateur, je souhaite définir les rôles et les permissions des utilisateurs. & Élevée\\
+&& M1.4 & En tant qu'ADMIN, je souhaite définir les rôles et les permissions des utilisateurs. & Élevée\\
 \cline{3-5}
-&& M1.5 & En tant qu'utilisateur, je souhaite générer une clé d'API pour piloter mes déploiements depuis un pipeline CI/CD externe. & Moyenne\\
+&& M1.5 & En tant qu'ADMIN, CLIENT\_ADMIN ou MEMBER, je souhaite générer une clé d'API pour piloter mes déploiements depuis un pipeline CI/CD externe. & Moyenne\\
 \hline
 
-\multirow{4}{*}{M2} & \multirow{4}{2.9cm}{\centering Utilisateurs \& équipes} & M2.1 & En tant qu'administrateur de compte client, je souhaite inviter un membre dans mon équipe. & Moyenne\\
+\multirow{4}{*}{M2} & \multirow{4}{2.9cm}{\centering Utilisateurs \& équipes} & M2.1 & En tant que CLIENT\_ADMIN, je souhaite inviter un membre dans mon équipe. & Moyenne\\
 \cline{3-5}
-&& M2.2 & En tant qu'administrateur de compte client, je souhaite modifier les permissions d'un membre de mon équipe. & Moyenne\\
+&& M2.2 & En tant que CLIENT\_ADMIN, je souhaite modifier les permissions d'un membre de mon équipe. & Moyenne\\
 \cline{3-5}
-&& M2.3 & En tant qu'administrateur de compte client, je souhaite retirer un membre de mon équipe. & Faible\\
+&& M2.3 & En tant que CLIENT\_ADMIN, je souhaite retirer un membre de mon équipe. & Faible\\
 \cline{3-5}
-&& M2.4 & En tant qu'administrateur de la plateforme, je souhaite gérer les comptes clients (activation, suspension, quotas). & Élevée\\
+&& M2.4 & En tant qu'ADMIN, je souhaite gérer les comptes clients (activation, suspension, quotas). & Élevée\\
 \hline
 
 \multirow{3}{*}{M3} & \multirow{3}{2.9cm}{\centering Infrastructure Cloud Native} & M3.1 & En tant que système, je souhaite créer automatiquement un espace de noms (namespace) dédié pour chaque nouveau tenant. & Élevée\\
 \cline{3-5}
 && M3.2 & En tant que système, je souhaite appliquer automatiquement une NetworkPolicy isolant chaque tenant. & Élevée\\
 \cline{3-5}
-&& M3.3 & En tant qu'administrateur, je souhaite superviser l'état des nœuds du cluster Kubernetes. & Moyenne\\
+&& M3.3 & En tant qu'ADMIN, je souhaite superviser l'état des nœuds du cluster Kubernetes. & Moyenne\\
 \hline
 
-\multirow{7}{*}{M4} & \multirow{7}{2.9cm}{\centering Gestion des applications} & M4.1 & En tant qu'utilisateur, je souhaite déployer une application à partir d'une image Docker. & Élevée\\
+\multirow{7}{*}{M4} & \multirow{7}{2.9cm}{\centering Gestion des applications} & M4.1 & En tant que CLIENT\_ADMIN ou MEMBER, je souhaite déployer une application à partir d'une image Docker. & Élevée\\
 \cline{3-5}
-&& M4.2 & En tant qu'utilisateur, je souhaite définir les ressources (CPU, mémoire) et les bornes de mise à l'échelle de mon application. & Moyenne\\
+&& M4.2 & En tant que CLIENT\_ADMIN ou MEMBER, je souhaite définir les ressources (CPU, mémoire) et les bornes de mise à l'échelle de mon application. & Moyenne\\
 \cline{3-5}
-&& M4.3 & En tant qu'utilisateur, je souhaite mettre à jour la configuration d'une application déjà déployée. & Moyenne\\
+&& M4.3 & En tant que CLIENT\_ADMIN ou MEMBER, je souhaite mettre à jour la configuration d'une application déjà déployée. & Moyenne\\
 \cline{3-5}
-&& M4.4 & En tant qu'utilisateur, je souhaite supprimer une application (suppression logique, conservation de l'historique de facturation). & Moyenne\\
+&& M4.4 & En tant que CLIENT\_ADMIN ou MEMBER, je souhaite supprimer une application (suppression logique, conservation de l'historique de facturation). & Moyenne\\
 \cline{3-5}
-&& M4.5 & En tant qu'utilisateur, je souhaite consulter l'historique des révisions d'une application. & Moyenne\\
+&& M4.5 & En tant que CLIENT\_ADMIN ou MEMBER, je souhaite consulter l'historique des révisions d'une application. & Moyenne\\
 \cline{3-5}
-&& M4.6 & En tant qu'utilisateur, je souhaite effectuer un rollback vers une révision antérieure. & Élevée\\
+&& M4.6 & En tant que CLIENT\_ADMIN ou MEMBER, je souhaite effectuer un rollback vers une révision antérieure. & Élevée\\
 \cline{3-5}
-&& M4.7 & En tant qu'utilisateur, je souhaite suivre en temps réel le statut de déploiement de mon application. & Élevée\\
+&& M4.7 & En tant que CLIENT\_ADMIN ou MEMBER, je souhaite suivre en temps réel le statut de déploiement de mon application. & Élevée\\
 \hline
 
-\multirow{3}{*}{M5} & \multirow{3}{2.9cm}{\centering Messaging Kafka} & M5.1 & En tant qu'utilisateur, je souhaite créer un sujet (topic) Kafka pour mon compte. & Moyenne\\
+\multirow{3}{*}{M5} & \multirow{3}{2.9cm}{\centering Messaging Kafka} & M5.1 & En tant que CLIENT\_ADMIN ou MEMBER, je souhaite créer un sujet (topic) Kafka pour mon compte. & Moyenne\\
 \cline{3-5}
-&& M5.2 & En tant qu'utilisateur, je souhaite consulter la liste des sujets Kafka de mon compte. & Faible\\
+&& M5.2 & En tant que CLIENT\_ADMIN ou MEMBER, je souhaite consulter la liste des sujets Kafka de mon compte. & Faible\\
 \cline{3-5}
-&& M5.3 & En tant qu'utilisateur, je souhaite supprimer un sujet Kafka. & Faible\\
+&& M5.3 & En tant que CLIENT\_ADMIN ou MEMBER, je souhaite supprimer un sujet Kafka. & Faible\\
 \hline
 
-\multirow{3}{*}{M6} & \multirow{3}{2.9cm}{\centering Knative Eventing} & M6.1 & En tant qu'utilisateur, je souhaite relier un sujet Kafka à une de mes applications déployées. & Élevée\\
+\multirow{3}{*}{M6} & \multirow{3}{2.9cm}{\centering Knative Eventing} & M6.1 & En tant que CLIENT\_ADMIN ou MEMBER, je souhaite relier un sujet Kafka à une de mes applications déployées. & Élevée\\
 \cline{3-5}
-&& M6.2 & En tant qu'utilisateur, je souhaite que mon application soit automatiquement réveillée (scale depuis zéro) à la réception d'un événement. & Élevée\\
+&& M6.2 & En tant que CLIENT\_ADMIN ou MEMBER, je souhaite que mon application soit automatiquement réveillée (scale depuis zéro) à la réception d'un événement. & Élevée\\
 \cline{3-5}
-&& M6.3 & En tant qu'utilisateur, je souhaite configurer un déclencheur (Trigger) avec un filtre sur le type d'événement. & Moyenne\\
+&& M6.3 & En tant que CLIENT\_ADMIN ou MEMBER, je souhaite configurer un déclencheur (Trigger) avec un filtre sur le type d'événement. & Moyenne\\
 \hline
 
-\multirow{3}{*}{M7} & \multirow{3}{2.9cm}{\centering Facturation} & M7.1 & En tant qu'utilisateur, je souhaite consulter la facturation de mes applications basée sur leur usage réel. & Élevée\\
+\multirow{3}{*}{M7} & \multirow{3}{2.9cm}{\centering Facturation} & M7.1 & En tant que CLIENT\_ADMIN ou MEMBER, je souhaite consulter la facturation de mes applications basée sur leur usage réel. & Élevée\\
 \cline{3-5}
-&& M7.2 & En tant qu'administrateur, je souhaite consulter la facturation globale de tous les comptes clients. & Moyenne\\
+&& M7.2 & En tant qu'ADMIN, je souhaite consulter la facturation globale de tous les comptes clients. & Moyenne\\
 \cline{3-5}
-&& M7.3 & En tant qu'utilisateur, je souhaite recevoir une alerte lorsque mon budget approche un seuil défini. & Moyenne\\
+&& M7.3 & En tant que CLIENT\_ADMIN ou MEMBER, je souhaite recevoir une alerte lorsque mon budget approche un seuil défini. & Moyenne\\
 \hline
 
-\multirow{4}{*}{M8} & \multirow{4}{2.9cm}{\centering Monitoring \& Observabilité} & M8.1 & En tant qu'utilisateur, je souhaite consulter les journaux applicatifs de mon application en temps réel (SSE). & Élevée\\
+\multirow{4}{*}{M8} & \multirow{4}{2.9cm}{\centering Monitoring \& Observabilité} & M8.1 & En tant que CLIENT\_ADMIN ou MEMBER, je souhaite consulter les journaux applicatifs de mon application en temps réel (SSE). & Élevée\\
 \cline{3-5}
-&& M8.2 & En tant qu'utilisateur, je souhaite consulter les métriques (CPU, mémoire, requêtes) de mon application. & Moyenne\\
+&& M8.2 & En tant que CLIENT\_ADMIN ou MEMBER, je souhaite consulter les métriques (CPU, mémoire, requêtes) de mon application. & Moyenne\\
 \cline{3-5}
-&& M8.3 & En tant qu'administrateur, je souhaite être alerté automatiquement en cas de redémarrage en boucle (crash loop) d'une application. & Élevée\\
+&& M8.3 & En tant que CLIENT\_ADMIN ou MEMBER, je souhaite être alerté automatiquement en cas de redémarrage en boucle (crash loop) d'une application. & Élevée\\
 \cline{3-5}
-&& M8.4 & En tant qu'administrateur, je souhaite consulter un tableau de bord Grafana de l'état global du cluster. & Moyenne\\
+&& M8.4 & En tant qu'ADMIN, je souhaite consulter un tableau de bord Grafana de l'état global du cluster. & Moyenne\\
 \hline
 
-\multirow{2}{*}{M9} & \multirow{2}{2.9cm}{\centering Administration plateforme} & M9.1 & En tant qu'administrateur, je souhaite consulter le journal d'audit des actions effectuées sur la plateforme. & Moyenne\\
+\multirow{2}{*}{M9} & \multirow{2}{2.9cm}{\centering Administration plateforme} & M9.1 & En tant qu'ADMIN, je souhaite consulter le journal d'audit des actions effectuées sur la plateforme. & Moyenne\\
 \cline{3-5}
-&& M9.2 & En tant qu'administrateur, je souhaite gérer les quotas alloués à chaque compte client. & Moyenne\\
+&& M9.2 & En tant qu'ADMIN, je souhaite gérer les quotas alloués à chaque compte client. & Moyenne\\
 \hline
 
 \multirow{3}{*}{M10} & \multirow{3}{2.9cm}{\centering CI/CD} & M10.1 & En tant qu'équipe de développement de la plateforme, je souhaite que chaque évolution du code source déclenche automatiquement la construction d'une image Docker via Kaniko. & Élevée\\

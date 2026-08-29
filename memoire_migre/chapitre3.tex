@@ -15,7 +15,7 @@ Ce sprint facture l'usage réel des applications déployées sur la plateforme e
 
 Le tableau~\ref{tab:sb-sprint7} présente le backlog détaillé du Sprint 7, obtenu en décomposant chaque User Story retenue en tâches techniques.
 
-\needspace{0.9\textheight}
+\needspace{0.75\textheight}
 {
 \setlength{\LTleft}{-1.5cm}
 \setlength{\LTright}{-1.5cm}
@@ -30,8 +30,8 @@ User Story & Tâches & Estimation \\
 User Story & Tâches & Estimation \\
 \hline
 \endhead
-\hline
 \endfoot
+\hline
 
 \caption{Backlog du Sprint 7}
 \label{tab:sb-sprint7}
@@ -80,8 +80,9 @@ Le diagramme réunit CLIENT\_ADMIN et MEMBER (sous permission \texttt{VIEW\_BILL
 
 \subsection{Services Web}
 
-\needspace{5cm}
-\begin{longtable}{|p{6cm}|p{9.3cm}|}
+\needspace{0.55\textheight}
+{\setlength{\tabcolsep}{8pt}
+\begin{longtable}{|p{5.8cm}|p{8.4cm}|}
 \hline
 Service Web & Description \\
 \hline
@@ -90,8 +91,8 @@ Service Web & Description \\
 Service Web & Description \\
 \hline
 \endhead
-\hline
 \endfoot
+\hline
 \endlastfoot
 \texttt{GET /api/billing/me} & Consulter sa facturation. \\ \hline
 \texttt{GET /api/billing/export} & Exporter un rapport de facturation. \\ \hline
@@ -109,37 +110,13 @@ Service Web & Description \\
 \texttt{POST /api/payment/pay} & Payer. \\ \hline
 \texttt{GET /api/payment/transactions} & Historique des transactions. \\ \hline
 \texttt{POST /api/payment/webhook} & Notification du prestataire de paiement. \\ \hline
-\end{longtable}
+\end{longtable}}
 
 \subsection{Conception}
 
-Deux fonctionnalités sont détaillées : la consultation de sa facturation, la plus fréquemment utilisée ; le paiement d'une facture, techniquement la plus riche puisqu'elle implique un prestataire externe.
+Une fonctionnalité est détaillée : le paiement d'une facture, techniquement la plus riche puisqu'elle implique un prestataire externe.
 
-\subsubsection{Cas d'utilisation : « Consulter sa facturation »}
-
-\subsubsection*{Description textuelle}
-
-\renewcommand{\arraystretch}{1.5}
-\begin{longtable}{|p{4cm}|p{11cm}|}
-\hline
-Nom & Consulter sa facturation \\
-\hline
-Acteur & CLIENT\_ADMIN, MEMBER (avec permission de consultation de la facturation) \\
-\hline
-Pré-condition & Le compte dispose d'au moins une application ayant fait l'objet d'un instantané de consommation \\
-\hline
-Scénario nominal & 1. L'utilisateur ouvre la page de facturation du portail. 2. Le backend agrège les instantanés horaires et les factures du compte. 3. Le portail affiche le coût projeté du mois en cours ainsi que l'historique des factures. \\
-\hline
-Post-condition & L'utilisateur dispose d'une vue à jour de sa consommation et de ses factures. \\
-\hline
-\caption{Description textuelle du cas d'utilisation « Consulter sa facturation »}
-\label{tab:uc-billing}
-\end{longtable}
-
-\subsubsection*{Diagramme de séquence}
-
-\EmplacementFigure{13cm}{7cm}{Diagramme de séquence — Consulter sa facturation}{fig:seq-billing}
-
+\needspace{0.45\textheight}
 \subsubsection{Cas d'utilisation : « Payer une facture »}
 
 \subsubsection*{Description textuelle}
@@ -161,27 +138,35 @@ Post-condition & La facture est marquée réglée, ou l'échec est signalé à l
 \label{tab:uc-pay}
 \end{longtable}
 
+\needspace{0.35\textheight}
 \subsubsection*{Diagramme de séquence}
 
-\EmplacementFigure{14cm}{8cm}{Diagramme de séquence — Payer une facture}{fig:seq-pay}
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=0.9\textwidth]{image/seq-pay.png}
+    \caption{Diagramme de séquence — Payer une facture}
+    \label{fig:seq-pay}
+\end{figure}
 
 \subsection{Réalisation du Sprint 7}
 
-Fonctionnalité : Consulter sa facturation. La page de facturation du portail affiche le coût projeté du mois en cours et l'historique des factures.
+Fonctionnalité : Consulter sa facturation, enregistrer un moyen de paiement et payer une facture. La page de facturation du portail regroupe, en un seul endroit, le coût projeté du mois en cours, l'historique des factures, les moyens de paiement enregistrés et l'historique des transactions.
 
-\EmplacementFigure{13cm}{8cm}{Interface de facturation du compte client}{fig:capture-billing}
-
-Fonctionnalité : Enregistrer un moyen de paiement et payer une facture. Le CLIENT\_ADMIN enregistre un moyen de paiement et règle ses factures depuis la même page.
-
-\EmplacementFigure{13cm}{8cm}{Interface de paiement}{fig:capture-payment}
-
-Fonctionnalité : Exporter un rapport de facturation. L'utilisateur exporte son historique de facturation.
-
-\EmplacementFigure{13cm}{8cm}{Export du rapport de facturation}{fig:capture-billingexport}
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=0.9\textwidth]{image/capture_client_billing.png}
+    \caption{Interface de facturation du compte client}
+    \label{fig:capture-billing}
+\end{figure}
 
 Fonctionnalité : Facturation globale et génération des factures (ADMIN). L'ADMIN consulte, depuis la console d'administration, la facturation de l'ensemble des clients et déclenche la génération des factures mensuelles.
 
-\EmplacementFigure{13cm}{8cm}{Interface de facturation globale (console d'administration)}{fig:capture-adminbilling}
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=0.9\textwidth]{image/capture_admin_billing.png}
+    \caption{Interface de facturation globale (console d'administration)}
+    \label{fig:capture-adminbilling}
+\end{figure}
 
 Fonctionnalité : Relancer et suspendre les clients en situation d'impayé (ADMIN). L'ADMIN consulte les factures impayées et suspend, le cas échéant, l'application concernée.
 
@@ -189,7 +174,7 @@ Fonctionnalité : Relancer et suspendre les clients en situation d'impayé (ADMI
 
 \subsection{Conclusion}
 
-Ce sprint livre la facturation à l'usage et son règlement en ligne, consultables par le client comme par l'équipe d'exploitation. Aucune limite de ressources par défaut n'est appliquée par tenant, ce qui expose le modèle à une facturation potentiellement illimitée en l'absence d'action du client ; ce point reste une limite assumée du projet.
+Ce sprint livre la facturation à l'usage et son règlement en ligne, consultables par le client comme par l'équipe d'exploitation. Aucune limite de ressources par défaut n'est appliquée par tenant, ce qui expose le modèle à une facturation potentiellement illimitée en l'absence d'action du client ; ce point est repris au chapitre de validation.
 
 \clearpage
 \section{Sprint 8 : Gestion des comptes clients, des quotas et de l'audit}
@@ -202,7 +187,7 @@ Ce sprint donne à l'ADMIN les moyens de gérer les comptes clients eux-mêmes :
 
 Le tableau~\ref{tab:sb-sprint8} présente le backlog détaillé du Sprint 8, obtenu en décomposant chaque User Story retenue en tâches techniques.
 
-\needspace{0.9\textheight}
+\needspace{0.75\textheight}
 {
 \setlength{\LTleft}{-1.5cm}
 \setlength{\LTright}{-1.5cm}
@@ -217,8 +202,8 @@ User Story & Tâches & Estimation \\
 User Story & Tâches & Estimation \\
 \hline
 \endhead
-\hline
 \endfoot
+\hline
 
 \caption{Backlog du Sprint 8}
 \label{tab:sb-sprint8}
@@ -256,8 +241,9 @@ Acteur unique : ADMIN. Le diagramme réunit l'ensemble des fonctionnalités du s
 
 \subsection{Services Web}
 
-\needspace{5cm}
-\begin{longtable}{|p{6cm}|p{9.3cm}|}
+\needspace{0.55\textheight}
+{\setlength{\tabcolsep}{8pt}
+\begin{longtable}{|p{5.8cm}|p{8.4cm}|}
 \hline
 Service Web & Description \\
 \hline
@@ -266,8 +252,8 @@ Service Web & Description \\
 Service Web & Description \\
 \hline
 \endhead
-\hline
 \endfoot
+\hline
 \endlastfoot
 \texttt{GET /api/admin/clients} & Lister les comptes clients avec leur état de suspension. \\ \hline
 \texttt{POST /api/admin/clients/\{userId\}/suspend} & Suspendre un compte client. \\ \hline
@@ -276,12 +262,13 @@ Service Web & Description \\
 \texttt{PUT /api/admin/clients/\{userId\}/quota} & Modifier le quota d'un client. \\ \hline
 \texttt{GET /api/admin/audit-log} & Consulter le journal d'audit, paginé et filtrable. \\ \hline
 \texttt{GET /api/admin/audit-log/export} & Exporter le journal d'audit (CSV). \\ \hline
-\end{longtable}
+\end{longtable}}
 
 \subsection{Conception}
 
 Deux fonctionnalités sont détaillées : la suspension d'un compte client, l'action de gouvernance la plus significative de ce sprint ; la consultation du journal d'audit, qui trace précisément ce type d'action.
 
+\needspace{0.45\textheight}
 \subsubsection{Cas d'utilisation : « Suspendre un compte client »}
 
 \subsubsection*{Description textuelle}
@@ -303,6 +290,7 @@ Post-condition & Les services du client sont suspendus, l'action est tracée. \\
 \label{tab:uc-suspend-client}
 \end{longtable}
 
+\needspace{0.35\textheight}
 \subsubsection*{Diagramme de séquence}
 
 \begin{figure}[H]
@@ -358,7 +346,7 @@ Ce sprint dote l'ADMIN d'une supervision complète de l'état du cluster Kuberne
 
 Le tableau~\ref{tab:sb-sprint9} présente le backlog détaillé du Sprint 9, obtenu en décomposant chaque User Story retenue en tâches techniques.
 
-\needspace{0.9\textheight}
+\needspace{0.75\textheight}
 {
 \setlength{\LTleft}{-1.5cm}
 \setlength{\LTright}{-1.5cm}
@@ -373,8 +361,8 @@ User Story & Tâches & Estimation \\
 User Story & Tâches & Estimation \\
 \hline
 \endhead
-\hline
 \endfoot
+\hline
 
 \caption{Backlog du Sprint 9}
 \label{tab:sb-sprint9}
@@ -406,8 +394,9 @@ Le diagramme réunit l'ADMIN (supervision détaillée du cluster) et le Public n
 
 \subsection{Services Web}
 
-\needspace{5cm}
-\begin{longtable}{|p{6cm}|p{9.3cm}|}
+\needspace{0.55\textheight}
+{\setlength{\tabcolsep}{8pt}
+\begin{longtable}{|p{5.8cm}|p{8.4cm}|}
 \hline
 Service Web & Description \\
 \hline
@@ -416,8 +405,8 @@ Service Web & Description \\
 Service Web & Description \\
 \hline
 \endhead
-\hline
 \endfoot
+\hline
 \endlastfoot
 \texttt{GET /api/admin/stats} & Statistiques globales de la plateforme (ADMIN). \\ \hline
 \texttt{GET /api/admin/cluster/nodes}, \texttt{/namespaces}, \texttt{/pods}, \texttt{/storage} & État des nœuds, espaces de noms, pods et volumes (ADMIN). \\ \hline
@@ -426,12 +415,13 @@ Service Web & Description \\
 \texttt{GET /api/admin/cluster/system-components} & Santé des composants système (ADMIN). \\ \hline
 \texttt{GET /api/admin/cluster/overview} & Vue d'ensemble consolidée du cluster (ADMIN). \\ \hline
 \texttt{GET /api/metrics/cluster} & Métriques agrégées du cluster (ADMIN). \\ \hline
-\end{longtable}
+\end{longtable}}
 
 \subsection{Conception}
 
 Deux fonctionnalités sont détaillées : la supervision du cluster, cœur du sprint côté ADMIN ; le statut public, fonctionnalité livrée dans le code mais jusqu'ici absente de ce mémoire.
 
+\needspace{0.45\textheight}
 \subsubsection{Cas d'utilisation : « Superviser le cluster »}
 
 \subsubsection*{Description textuelle}
@@ -453,6 +443,7 @@ Post-condition & L'ADMIN dispose d'une vue à jour de l'état global du cluster.
 \label{tab:uc-cluster}
 \end{longtable}
 
+\needspace{0.35\textheight}
 \subsubsection*{Diagramme de séquence}
 
 \begin{figure}[H]
@@ -468,7 +459,7 @@ Fonctionnalité : Superviser le cluster. La console d'administration affiche l'�
 
 \begin{figure}[H]
  \centering
-    \includegraphics[width=0.9\textwidth]{image/capture_cluster.png}
+    \includegraphics[width=0.9\textwidth]{image/Interface de supervision du cluster.png}
     \caption{Interface de supervision du cluster}
     \label{fig:capture-cluster}
 \end{figure}
@@ -477,7 +468,7 @@ Fonctionnalité : Consulter les alertes et événements du cluster. Les alertes 
 
 \begin{figure}[H]
  \centering
-    \includegraphics[width=0.9\textwidth]{image/capture_alerts.png}
+    \includegraphics[width=0.9\textwidth]{image/Interface des alertes et événements du clust.png}
     \caption{Interface des alertes et événements du cluster}
     \label{fig:capture-alerts}
 \end{figure}

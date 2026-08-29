@@ -55,6 +55,33 @@
 \usepackage{placeins}
 \usepackage{rotating}
 
+% ── Respiration autour des figures et des tableaux flottants ─────────────
+% Valeurs LaTeX par defaut trop faibles : le texte se retrouve colle sous
+% une figure. On separe nettement figure / legende / paragraphe suivant.
+\setlength{\intextsep}{20pt plus 4pt minus 4pt}      % figure [H] ou [h] dans le texte
+\setlength{\textfloatsep}{22pt plus 4pt minus 4pt}   % figure en haut/bas de page
+\setlength{\floatsep}{18pt plus 4pt minus 4pt}       % entre deux flottants
+\setlength{\abovecaptionskip}{12pt}                  % figure -> legende
+\setlength{\belowcaptionskip}{6pt}                   % legende -> texte suivant
+
+% ── Controle des veuves et orphelines ────────────────────────────────────
+% Interdit qu'une ligne isolee d'un paragraphe se retrouve seule en bas ou en
+% haut de page. Valeur 10000 = interdiction stricte.
+\widowpenalty=10000
+\clubpenalty=10000
+\displaywidowpenalty=10000
+% Tolere legerement plus d'etirement vertical plutot que de creer un grand
+% blanc en bas de page.
+\raggedbottom
+
+% ── Ecriture homogene : neutralisation du rendu machine a ecrire ─────────
+% Le mémoire doit avoir une typographie uniforme. \texttt reste defini pour
+% ne casser aucun appel existant, mais rend desormais le texte dans la police
+% courante. Le contenu des arguments est strictement conserve. Les blocs de
+% code (lstlisting) ne sont pas concernes : ils ont leur propre basicstyle.
+\let\anciennetexttt\texttt
+\renewcommand{\texttt}[1]{#1}
+
 % Emplacement réservé à une image non encore fournie (diagramme ou capture) :
 % #1 largeur, #2 hauteur, #3 légende, #4 étiquette. Garde la numérotation des
 % figures et les renvois \ref/\autoref fonctionnels avant que l'image définitive
@@ -95,7 +122,14 @@
 \arrayrulecolor{black}
 \setlength{\arrayrulewidth}{1pt}
 
-\renewcommand{\arraystretch}{1.4}
+% ── Aération des tableaux (reglage global) ───────────────────────────────
+% arraystretch : hauteur de ligne. tabcolsep : marge horizontale interne de
+% chaque cellule (defaut LaTeX = 6pt, trop serre). extrarowheight : espace
+% supplementaire au-dessus du texte de chaque ligne, evite que le texte
+% touche le filet superieur.
+\renewcommand{\arraystretch}{1.6}
+\setlength{\tabcolsep}{10pt}
+\setlength{\extrarowheight}{3pt}
 
 \newcolumntype{L}{>{\raggedright\arraybackslash}X}
 \newcolumntype{Y}{>{\RaggedRight\arraybackslash}X}

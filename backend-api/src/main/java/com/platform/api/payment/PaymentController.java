@@ -22,7 +22,7 @@ public class PaymentController {
 
     // ── Stripe publishable key (safe to expose) ────────────────────────────────
     @GetMapping("/config")
-    public ResponseEntity<Map<String, String>> getConfig() {
+     public ResponseEntity<Map<String, String>> getConfig() {
         return ResponseEntity.ok(Map.of("publishableKey", paymentService.getPublishableKey()));
     }
 

@@ -27,7 +27,7 @@ Le tableau~\ref{tab:sb-sprint10} présente le backlog détaillé du Sprint 10, o
 % \needspace garantit qu'il reste assez de place sur la page : sans cela une
 % coupure peut tomber au milieu d'un groupe \multirow, dont le contenu deborde
 % alors hors du cadre et laisse une cellule vide sur la page suivante.
-\needspace{0.9\textheight}
+\needspace{0.75\textheight}
 {
 % Le tableau deborde volontairement de 1,5 cm dans chaque marge afin de laisser
 % respirer les trois colonnes ; LTleft/LTright sont les parametres propres a
@@ -46,8 +46,8 @@ User Story & Tâches & Estimation \\
 User Story & Tâches & Estimation \\
 \hline
 \endhead
-\hline
 \endfoot
+\hline
 
 \caption{Backlog du Sprint 10}
 \label{tab:sb-sprint10}
@@ -329,7 +329,7 @@ Le tableau~\ref{tab:sb-sprint11} présente le backlog détaillé du Sprint 11, o
 % \needspace garantit qu'il reste assez de place sur la page : sans cela une
 % coupure peut tomber au milieu d'un groupe \multirow, dont le contenu deborde
 % alors hors du cadre et laisse une cellule vide sur la page suivante.
-\needspace{0.9\textheight}
+\needspace{0.75\textheight}
 {
 % Le tableau deborde volontairement de 1,5 cm dans chaque marge afin de laisser
 % respirer les trois colonnes ; LTleft/LTright sont les parametres propres a
@@ -348,8 +348,8 @@ User Story & Tâches & Estimation \\
 User Story & Tâches & Estimation \\
 \hline
 \endhead
-\hline
 \endfoot
+\hline
 
 \caption{Backlog du Sprint 11}
 \label{tab:sb-sprint11}
@@ -565,7 +565,7 @@ La vue Jenkins du projet \texttt{platform-backend} rassemble l'historique des ex
 
 \begin{figure}[H]
  \centering
-    \includegraphics[width=\textwidth]{image/capture_jenkins_historique.png}
+    \includegraphics[width=\textwidth]{image/Historique d’exécution de la pipeline platform.png}
     \caption{Historique d'exécution de la pipeline \texttt{platform-backend} dans Jenkins}
     \label{fig:jenkins-historique}
 \end{figure}
@@ -578,7 +578,7 @@ Les images produites par le pipeline sont publiées sur le registre Docker Hub.
 
 \begin{figure}[H]
  \centering
-    \includegraphics[width=\textwidth]{image/capture_dockerhub_tags.png}
+    \includegraphics[width=\textwidth]{image/tiquettes publiées de l’image adelbettaieb.png}
     \caption{Étiquettes publiées de l'image \texttt{adelbettaieb/platform-api} sur Docker Hub}
     \label{fig:dockerhub-tags}
 \end{figure}
@@ -591,7 +591,7 @@ La dernière étape du pipeline met à jour le déploiement Kubernetes puis en v
 
 \begin{figure}[H]
  \centering
-    \includegraphics[width=\textwidth]{image/capture_deploiement_k8s.png}
+    \includegraphics[width=\textwidth]{image/Résultat du déploiement sur le cluster Kubernetes.png}
     \caption{Résultat du déploiement sur le cluster Kubernetes}
     \label{fig:deploiement-k8s}
 \end{figure}

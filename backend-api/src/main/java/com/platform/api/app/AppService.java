@@ -47,22 +47,34 @@ public class AppService {
         // consumption (see QuotaService/Billing), not on a fixed app quota.
         String serviceName = generateServiceName(req.getImageName(), effectiveUserId);
 
-        App app = App.builder()
-                .name(req.getName())
-                .userId(effectiveUserId)
-                .imageName(req.getImageName())
-                .imageTag(req.getImageTag() != null ? req.getImageTag() : "latest")
-                .description(req.getDescription())
-                .port(req.getPort() != null ? req.getPort() : 8080)
-                .minReplicas(req.getMinReplicas() != null ? req.getMinReplicas() : 0)
-                .maxReplicas(req.getMaxReplicas() != null ? req.getMaxReplicas() : 10)
-                .cpuRequest(req.getCpuRequest() != null ? req.getCpuRequest() : "100m")
-                .memoryRequest(req.getMemoryRequest() != null ? req.getMemoryRequest() : "128Mi")
-                .serviceName(serviceName)
-                .namespace(namespace)
-                .status("DEPLOYING")
-                .updatedAt(LocalDateTime.now())
-                .build();
+        // Reuse existing DB entry if same service already exists (avoids duplicates)
+        App app = appRepository.findByServiceNameAndNamespace(serviceName, namespace)
+                .stream().findFirst().orElse(null);
+
+        if (app == null) {
+            app = App.builder()
+                    .name(req.getName())
+                    .userId(effectiveUserId)
+                    .imageName(req.getImageName())
+                    .imageTag(req.getImageTag() != null ? req.getImageTag() : "latest")
+                    .description(req.getDescription())
+                    .port(req.getPort() != null ? req.getPort() : 8080)
+                    .minReplicas(req.getMinReplicas() != null ? req.getMinReplicas() : 0)
+                    .maxReplicas(req.getMaxReplicas() != null ? req.getMaxReplicas() : 10)
+                    .cpuRequest(req.getCpuRequest() != null ? req.getCpuRequest() : "100m")
+                    .memoryRequest(req.getMemoryRequest() != null ? req.getMemoryRequest() : "128Mi")
+                    .serviceName(serviceName)
+                    .namespace(namespace)
+                    .status("DEPLOYING")
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+        } else {
+            app.setName(req.getName());
+            app.setImageName(req.getImageName());
+            app.setImageTag(req.getImageTag() != null ? req.getImageTag() : "latest");
+            app.setStatus("DEPLOYING");
+            app.setUpdatedAt(LocalDateTime.now());
+        }
 
         appRepository.save(app);
         addLog(app.getId(), effectiveUserId, "Deployment triggered", "DEPLOYMENT_START");

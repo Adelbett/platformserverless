@@ -19,7 +19,7 @@ L'authentification passe entièrement par Keycloak. Le backend ne gère ni mot d
 
 Le tableau~\ref{tab:sb-sprint3} présente le backlog détaillé du Sprint 3, obtenu en décomposant chaque User Story retenue en tâches techniques.
 
-\needspace{0.9\textheight}
+\needspace{0.75\textheight}
 {
 \setlength{\LTleft}{-1.5cm}
 \setlength{\LTright}{-1.5cm}
@@ -34,8 +34,8 @@ User Story & Tâches & Estimation \\
 User Story & Tâches & Estimation \\
 \hline
 \endhead
-\hline
 \endfoot
+\hline
 
 \caption{Backlog du Sprint 3}
 \label{tab:sb-sprint3}
@@ -85,8 +85,9 @@ Le diagramme réunit les quatre acteurs de ce sprint (Visiteur, MEMBER, CLIENT\_
 
 \subsection{Services Web}
 
-\needspace{5cm}
-\begin{longtable}{|p{6cm}|p{9.3cm}|}
+\needspace{0.55\textheight}
+{\setlength{\tabcolsep}{8pt}
+\begin{longtable}{|p{5.8cm}|p{8.4cm}|}
 \hline
 Service Web & Description \\
 \hline
@@ -95,8 +96,8 @@ Service Web & Description \\
 Service Web & Description \\
 \hline
 \endhead
-\hline
 \endfoot
+\hline
 \endlastfoot
 \texttt{POST /api/auth/register} & Créer un compte. \\ \hline
 Connexion (Keycloak, OIDC) & Échange des identifiants contre un jeton, hors API du backend. \\ \hline
@@ -108,17 +109,17 @@ Connexion (Keycloak, OIDC) & Échange des identifiants contre un jeton, hors API
 \texttt{POST /api/team/members} & Ajouter un membre. \\ \hline
 \texttt{PUT /api/team/members/\{id\}/permissions} & Modifier les permissions d'un membre. \\ \hline
 \texttt{DELETE /api/team/members/\{id\}} & Supprimer un membre. \\ \hline
-\end{longtable}
+\end{longtable}}
 
 \subsection{Conception}
 
 Une fonctionnalité est détaillée : l'ajout d'un membre, la plus distinctive sur le plan métier de ce sprint, puisqu'elle ne suit pas un flux d'invitation classique.
 
+\needspace{0.45\textheight}
 \subsubsection{Cas d'utilisation : « Ajouter un membre »}
 
 \subsubsection*{Description textuelle}
 
-\needspace{8cm}
 \renewcommand{\arraystretch}{1.5}
 \begin{longtable}{|p{4cm}|p{11cm}|}
 \hline
@@ -140,6 +141,7 @@ Post-condition & Le membre peut se connecter immédiatement avec les identifiant
 
 Il ne s'agit pas d'un flux d'invitation par e-mail : le CLIENT\_ADMIN choisit lui-même les identifiants du membre, qu'il lui communique par un canal de son choix.
 
+\needspace{0.35\textheight}
 \subsubsection*{Diagramme de séquence}
 
 \begin{figure}[H]
@@ -162,9 +164,7 @@ Fonctionnalité : Se connecter. L'utilisateur se connecte avec son compte, quel 
     \label{fig:capture-login}
 \end{figure}
 
-Fonctionnalité : Consulter et modifier son profil. Chaque utilisateur consulte et met à jour ses informations de profil depuis les paramètres de son compte.
 
-\EmplacementFigure{13cm}{8cm}{Interface de gestion du profil}{fig:capture-profile}
 
 Fonctionnalité : Gérer les utilisateurs (ADMIN). L'ADMIN consulte la liste des utilisateurs de la plateforme et modifie leur rôle depuis la console d'administration.
 
@@ -192,7 +192,7 @@ Ce sprint livre le cycle de vie complet d'une application cliente : déploiement
 
 Le tableau~\ref{tab:sb-sprint4} présente le backlog détaillé du Sprint 4, obtenu en décomposant chaque User Story retenue en tâches techniques.
 
-\needspace{0.9\textheight}
+\needspace{0.75\textheight}
 {
 \setlength{\LTleft}{-1.5cm}
 \setlength{\LTright}{-1.5cm}
@@ -207,8 +207,8 @@ User Story & Tâches & Estimation \\
 User Story & Tâches & Estimation \\
 \hline
 \endhead
-\hline
 \endfoot
+\hline
 
 \caption{Backlog du Sprint 4}
 \label{tab:sb-sprint4}
@@ -256,8 +256,9 @@ Le diagramme réunit CLIENT\_ADMIN et MEMBER (généralisés sous « Utilisateur
 
 \subsection{Services Web}
 
-\needspace{5cm}
-\begin{longtable}{|p{6cm}|p{9.3cm}|}
+\needspace{0.55\textheight}
+{\setlength{\tabcolsep}{8pt}
+\begin{longtable}{|p{5.8cm}|p{8.4cm}|}
 \hline
 Service Web & Description \\
 \hline
@@ -266,8 +267,8 @@ Service Web & Description \\
 Service Web & Description \\
 \hline
 \endhead
-\hline
 \endfoot
+\hline
 \endlastfoot
 \texttt{POST /api/apps} & Déployer une application. \\ \hline
 \texttt{GET /api/apps} & Lister ses applications. \\ \hline
@@ -281,12 +282,13 @@ Service Web & Description \\
 \texttt{DELETE /api/admin/apps/\{id\}} & Suppression forcée (ADMIN). \\ \hline
 \texttt{POST /api/admin/apps/\{id\}/suspend} & Suspendre une application (ADMIN). \\ \hline
 \texttt{POST /api/admin/apps/\{id\}/restore} & Restaurer une application suspendue (ADMIN). \\ \hline
-\end{longtable}
+\end{longtable}}
 
 \subsection{Conception}
 
 Deux fonctionnalités sont détaillées : le déploiement, cœur fonctionnel du sprint et de la plateforme ; le retour à une révision antérieure, scénario opérationnel distinctif.
 
+\needspace{0.45\textheight}
 \subsubsection{Cas d'utilisation : « Déployer une application »}
 
 \subsubsection*{Description textuelle}
@@ -308,44 +310,16 @@ Post-condition & L'application est déployée et accessible, ou son statut refl�
 \label{tab:uc-deploy}
 \end{longtable}
 
+\needspace{0.35\textheight}
 \subsubsection*{Diagramme de séquence}
 
 \begin{figure}[H]
  \centering
-    \includegraphics[width=\textwidth,height=0.85\textheight,keepaspectratio]{image/seq-deploy.png}
+    \includegraphics[width=\textwidth,height=0.92\textheight,keepaspectratio]{image/seq-deploy.png}
     \caption{Diagramme de séquence — Déployer une application}
     \label{fig:seq-deploy}
 \end{figure}
 
-\subsubsection{Cas d'utilisation : « Revenir à une révision antérieure »}
-
-\subsubsection*{Description textuelle}
-
-\renewcommand{\arraystretch}{1.5}
-\begin{longtable}{|p{4cm}|p{11cm}|}
-\hline
-Nom & Revenir à une révision antérieure \\
-\hline
-Acteur & CLIENT\_ADMIN, MEMBER (avec permission de déploiement) \\
-\hline
-Pré-condition & L'application dispose d'au moins deux révisions \\
-\hline
-Scénario nominal & 1. L'utilisateur consulte l'historique des révisions de son application. 2. Il sélectionne une révision antérieure. 3. Le backend fait pointer le trafic Knative vers cette révision. \\
-\hline
-Post-condition & L'application sert à nouveau le comportement de la révision sélectionnée. \\
-\hline
-\caption{Description textuelle du cas d'utilisation « Revenir à une révision antérieure »}
-\label{tab:uc-rollback}
-\end{longtable}
-
-\subsubsection*{Diagramme de séquence}
-
-\begin{figure}[H]
- \centering
-    \includegraphics[width=\textwidth,height=0.85\textheight,keepaspectratio]{image/seq-rollback.png}
-    \caption{Diagramme de séquence — Revenir à une révision antérieure}
-    \label{fig:seq-rollback}
-\end{figure}
 
 \subsection{Réalisation du Sprint 4}
 
@@ -362,7 +336,7 @@ Fonctionnalité : Consulter ses applications et leur statut. Le tableau de bord 
 
 \begin{figure}[H]
  \centering
-    \includegraphics[width=\textwidth]{image/capture-appslist.png}
+    \includegraphics[width=\textwidth]{image/Liste des applications et de leur statut.png}
     \caption{Liste des applications et de leur statut}
     \label{fig:capture-appslist}
 \end{figure}
@@ -373,7 +347,12 @@ Fonctionnalité : Consulter l'historique des révisions et revenir en arrière. 
 
 Fonctionnalité : Suspendre ou supprimer de force une application (ADMIN). L'ADMIN dispose, depuis la console d'administration, d'actions de suspension et de suppression forcée sur n'importe quelle application.
 
-\EmplacementFigure{13cm}{8cm}{Actions administratives sur une application}{fig:capture-adminapps}
+\begin{figure}[H]
+ \centering
+    \includegraphics[width=0.9\textwidth]{image/capture_adminapps.png}
+    \caption{Actions administratives sur une application}
+    \label{fig:capture-adminapps}
+\end{figure}
 
 Au-delà du scénario nominal, le déploiement peut, si le formulaire renseigne un sujet Kafka, câbler automatiquement l'application créée à ce sujet, sans étape manuelle supplémentaire : ce chemin optionnel est décrit avec la gestion de la messagerie événementielle (Sprint 5), dont il anticipe la fonctionnalité de configuration d'un déclencheur.
 
@@ -392,7 +371,7 @@ Ce sprint livre, comme un seul domaine fonctionnel, la gestion des sujets Kafka 
 
 Le tableau~\ref{tab:sb-sprint5} présente le backlog détaillé du Sprint 5, obtenu en décomposant chaque User Story retenue en tâches techniques.
 
-\needspace{0.9\textheight}
+\needspace{0.75\textheight}
 {
 \setlength{\LTleft}{-1.5cm}
 \setlength{\LTright}{-1.5cm}
@@ -407,8 +386,8 @@ User Story & Tâches & Estimation \\
 User Story & Tâches & Estimation \\
 \hline
 \endhead
-\hline
 \endfoot
+\hline
 
 \caption{Backlog du Sprint 5}
 \label{tab:sb-sprint5}
@@ -453,8 +432,9 @@ Le diagramme réunit CLIENT\_ADMIN et MEMBER (sous permission \texttt{MANAGE\_KA
 
 \subsection{Services Web}
 
-\needspace{5cm}
-\begin{longtable}{|p{6cm}|p{9.3cm}|}
+\needspace{0.55\textheight}
+{\setlength{\tabcolsep}{8pt}
+\begin{longtable}{|p{5.8cm}|p{8.4cm}|}
 \hline
 Service Web & Description \\
 \hline
@@ -463,8 +443,8 @@ Service Web & Description \\
 Service Web & Description \\
 \hline
 \endhead
-\hline
 \endfoot
+\hline
 \endlastfoot
 \texttt{POST /api/kafka/topics} & Créer un sujet Kafka. \\ \hline
 \texttt{GET /api/kafka/topics} & Lister ses sujets. \\ \hline
@@ -479,12 +459,13 @@ Service Web & Description \\
 \texttt{GET /api/admin/kafka/topics} & Lister tous les sujets, tous locataires confondus (ADMIN). \\ \hline
 \texttt{DELETE /api/admin/kafka/topics/\{id\}} & Suppression forcée d'un sujet (ADMIN). \\ \hline
 \texttt{GET /api/admin/eventing/sources}, \texttt{/triggers} & Vue globale des sources et déclencheurs (ADMIN). \\ \hline
-\end{longtable}
+\end{longtable}}
 
 \subsection{Conception}
 
 Une fonctionnalité est détaillée : la configuration d'un déclencheur, la plus riche techniquement puisqu'elle relie deux briques indépendantes du socle (Kafka et Knative).
 
+\needspace{0.45\textheight}
 \subsubsection{Cas d'utilisation : « Configurer un déclencheur d'événement »}
 
 \subsubsection*{Description textuelle}
@@ -580,11 +561,12 @@ Ce processus, du message Kafka au réveil et au traitement par l'application, es
 \end{adjustwidth}
 \end{figure}
 
+\needspace{0.35\textheight}
 \subsubsection*{Diagramme de séquence}
 
 \begin{figure}[H]
  \centering
-    \includegraphics[width=\textwidth,height=0.85\textheight,keepaspectratio]{image/seq-eventing-trigger.png}
+    \includegraphics[width=\textwidth,height=0.92\textheight,keepaspectratio]{image/seq-eventing-trigger.png}
     \caption{Diagramme de séquence — Configurer un déclencheur d'événement}
     \label{fig:seq-eventing-trigger}
 \end{figure}
@@ -664,7 +646,7 @@ Ce sprint dote le portail client des capacités d'observation de ses propres app
 
 Le tableau~\ref{tab:sb-sprint6} présente le backlog détaillé du Sprint 6, obtenu en décomposant chaque User Story retenue en tâches techniques.
 
-\needspace{0.9\textheight}
+\needspace{0.75\textheight}
 {
 \setlength{\LTleft}{-1.5cm}
 \setlength{\LTright}{-1.5cm}
@@ -679,8 +661,8 @@ User Story & Tâches & Estimation \\
 User Story & Tâches & Estimation \\
 \hline
 \endhead
-\hline
 \endfoot
+\hline
 
 \caption{Backlog du Sprint 6}
 \label{tab:sb-sprint6}
@@ -720,8 +702,9 @@ Le diagramme réunit CLIENT\_ADMIN et MEMBER (sous permission \texttt{VIEW\_LOGS
 
 \subsection{Services Web}
 
-\needspace{5cm}
-\begin{longtable}{|p{6cm}|p{9.3cm}|}
+\needspace{0.55\textheight}
+{\setlength{\tabcolsep}{8pt}
+\begin{longtable}{|p{5.8cm}|p{8.4cm}|}
 \hline
 Service Web & Description \\
 \hline
@@ -730,8 +713,8 @@ Service Web & Description \\
 Service Web & Description \\
 \hline
 \endhead
-\hline
 \endfoot
+\hline
 \endlastfoot
 \texttt{GET /api/logs/apps/\{id\}} & Journaux de déploiement d'une application, filtrables par niveau. \\ \hline
 \texttt{GET /api/logs/me} & Ses propres journaux. \\ \hline
@@ -740,12 +723,13 @@ Service Web & Description \\
 \texttt{GET /api/metrics/apps/\{id\}} & Métriques d'une application (requêtes/s, latence, CPU, mémoire). \\ \hline
 \texttt{GET /api/metrics/apps/\{id\}/stream} (SSE) & Flux temps réel des métriques d'une application. \\ \hline
 \texttt{GET /api/admin/logs} & Journaux de déploiement de tous les locataires (ADMIN). \\ \hline
-\end{longtable}
+\end{longtable}}
 
 \subsection{Conception}
 
 Deux fonctionnalités sont détaillées : la consultation des journaux en temps réel, dont la mise en œuvre a nécessité une correction de sécurité notable ; la consultation des métriques, appuyée sur Prometheus.
 
+\needspace{0.45\textheight}
 \subsubsection{Cas d'utilisation : « Consulter les journaux en temps réel »}
 
 \subsubsection*{Description textuelle}
@@ -767,11 +751,12 @@ Post-condition & L'utilisateur dispose d'une vue à jour de l'activité de son a
 \label{tab:uc-logs}
 \end{longtable}
 
+\needspace{0.35\textheight}
 \subsubsection*{Diagramme de séquence}
 
 \begin{figure}[H]
  \centering
-    \includegraphics[width=\textwidth,height=0.85\textheight,keepaspectratio]{image/seq-logs.png}
+    \includegraphics[width=\textwidth,height=0.92\textheight,keepaspectratio]{image/seq-logs.png}
     \caption{Diagramme de séquence — Consulter les journaux en temps réel}
     \label{fig:seq-logs}
 \end{figure}
@@ -815,4 +800,4 @@ Ce sprint livre l'observabilité applicative côté client : journaux et métriq
 
 \section{Conclusion}
 
-La Release 1 a transformé le socle technique de la Release 0 en un cœur applicatif cohérent, organisé par domaine de gestion plutôt que par brique livrée : accès et identité, cycle de vie des applications, messagerie événementielle, observabilité. Chaque sprint réunit tous les acteurs concernés par son domaine, du visiteur à l'ADMIN, et livre conjointement la brique backend et l'écran du portail qui l'expose. Plusieurs anomalies de cohérence et de sécurité identifiées au fil de ces sprints sont assumées comme limites du projet.
+La Release 1 a transformé le socle technique de la Release 0 en un cœur applicatif cohérent, organisé par domaine de gestion plutôt que par brique livrée : accès et identité, cycle de vie des applications, messagerie événementielle, observabilité. Chaque sprint réunit tous les acteurs concernés par son domaine, du visiteur à l'ADMIN, et livre conjointement la brique backend et l'écran du portail qui l'expose. Plusieurs anomalies de cohérence et de sécurité identifiées au fil de ces sprints sont reprises dans les limites du chapitre de validation.

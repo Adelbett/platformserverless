@@ -33,7 +33,7 @@ Le tableau~\ref{tab:sb-sprint0} présente le backlog détaillé du Sprint 0, obt
 % \needspace garantit qu'il reste assez de place sur la page : sans cela une
 % coupure peut tomber au milieu d'un groupe \multirow, dont le contenu deborde
 % alors hors du cadre et laisse une cellule vide sur la page suivante.
-\needspace{0.9\textheight}
+\needspace{0.75\textheight}
 {
 % Le tableau deborde volontairement de 1,5 cm dans chaque marge afin de laisser
 % respirer les trois colonnes ; LTleft/LTright sont les parametres propres a
@@ -52,8 +52,8 @@ User Story & Tâches & Estimation \\
 User Story & Tâches & Estimation \\
 \hline
 \endhead
-\hline
 \endfoot
+\hline
 
 \caption{Backlog du Sprint 0}
 \label{tab:sb-sprint0}
@@ -61,7 +61,7 @@ User Story & Tâches & Estimation \\
 
 \multirow{4}{6.6cm}{
 \centering
-En tant qu'exploitant, je veux disposer d'un cluster Kubernetes opérationnel afin d'héberger les composants de la plateforme.
+En tant qu'ADMIN, je veux disposer d'un cluster Kubernetes opérationnel afin d'héberger les composants de la plateforme.
 }
 &
 Provisionner le cluster Kubernetes composé d'un control-plane et de deux workers.
@@ -85,7 +85,7 @@ Mettre en place les namespaces nécessaires à l'organisation des workloads et d
 
 \multirow{4}{6.6cm}{
 \centering
-En tant qu'exploitant, je veux assurer la connectivité et l'isolation réseau entre les tenants.
+En tant qu'ADMIN, je veux assurer la connectivité et l'isolation réseau entre les tenants.
 }
 &
 Installer et configurer Cilium comme CNI du cluster Kubernetes.
@@ -109,7 +109,7 @@ Vérifier l'isolation réseau entre deux namespaces de tenants.
 
 \multirow{3}{6.6cm}{
 \centering
-En tant qu'exploitant, je veux exposer les services Kubernetes vers le réseau externe.
+En tant qu'ADMIN, je veux exposer les services Kubernetes vers le réseau externe.
 }
 &
 Installer et configurer MetalLB dans le cluster on-premise.
@@ -128,7 +128,7 @@ Vérifier l'attribution d'une adresse IP externe à un service Kubernetes.
 
 \multirow{3}{6.6cm}{
 \centering
-En tant qu'exploitant, je veux disposer d'une passerelle d'entrée pour les futures applications Knative.
+En tant qu'ADMIN, je veux disposer d'une passerelle d'entrée pour les futures applications Knative.
 }
 &
 Installer Kourier comme passerelle d'entrée pour Knative Serving.
@@ -456,7 +456,7 @@ Le tableau~\ref{tab:sb-sprint1} présente le backlog détaillé du Sprint 1, obt
 % \needspace garantit qu'il reste assez de place sur la page : sans cela une
 % coupure peut tomber au milieu d'un groupe \multirow, dont le contenu deborde
 % alors hors du cadre et laisse une cellule vide sur la page suivante.
-\needspace{0.9\textheight}
+\needspace{0.75\textheight}
 {
 % Le tableau deborde volontairement de 1,5 cm dans chaque marge afin de laisser
 % respirer les trois colonnes ; LTleft/LTright sont les parametres propres a
@@ -475,8 +475,8 @@ User Story & Tâches & Estimation \\
 User Story & Tâches & Estimation \\
 \hline
 \endhead
-\hline
 \endfoot
+\hline
 
 \caption{Backlog du Sprint 1}
 \label{tab:sb-sprint1}
@@ -484,7 +484,7 @@ User Story & Tâches & Estimation \\
 
 \multirow{2}{6.6cm}{
 \centering
-En tant qu'exploitant, je veux que Knative Serving soit opérationnel sur le cluster.
+En tant qu'ADMIN, je veux que Knative Serving soit opérationnel sur le cluster.
 }
 &
 Installer Knative Serving et l'intégrer à la passerelle Kourier mise en place au Sprint 0.
@@ -517,7 +517,7 @@ Observer le cycle Service vers Revision et le comportement d'autoscaling.
 
 \multirow{3}{6.6cm}{
 \centering
-En tant qu'exploitant, je veux que l'espace de noms d'un tenant soit créé automatiquement au premier déploiement.
+En tant que système, je veux que l'espace de noms d'un tenant soit créé automatiquement au premier déploiement.
 }
 &
 Implémenter la création automatique du namespace tenant et de sa NetworkPolicy au premier déploiement.
@@ -750,7 +750,7 @@ Le tableau~\ref{tab:sb-sprint2} présente le backlog détaillé du Sprint 2, obt
 % \needspace garantit qu'il reste assez de place sur la page : sans cela une
 % coupure peut tomber au milieu d'un groupe \multirow, dont le contenu deborde
 % alors hors du cadre et laisse une cellule vide sur la page suivante.
-\needspace{0.9\textheight}
+\needspace{0.75\textheight}
 {
 % Le tableau deborde volontairement de 1,5 cm dans chaque marge afin de laisser
 % respirer les trois colonnes ; LTleft/LTright sont les parametres propres a
@@ -769,8 +769,8 @@ User Story & Tâches & Estimation \\
 User Story & Tâches & Estimation \\
 \hline
 \endhead
-\hline
 \endfoot
+\hline
 
 \caption{Backlog du Sprint 2}
 \label{tab:sb-sprint2}
@@ -778,7 +778,7 @@ User Story & Tâches & Estimation \\
 
 \multirow{2}{6.6cm}{
 \centering
-En tant qu'exploitant, je veux disposer d'un cluster Kafka opéré par Strimzi.
+En tant qu'ADMIN, je veux disposer d'un cluster Kafka opéré par Strimzi.
 }
 &
 Provisionner l'opérateur Strimzi et un cluster Kafka, my-cluster, sur le cluster Kubernetes.

@@ -101,6 +101,39 @@ public class KeycloakAdminService {
         }
     }
 
+    /**
+     * Assigns a realm role to a Keycloak user — used to make a self-registered
+     * user a CLIENT_ADMIN by default (see AuthService.register()). The role
+     * must already exist in the realm (created once via the Keycloak admin
+     * console, not by this code).
+     */
+    public void assignRealmRole(String username, String roleName) {
+        String adminToken = getAdminToken();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(adminToken);
+
+        String searchUrl = keycloakUrl + "/admin/realms/" + realm + "/users?username=" + username + "&exact=true";
+        ResponseEntity<List<Map<String, Object>>> searchRes = restTemplate.exchange(
+                searchUrl, HttpMethod.GET, new HttpEntity<>(headers),
+                new ParameterizedTypeReference<>() {});
+
+        if (searchRes.getBody() == null || searchRes.getBody().isEmpty()) {
+            throw new com.platform.api.exception.NotFoundException("Keycloak user not found: " + username);
+        }
+        String userId = (String) searchRes.getBody().get(0).get("id");
+
+        // The role-mappings endpoint needs the role's {id, name} representation,
+        // not just its name — fetch it first.
+        ResponseEntity<Map> roleRes = restTemplate.exchange(
+                keycloakUrl + "/admin/realms/" + realm + "/roles/" + roleName,
+                HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+
+        restTemplate.exchange(
+                keycloakUrl + "/admin/realms/" + realm + "/users/" + userId + "/role-mappings/realm",
+                HttpMethod.POST, new HttpEntity<>(List.of(roleRes.getBody()), headers), Void.class);
+    }
+
     /** Updates a Keycloak user's email — used when a user changes their own email in Settings. */
     public void updateEmail(String username, String newEmail) {
         String adminToken = getAdminToken();

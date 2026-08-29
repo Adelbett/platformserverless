@@ -30,7 +30,7 @@ const Register = () => {
             await authApi.register({ username: form.username, password: form.password, email: form.email });
             navigate('/login');
         } catch (err) {
-            const msg = err?.message || err?.response?.data?.error_description || err?.response?.data?.message || 'Erreur lors de la création du compte.';
+            const msg = err?.response?.data?.detail || err?.response?.data?.error_description || err?.response?.data?.message || 'Erreur lors de la création du compte.';
             setError(msg);
         } finally {
             setLoading(false);

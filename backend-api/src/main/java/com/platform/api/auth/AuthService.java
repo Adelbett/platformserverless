@@ -14,10 +14,15 @@ public class AuthService {
     public AuthResponse register(RegisterRequest req) {
         keycloakAdminService.createUser(req.getUsername(), req.getEmail(), req.getPassword());
 
+        // Self-registration always creates the owner of a brand-new tenant —
+        // members are never self-registered, they're added by their
+        // CLIENT_ADMIN afterwards (see TeamService.addMember()).
+        keycloakAdminService.assignRealmRole(req.getUsername(), "client_admin");
+
         return AuthResponse.builder()
                 .username(req.getUsername())
                 .email(req.getEmail())
-                .role("MEMBER")
+                .role("CLIENT_ADMIN")
                 .build();
     }
 }

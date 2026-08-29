@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-    User, Lock, Bell, Palette, AlertTriangle, Copy, Eye, EyeOff,
-    Check, RefreshCw, Trash2, LogOut, Shield, Key,
+    User, Lock, Bell, Palette, AlertTriangle, Eye, EyeOff,
+    Check, Trash2, LogOut,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -67,117 +67,6 @@ const Toggle = ({ value, onChange, label, desc }) => (
         </button>
     </div>
 );
-
-const ApiKeysSection = () => {
-    const [keys,     setKeys]     = useState([]);
-    const [revealed, setRevealed] = useState({}); // id → rawKey (shown once after creation)
-    const [newName,  setNewName]  = useState('');
-    const [copied,   setCopied]   = useState(null);
-    const [creating, setCreating] = useState(false);
-    const [loading,  setLoading]  = useState(true);
-
-    useEffect(() => {
-        api.get('/apikeys').then(r => setKeys(r.data || [])).catch(() => {}).finally(() => setLoading(false));
-    }, []);
-
-    const create = async () => {
-        if (!newName.trim()) return;
-        try {
-            const { data } = await api.post('/apikeys', { name: newName.trim() });
-            // rawKey shown once — store in revealed map
-            setRevealed(prev => ({ ...prev, [data.id]: data.rawKey }));
-            setKeys(prev => [{ id: data.id, name: data.name, keyPrefix: data.prefix, createdAt: new Date().toISOString() }, ...prev]);
-            setNewName('');
-            setCreating(false);
-        } catch (e) { alert('Failed to create key'); }
-    };
-
-    const revoke = async (id) => {
-        if (!window.confirm('Revoke this key? It will stop working immediately.')) return;
-        await api.delete(`/apikeys/${id}`);
-        setKeys(prev => prev.filter(k => k.id !== id));
-        setRevealed(prev => { const n = {...prev}; delete n[id]; return n; });
-    };
-
-    const copy = (id, value) => {
-        navigator.clipboard.writeText(value);
-        setCopied(id);
-        setTimeout(() => setCopied(null), 2000);
-    };
-
-    return (
-        <Section icon={Key} title="API Keys" subtitle="Personal access tokens for CLI and API access" color="#A855F7">
-            <div style={{ marginBottom: 16 }}>
-                {!creating ? (
-                    <button className="btn-primary" style={{ fontSize: 12 }} onClick={() => setCreating(true)}>
-                        + Generate New Token
-                    </button>
-                ) : (
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '12px 16px', borderRadius: 10, background: 'rgba(168,85,247,0.05)', border: '1px solid rgba(168,85,247,0.2)' }}>
-                        <input
-                            className="ns-input"
-                            placeholder="Token name (e.g. CI/CD pipeline)"
-                            value={newName}
-                            onChange={e => setNewName(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && create()}
-                            autoFocus
-                            style={{ flex: 1, fontSize: 13 }}
-                        />
-                        <button className="btn-primary" style={{ fontSize: 12 }} onClick={create} disabled={!newName.trim()}>Create</button>
-                        <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => setCreating(false)}>Cancel</button>
-                    </div>
-                )}
-            </div>
-
-            {loading ? (
-                <div style={{ padding: 24, textAlign: 'center', color: '#6B7280', fontSize: 12 }}>Loading…</div>
-            ) : keys.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '32px 0', color: '#6B7280' }}>
-                    <Key size={28} style={{ margin: '0 auto 10px', display: 'block', color: '#374151' }} />
-                    <p style={{ fontSize: 13, margin: 0 }}>No API keys yet</p>
-                    <p style={{ fontSize: 11, margin: '4px 0 0' }}>Generate a key to use with your services</p>
-                </div>
-            ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {keys.map(k => {
-                        const rawKey = revealed[k.id];
-                        const display = rawKey ? rawKey : (k.keyPrefix + '••••••••••••••••••••••••');
-                        return (
-                            <div key={k.id} style={{ padding: '12px 16px', borderRadius: 10, border: rawKey ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(0,0,0,0.07)', background: rawKey ? 'rgba(16,185,129,0.04)' : 'transparent', display: 'flex', alignItems: 'center', gap: 12 }}>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }} className="text-primary">{k.name}</p>
-                                        <span style={{ fontSize: 9, fontWeight: 700, color: '#10B981', background: 'rgba(16,185,129,0.1)', padding: '1px 7px', borderRadius: 999 }}>ACTIVE</span>
-                                        {rawKey && <span style={{ fontSize: 9, fontWeight: 700, color: '#F59E0B', background: 'rgba(245,158,11,0.1)', padding: '1px 7px', borderRadius: 999 }}>COPY NOW — shown once</span>}
-                                    </div>
-                                    <code style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: rawKey ? '#10B981' : '#9CA3AF', marginTop: 4, display: 'block' }}>
-                                        {display}
-                                    </code>
-                                    <p style={{ fontSize: 10, margin: '3px 0 0', color: '#6B7280' }}>
-                                        Created {new Date(k.createdAt).toLocaleDateString()}
-                                        {k.lastUsedAt && ` · Last used ${new Date(k.lastUsedAt).toLocaleDateString()}`}
-                                    </p>
-                                </div>
-                                <div style={{ display: 'flex', gap: 6 }}>
-                                    {rawKey && (
-                                        <button onClick={() => copy(k.id, rawKey)}
-                                            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(16,185,129,0.3)', background: 'rgba(16,185,129,0.08)', cursor: 'pointer', color: copied === k.id ? '#10B981' : '#64748B' }}>
-                                            {copied === k.id ? <><Check size={11} /> Copied!</> : <><Copy size={11} /> Copy</>}
-                                        </button>
-                                    )}
-                                    <button onClick={() => revoke(k.id)}
-                                        style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.05)', cursor: 'pointer', color: '#EF4444' }}>
-                                        <Trash2 size={11} /> Revoke
-                                    </button>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-        </Section>
-    );
-};
 
 // ── Main Settings ──────────────────────────────────────────────────────────────
 const Settings = () => {
@@ -348,9 +237,6 @@ const Settings = () => {
                     </div>
                 </form>
             </Section>
-
-            {/* API Keys */}
-            <ApiKeysSection />
 
             {/* Notifications */}
             <Section icon={Bell} title="Notifications" subtitle="Choose which events trigger in-app notifications" color="#10B981">
