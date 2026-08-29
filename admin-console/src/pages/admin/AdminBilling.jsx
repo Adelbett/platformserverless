@@ -4,7 +4,7 @@ import {
     AreaChart, Area, BarChart, Bar,
     XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
-import { appsApi, kafkaApi, billingApi, invoiceApi } from '../../api';
+import { billingApi, invoiceApi, adminApi } from '../../api';
 import {
     CreditCard, TrendingUp, Users, Cpu, Database,
     RefreshCw, ChevronDown, ChevronRight, DollarSign,
@@ -219,8 +219,8 @@ const AdminBilling = () => {
         setLoading(true);
         try {
             const [ar, kr, br] = await Promise.allSettled([
-                appsApi.list(),
-                kafkaApi.list(),
+                adminApi.getAllApps(),
+                adminApi.getAllTopics(),
                 billingApi.getAdminBilling(),
             ]);
             if (ar.status === 'fulfilled') setApps(ar.value.data || []);
@@ -344,9 +344,9 @@ const AdminBilling = () => {
                 <KPI highlight label="Platform MTD"     value={fmtUsd(totalMtdCost, 4)}       sub={`${hoursElapsed}h elapsed`}         color="#3B82F6" icon={DollarSign} />
                 <KPI           label="End-of-month est." value={fmtUsd(totalProjected, 4)}   sub="at current rate"                    color="#8B5CF6" icon={TrendingUp} />
                 <KPI           label="Run rate / hour"   value={`${fmtUsd(totalHourly + totalKafkaH, 5)}/h`} sub="live"              color="#10B981" icon={Zap}        />
-                <KPI           label="Active clients"    value={clients.length}                sub={`${apps.length} service${apps.length!==1?'s':''}`} color="#06B6D4" icon={Users} />
+                <KPI           label="Active clients"    value={clientsData.length}            sub={`${apps.length} service${apps.length!==1?'s':''}`} color="#06B6D4" icon={Users} />
                 <KPI           label="Kafka revenue"     value={fmtUsd(totalKafkaMo, 2)}       sub={`${topics.length} topics/mo`}       color="#F59E0B" icon={Database}  />
-                <KPI           label="Avg / client"      value={fmtUsd(clients.length ? totalMtdCost / clients.length : 0, 4)} sub="this month" color="#EC4899" icon={Activity} />
+                <KPI           label="Avg / client"      value={fmtUsd(clientsData.length ? totalMtdCost / clientsData.length : 0, 4)} sub="this month" color="#EC4899" icon={Activity} />
             </div>
 
             {/* Tabs */}
@@ -375,20 +375,20 @@ const AdminBilling = () => {
                                     <RefreshCw size={20} style={{ animation: 'spin 1s linear infinite', display: 'block', margin: '0 auto 12px', color: '#334155' }} />
                                     Loading client data…
                                 </td></tr>
-                            ) : clients.length === 0 ? (
+                            ) : clientsData.length === 0 ? (
                                 <tr><td colSpan={8} style={{ padding: 52, textAlign: 'center' }}>
                                     <Package size={30} style={{ display: 'block', margin: '0 auto 12px', color: '#334155' }} />
                                     <p style={{ color: '#475569', fontSize: 13, margin: 0 }}>No deployments found.</p>
                                 </td></tr>
-                            ) : clients.map((c, i) => (
+                            ) : clientsData.map((c, i) => (
                                 <ClientRow key={c.userId} client={c} rank={i} totalRevenue={totalMtdCost} />
                             ))}
                         </tbody>
-                        {clients.length > 0 && (
+                        {clientsData.length > 0 && (
                             <tfoot>
                                 <tr style={{ borderTop: '2px solid rgba(255,255,255,0.1)', background: 'rgba(59,130,246,0.04)' }}>
                                     <td colSpan={4} style={{ padding: '14px 14px', fontSize: 13, fontWeight: 700, color: '#94A3B8' }}>
-                                        Platform Total · {clients.length} clients · {apps.length} services · {topics.length} topics
+                                        Platform Total · {clientsData.length} clients · {apps.length} services · {topics.length} topics
                                     </td>
                                     <td style={{ padding: '14px 14px', textAlign: 'right', fontSize: 14, fontWeight: 900, fontFamily: "'JetBrains Mono', monospace", color: '#3B82F6' }}>
                                         {fmtUsd(totalMtdCost, 4)}
@@ -483,7 +483,7 @@ const AdminBilling = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {clients.map(c => {
+                                {clientsData.map(c => {
                                     const vcpuH  = c.enriched.reduce((s, a) => s + a.vcpu * Math.max(a.replicas ?? 0, a.minReplicas ?? 0, 1) * a.uptime * hoursElapsed, 0);
                                     const gibH   = c.enriched.reduce((s, a) => s + a.ramGb * Math.max(a.replicas ?? 0, a.minReplicas ?? 0, 1) * a.uptime * hoursElapsed, 0);
                                     return (
@@ -504,7 +504,7 @@ const AdminBilling = () => {
                             <tfoot>
                                 <tr style={{ borderTop: '2px solid rgba(255,255,255,0.1)', background: 'rgba(59,130,246,0.04)' }}>
                                     <td colSpan={4} style={{ padding: '13px 16px', fontSize: 13, fontWeight: 800, color: '#F1F5F9' }}>
-                                        PLATFORM TOTAL — {clients.length} clients
+                                        PLATFORM TOTAL — {clientsData.length} clients
                                     </td>
                                     <td style={{ padding: '13px 16px', textAlign: 'right', fontSize: 15, fontWeight: 900, fontFamily: "'JetBrains Mono', monospace", color: '#3B82F6' }}>
                                         {fmtUsd(totalMtdCost, 4)}
