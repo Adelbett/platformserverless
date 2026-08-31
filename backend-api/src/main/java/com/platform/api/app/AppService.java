@@ -45,7 +45,10 @@ public class AppService {
 
         // No cap on app count — tenants are billed on actual resource
         // consumption (see QuotaService/Billing), not on a fixed app quota.
-        String serviceName = generateServiceName(req.getImageName(), effectiveUserId);
+        // Derived from the user-chosen app name, not the image — two apps
+        // built from the same image (e.g. two "postgres" deployments) must
+        // remain distinct services, not collapse into one.
+        String serviceName = generateServiceName(req.getName(), effectiveUserId);
 
         // Reuse existing DB entry if same service already exists (avoids duplicates)
         App app = appRepository.findByServiceNameAndNamespace(serviceName, namespace)

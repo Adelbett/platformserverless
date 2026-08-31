@@ -365,6 +365,7 @@ public class KnativeService {
 
     // ── Revisions (rollback) ────────────────────────────────────────────
 
+    @SuppressWarnings("unchecked")
     public List<Map<String, String>> listRevisions(String serviceName, String namespace) {
         String ns = namespace != null ? namespace : defaultNamespace;
         if (!kubernetesEnabled) return List.of();
@@ -375,14 +376,42 @@ public class KnativeService {
                     .withLabel("serving.knative.dev/service", serviceName)
                     .list().getItems();
 
+            // The revision(s) actually receiving traffic — not necessarily the most
+            // recently created one, e.g. right after a rollback — are read from the
+            // parent Service's status.traffic, not guessed from creation order.
+            java.util.Set<String> activeRevisionNames = new java.util.HashSet<>();
+            try {
+                GenericKubernetesResource ksvc = kubernetesClient
+                        .genericKubernetesResources("serving.knative.dev/v1", "Service")
+                        .inNamespace(ns).withName(serviceName).get();
+                if (ksvc != null) {
+                    Map<String, Object> status = (Map<String, Object>) ksvc.getAdditionalProperties().get("status");
+                    List<Map<String, Object>> traffic = status != null
+                            ? (List<Map<String, Object>>) status.get("traffic") : null;
+                    if (traffic != null) {
+                        for (Map<String, Object> t : traffic) {
+                            Object percent = t.get("percent");
+                            String revisionName = (String) t.get("revisionName");
+                            if (revisionName != null && percent instanceof Number n && n.intValue() > 0) {
+                                activeRevisionNames.add(revisionName);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Could not read traffic split for '{}': {}", serviceName, e.getMessage());
+            }
+
             return revisions.stream()
                     .sorted(Comparator.comparing(
                             (GenericKubernetesResource r) -> r.getMetadata().getCreationTimestamp()
                     ).reversed())
                     .map(r -> {
                         Map<String, String> info = new java.util.HashMap<>();
-                        info.put("name", r.getMetadata().getName());
+                        String name = r.getMetadata().getName();
+                        info.put("name", name);
                         info.put("createdAt", r.getMetadata().getCreationTimestamp());
+                        info.put("active", String.valueOf(activeRevisionNames.contains(name)));
                         return info;
                     })
                     .collect(Collectors.toList());

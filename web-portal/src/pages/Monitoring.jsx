@@ -9,7 +9,7 @@ import {
     Activity, Server, RefreshCw,
     ChevronDown, ExternalLink,
 } from 'lucide-react';
-import { appsApi, metricsApi } from '../api';
+import { appsApi } from '../api';
 import { openSseStream } from '../api/sse';
 import { useTheme } from '../context/ThemeContext';
 
@@ -70,31 +70,6 @@ const KpiCard = ({ label, value, sub, trend, icon: Icon, iconBg, iconColor, spar
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
                 <TrendBadge value={trend ?? 0} />
                 {sub && <span style={{ fontSize: 10, color: '#9CA3AF' }}>{sub}</span>}
-            </div>
-        </div>
-    );
-};
-
-// ── Gauge ring ─────────────────────────────────────────────────────────────────
-const GaugeRing = ({ value, max = 100, color, label, sublabel }) => {
-    const r = 38, circ = 2 * Math.PI * r;
-    const pct = Math.min((value || 0) / max, 1), dash = pct * circ;
-    const ring = value > max * 0.9 ? '#F85149' : value > max * 0.75 ? '#E8A838' : color;
-    return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-            <div className="gauge-wrap">
-                <svg viewBox="0 0 88 88">
-                    <circle cx="44" cy="44" r={r} fill="none" strokeWidth="8" stroke="rgba(156,163,175,0.18)" />
-                    <circle cx="44" cy="44" r={r} fill="none" strokeWidth="8" stroke={ring} strokeLinecap="round"
-                        strokeDasharray={`${dash} ${circ}`} style={{ transition: 'stroke-dasharray 1.2s cubic-bezier(0.4,0,0.2,1)' }} />
-                </svg>
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontSize: 15, fontWeight: 900, fontFamily: "'Outfit', sans-serif" }} className="text-primary">{value || 0}%</span>
-                </div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: 12, fontWeight: 700, margin: 0 }} className="text-primary">{label}</p>
-                <p style={{ fontSize: 10, margin: '2px 0 0' }} className="text-secondary">{sublabel}</p>
             </div>
         </div>
     );
@@ -297,18 +272,13 @@ const Monitoring = () => {
     const [selectedApp, setSelectedApp] = useState(null);
 
     const [apps,    setApps]    = useState([]);
-    const [cluster, setCluster] = useState(null);
 
     const loadData = async () => {
         try {
-            const [appsRes, metricsRes] = await Promise.all([
-                appsApi.list().catch(() => ({ data: [] })),
-                metricsApi.getCluster().catch(() => ({ data: null })),
-            ]);
+            const appsRes = await appsApi.list().catch(() => ({ data: [] }));
             const raw = Array.isArray(appsRes.data) ? appsRes.data : [];
             const appList = raw.filter((a, idx, arr) => arr.findIndex(b => b.id === a.id) === idx);
             setApps(appList);
-            setCluster(metricsRes.data);
             if (!selectedApp && appList.length > 0) setSelectedApp(appList[0].id);
         } finally {
             setLoading(false);
@@ -318,23 +288,18 @@ const Monitoring = () => {
 
     useEffect(() => { loadData(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // SSE cluster metrics
-    useEffect(() => {
-        const close = openSseStream('/api/metrics/cluster/stream', {
-            onMessage: (data) => { try { setCluster(JSON.parse(data)); } catch {} },
-        });
-        return close;
-    }, []);
-
     const refresh = () => { setRefreshing(true); loadData(); };
 
     const running = apps.filter(a => a.status === 'RUNNING').length;
 
+    const suspended  = apps.filter(a => a.status === 'SUSPENDED').length;
+    const scaledZero = apps.filter(a => a.status === 'SCALED_TO_ZERO' || a.status === 'IDLE').length;
+
     const kpiCards = [
         { label: 'Your Apps',         value: apps.length,        sub: `${apps.filter(a=>a.status==='FAILED').length} errors`, trend: 2, icon: Box,         iconBg: 'rgba(0,212,255,0.1)',  iconColor: '#00D4FF', sparkColor: '#00D4FF' },
         { label: 'Running Instances', value: running,            sub: `${running}/${apps.length} healthy`,                     trend: 0, icon: Cpu,         iconBg: 'rgba(168,85,247,0.1)', iconColor: '#A855F7', sparkColor: '#A855F7' },
-        { label: 'Requests / sec',    value: fmtReq(cluster?.totalReqPerSec), sub: cluster ? `Error: ${fmtPct(cluster.clusterErrorRate)}` : 'No data', trend: 8, icon: Zap, iconBg: 'rgba(16,185,129,0.1)', iconColor: '#10B981', sparkColor: '#10B981' },
-        { label: 'CPU Cores',         value: cluster ? cluster.totalCpuCores?.toFixed(2) : '—', sub: cluster ? `${cluster.totalMemoryGiB?.toFixed(1)} GiB RAM` : 'No data', trend: -3, icon: Server, iconBg: 'rgba(245,158,11,0.1)', iconColor: '#F59E0B', sparkColor: '#F59E0B' },
+        { label: 'Scaled to Zero',    value: scaledZero,         sub: 'idle, no cost',                                         trend: 0, icon: Zap,         iconBg: 'rgba(16,185,129,0.1)', iconColor: '#10B981', sparkColor: '#10B981' },
+        { label: 'Suspended',         value: suspended,          sub: suspended > 0 ? 'action needed' : 'none',                trend: 0, icon: Server,      iconBg: 'rgba(245,158,11,0.1)', iconColor: '#F59E0B', sparkColor: '#F59E0B' },
     ];
 
     return (
@@ -367,45 +332,6 @@ const Monitoring = () => {
                 {kpiCards.map(card => (
                     <KpiCard key={card.label} {...card} loading={loading} />
                 ))}
-            </div>
-
-            {/* Cluster overview + Gauges */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 20 }}>
-                {/* Cluster req/s chart */}
-                <div className="ns-card" style={{ padding: 20 }}>
-                    <div style={{ marginBottom: 14 }}>
-                        <h3 style={{ fontSize: 14, fontWeight: 800, margin: 0 }} className="text-primary">Cluster Request Volume</h3>
-                        <p style={{ fontSize: 11, margin: '3px 0 0' }} className="text-secondary">HTTP req/sec across all your services · live SSE</p>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 16 }}>
-                        <div style={{ textAlign: 'center' }}>
-                            <p style={{ fontSize: 28, fontWeight: 900, fontFamily: "'Outfit', sans-serif", color: '#00D4FF', margin: 0 }}>{fmtReq(cluster?.totalReqPerSec)}</p>
-                            <p style={{ fontSize: 10, color: '#64748B', margin: '2px 0 0' }}>req / sec</p>
-                        </div>
-                        <div style={{ textAlign: 'center' }}>
-                            <p style={{ fontSize: 28, fontWeight: 900, fontFamily: "'Outfit', sans-serif", color: '#EF4444', margin: 0 }}>{cluster ? `${(cluster.clusterErrorRate * 100).toFixed(2)}%` : '—'}</p>
-                            <p style={{ fontSize: 10, color: '#64748B', margin: '2px 0 0' }}>error rate</p>
-                        </div>
-                        <div style={{ textAlign: 'center' }}>
-                            <p style={{ fontSize: 28, fontWeight: 900, fontFamily: "'Outfit', sans-serif", color: '#10B981', margin: 0 }}>{running}</p>
-                            <p style={{ fontSize: 10, color: '#64748B', margin: '2px 0 0' }}>running apps</p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Gauges */}
-                <div className="ns-card" style={{ padding: 20 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                        <h3 style={{ fontSize: 13, fontWeight: 800, margin: 0 }} className="text-primary">Cluster Resources</h3>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, color: '#10B981', background: 'rgba(16,185,129,0.1)', padding: '3px 10px', borderRadius: 999 }}>
-                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981', display: 'inline-block', animation: 'pulseDot 2s ease-in-out infinite' }} /> Live
-                        </span>
-                    </div>
-                    <div style={{ display: 'flex', gap: 12, justifyContent: 'space-around' }}>
-                        <GaugeRing value={cluster?.cpuUsagePct ?? 0} color="#00D4FF" label="CPU"    sublabel={cluster ? `${cluster.totalCpuCores?.toFixed(1)} cores` : '—'} />
-                        <GaugeRing value={cluster?.memUsagePct ?? 0} color="#A855F7" label="Memory" sublabel={cluster ? `${cluster.totalMemoryGiB?.toFixed(1)} GiB`  : '—'} />
-                    </div>
-                </div>
             </div>
 
             {/* Per-app metrics */}

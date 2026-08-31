@@ -315,7 +315,9 @@ const RevisionHistory = ({ appId, dark }) => {
                 <p style={{ fontSize: 12, color: '#6B7280', margin: 0 }}>No Knative revisions found for this app yet.</p>
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {revisions.map((rev, i) => (
+                    {revisions.map((rev) => {
+                        const isActive = rev.active === 'true';
+                        return (
                         <div key={rev.name} style={{
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                             padding: '10px 14px', borderRadius: 8,
@@ -325,21 +327,22 @@ const RevisionHistory = ({ appId, dark }) => {
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                 <span style={{
                                     fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
-                                    background: i === 0 ? 'rgba(16,185,129,0.1)' : 'rgba(148,163,184,0.1)',
-                                    color: i === 0 ? '#10B981' : '#94A3B8',
+                                    background: isActive ? 'rgba(16,185,129,0.1)' : 'rgba(148,163,184,0.1)',
+                                    color: isActive ? '#10B981' : '#94A3B8',
                                 }}>
-                                    {i === 0 ? 'ACTIVE' : 'OLDER'}
+                                    {isActive ? 'ACTIVE' : 'OLDER'}
                                 </span>
                                 <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }} className="text-primary">{rev.name}</span>
                                 <span style={{ fontSize: 11, color: '#9CA3AF' }}>{rev.createdAt ? new Date(rev.createdAt).toLocaleString() : ''}</span>
                             </div>
-                            {i !== 0 && (
+                            {!isActive && (
                                 <button className="btn-secondary" style={{ padding: '5px 10px', fontSize: 11 }} onClick={() => setTarget(rev.name)}>
                                     Rollback here
                                 </button>
                             )}
                         </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
 
