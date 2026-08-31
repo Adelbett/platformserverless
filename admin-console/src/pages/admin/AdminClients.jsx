@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Ban, Play, AlertTriangle, RefreshCw, CreditCard, Gauge, ChevronDown, ChevronUp } from 'lucide-react';
-import { adminApi, invoiceApi } from '../../api';
+import { Users, Ban, Play, AlertTriangle, RefreshCw, CreditCard, Gauge, ChevronDown, ChevronUp, UserRound } from 'lucide-react';
+import { adminApi, invoiceApi, usersApi } from '../../api';
 
 const quotaInputStyle = {
     background: 'rgba(255,255,255,0.03)',
@@ -94,9 +94,31 @@ const QuotaPanel = ({ client }) => {
     );
 };
 
-const ClientRow = ({ client, onSuspend, onRestore }) => {
+const TeamPanel = ({ members }) => (
+    <tr style={{ background: 'rgba(255,255,255,0.015)' }}>
+        <td colSpan={6} style={{ padding: '4px 20px 18px' }}>
+            {members.length === 0 ? (
+                <span style={{ fontSize: 12, color: '#475569' }}>No team members.</span>
+            ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {members.map(m => (
+                        <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                            <UserRound size={13} color="#64748B" />
+                            <span style={{ fontSize: 12, fontWeight: 700, color: '#F1F5F9' }}>{m.username}</span>
+                            <span style={{ fontSize: 11, color: '#475569' }}>{m.email}</span>
+                            <span style={{ marginLeft: 'auto', fontSize: 9, fontWeight: 800, color: '#3B82F6', background: 'rgba(59,130,246,0.1)', padding: '2px 8px', borderRadius: 999, fontFamily: "'JetBrains Mono', monospace" }}>MEMBER</span>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </td>
+    </tr>
+);
+
+const ClientRow = ({ client, members, onSuspend, onRestore }) => {
     const [loading, setLoading] = useState(false);
     const [quotaOpen, setQuotaOpen] = useState(false);
+    const [teamOpen, setTeamOpen] = useState(false);
     const [error, setError] = useState(null);
 
     const handleToggle = async () => {
@@ -124,7 +146,7 @@ const ClientRow = ({ client, onSuspend, onRestore }) => {
         <motion.tr
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            style={{ borderBottom: quotaOpen ? 'none' : '1px solid rgba(255,255,255,0.04)' }}
+            style={{ borderBottom: (quotaOpen || teamOpen) ? 'none' : '1px solid rgba(255,255,255,0.04)' }}
             onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.025)'}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
         >
@@ -171,6 +193,19 @@ const ClientRow = ({ client, onSuspend, onRestore }) => {
             <td style={{ padding: '14px 20px', textAlign: 'right' }}>
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                     <button
+                        onClick={() => setTeamOpen(o => !o)}
+                        style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 6,
+                            padding: '7px 12px', borderRadius: 8,
+                            border: '1px solid rgba(148,163,184,0.25)',
+                            cursor: 'pointer', fontWeight: 700, fontSize: 12,
+                            background: teamOpen ? 'rgba(148,163,184,0.15)' : 'transparent',
+                            color: '#94A3B8',
+                        }}
+                    >
+                        <Users size={13} /> Team ({members.length}) {teamOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                    </button>
+                    <button
                         onClick={() => setQuotaOpen(o => !o)}
                         style={{
                             display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -209,6 +244,7 @@ const ClientRow = ({ client, onSuspend, onRestore }) => {
                 )}
             </td>
         </motion.tr>
+        {teamOpen && <TeamPanel members={members} />}
         {quotaOpen && <QuotaPanel client={client} />}
         </>
     );
@@ -216,6 +252,7 @@ const ClientRow = ({ client, onSuspend, onRestore }) => {
 
 const AdminClients = () => {
     const [clients,          setClients]          = useState([]);
+    const [allUsers,         setAllUsers]         = useState([]);
     const [overdueInvoices,  setOverdueInvoices]  = useState([]);
     const [loading,          setLoading]          = useState(true);
     const [suspendAppError,  setSuspendAppError]  = useState(null);
@@ -224,8 +261,12 @@ const AdminClients = () => {
     const load = async () => {
         setLoading(true);
         try {
-            const res = await adminApi.getClients();
-            setClients(res.data || []);
+            const [clientsRes, usersRes] = await Promise.allSettled([
+                adminApi.getClients(),
+                usersApi.list(),
+            ]);
+            if (clientsRes.status === 'fulfilled') setClients(clientsRes.value.data || []);
+            if (usersRes.status === 'fulfilled')   setAllUsers(usersRes.value.data || []);
         } finally {
             setLoading(false);
         }
@@ -235,6 +276,11 @@ const AdminClients = () => {
         load();
         invoiceApi.adminOverdue().then(r => setOverdueInvoices(r.data || [])).catch(() => {});
     }, []);
+
+    const membersByClient = clients.reduce((acc, c) => {
+        acc[c.id] = allUsers.filter(u => u.ownerId === c.id && u.role === 'MEMBER');
+        return acc;
+    }, {});
 
     const handleSuspend = async (id) => {
         await adminApi.suspendClient(id);
@@ -296,6 +342,52 @@ const AdminClients = () => {
                 </button>
             </div>
 
+            {/* Table */}
+            <div style={{
+                background: 'rgba(255,255,255,0.02)',
+                border: '1px solid rgba(255,255,255,0.07)',
+                borderRadius: 14, overflow: 'hidden', marginBottom: 20,
+            }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                            {['Client', 'Namespace', 'Apps', 'Status', 'Joined', ''].map((h, i) => (
+                                <th key={i} style={{
+                                    padding: '11px 20px', fontSize: 9, fontWeight: 700,
+                                    textTransform: 'uppercase', letterSpacing: '0.1em',
+                                    color: '#334155', textAlign: i >= 2 && i <= 3 ? 'center' : i === 5 ? 'right' : 'left',
+                                    background: 'rgba(255,255,255,0.01)',
+                                }}>{h}</th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {loading ? (
+                            <tr>
+                                <td colSpan={6} style={{ padding: 48, textAlign: 'center', color: '#475569' }}>
+                                    Loading…
+                                </td>
+                            </tr>
+                        ) : clients.length === 0 ? (
+                            <tr>
+                                <td colSpan={6} style={{ padding: 52, textAlign: 'center' }}>
+                                    <Users size={32} style={{ display: 'block', margin: '0 auto 12px', color: '#334155' }} />
+                                    <p style={{ color: '#475569', fontSize: 13, margin: 0 }}>No client accounts yet.</p>
+                                </td>
+                            </tr>
+                        ) : clients.map(c => (
+                            <ClientRow
+                                key={c.id}
+                                client={c}
+                                members={membersByClient[c.id] || []}
+                                onSuspend={handleSuspend}
+                                onRestore={handleRestore}
+                            />
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
             {/* Overdue invoices banner */}
             {overdueInvoices.filter(i => i.status !== 'SUSPENDED' && i.status !== 'PAID').length > 0 && (
                 <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 12, overflow: 'hidden', marginBottom: 20 }}>
@@ -354,50 +446,6 @@ const AdminClients = () => {
                 </div>
             )}
 
-            {/* Table */}
-            <div style={{
-                background: 'rgba(255,255,255,0.02)',
-                border: '1px solid rgba(255,255,255,0.07)',
-                borderRadius: 14, overflow: 'hidden',
-            }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                            {['Client', 'Namespace', 'Apps', 'Status', 'Joined', ''].map((h, i) => (
-                                <th key={i} style={{
-                                    padding: '11px 20px', fontSize: 9, fontWeight: 700,
-                                    textTransform: 'uppercase', letterSpacing: '0.1em',
-                                    color: '#334155', textAlign: i >= 2 && i <= 3 ? 'center' : i === 5 ? 'right' : 'left',
-                                    background: 'rgba(255,255,255,0.01)',
-                                }}>{h}</th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {loading ? (
-                            <tr>
-                                <td colSpan={6} style={{ padding: 48, textAlign: 'center', color: '#475569' }}>
-                                    Loading…
-                                </td>
-                            </tr>
-                        ) : clients.length === 0 ? (
-                            <tr>
-                                <td colSpan={6} style={{ padding: 52, textAlign: 'center' }}>
-                                    <Users size={32} style={{ display: 'block', margin: '0 auto 12px', color: '#334155' }} />
-                                    <p style={{ color: '#475569', fontSize: 13, margin: 0 }}>No client accounts yet.</p>
-                                </td>
-                            </tr>
-                        ) : clients.map(c => (
-                            <ClientRow
-                                key={c.id}
-                                client={c}
-                                onSuspend={handleSuspend}
-                                onRestore={handleRestore}
-                            />
-                        ))}
-                    </tbody>
-                </table>
-            </div>
         </div>
     );
 };

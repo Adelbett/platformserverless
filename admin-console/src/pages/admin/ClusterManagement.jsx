@@ -544,12 +544,12 @@ const ClusterManagement = () => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                         <div style={{ display: 'flex', gap: 10 }}>
                             <select value={podNsFilter} onChange={e => setPodNsFilter(e.target.value)} style={{ background: '#0D1117', border: '1px solid #1F2B3A', color: '#DDE6F0', borderRadius: 8, padding: '7px 12px', fontSize: 12 }}>
-                                <option value="">All namespaces</option>
-                                {podNamespaces.map(ns => <option key={ns} value={ns}>{ns}</option>)}
+                                <option value="" style={{ background: '#0D1117', color: '#DDE6F0' }}>All namespaces</option>
+                                {podNamespaces.map(ns => <option key={ns} value={ns} style={{ background: '#0D1117', color: '#DDE6F0' }}>{ns}</option>)}
                             </select>
                             <select value={podStatusFilter} onChange={e => setPodStatusFilter(e.target.value)} style={{ background: '#0D1117', border: '1px solid #1F2B3A', color: '#DDE6F0', borderRadius: 8, padding: '7px 12px', fontSize: 12 }}>
-                                <option value="">All statuses</option>
-                                {['Running', 'Pending', 'Failed', 'Succeeded'].map(s => <option key={s} value={s}>{s}</option>)}
+                                <option value="" style={{ background: '#0D1117', color: '#DDE6F0' }}>All statuses</option>
+                                {['Running', 'Pending', 'Failed', 'Succeeded'].map(s => <option key={s} value={s} style={{ background: '#0D1117', color: '#DDE6F0' }}>{s}</option>)}
                             </select>
                         </div>
                         <div className="ns-card" style={{ overflow: 'hidden', background: '#0D1117', border: '1px solid #1F2B3A', borderRadius: 12 }}>
@@ -711,12 +711,12 @@ const ClusterManagement = () => {
                                 style={{ background: '#0D1117', border: '1px solid #1F2B3A', color: '#DDE6F0', borderRadius: 8, padding: '7px 12px', fontSize: 12, width: 220 }}
                             />
                             <select value={logAppFilter} onChange={e => setLogAppFilter(e.target.value)} style={{ background: '#0D1117', border: '1px solid #1F2B3A', color: '#DDE6F0', borderRadius: 8, padding: '7px 12px', fontSize: 12 }}>
-                                <option value="">All apps</option>
-                                {logAppNames.map(a => <option key={a} value={a}>{a}</option>)}
+                                <option value="" style={{ background: '#0D1117', color: '#DDE6F0' }}>All apps</option>
+                                {logAppNames.map(a => <option key={a} value={a} style={{ background: '#0D1117', color: '#DDE6F0' }}>{a}</option>)}
                             </select>
                             <select value={logLevelFilter} onChange={e => setLogLevelFilter(e.target.value)} style={{ background: '#0D1117', border: '1px solid #1F2B3A', color: '#DDE6F0', borderRadius: 8, padding: '7px 12px', fontSize: 12 }}>
-                                <option value="">All levels</option>
-                                {['INFO', 'WARN', 'ERROR'].map(l => <option key={l} value={l}>{l}</option>)}
+                                <option value="" style={{ background: '#0D1117', color: '#DDE6F0' }}>All levels</option>
+                                {['INFO', 'WARN', 'ERROR'].map(l => <option key={l} value={l} style={{ background: '#0D1117', color: '#DDE6F0' }}>{l}</option>)}
                             </select>
                             <button onClick={loadLogs} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 8, border: '1px solid #1F2B3A', background: 'transparent', color: '#5A7080', cursor: 'pointer', fontSize: 12, marginLeft: 'auto' }}>
                                 <RefreshCw size={12} /> Refresh

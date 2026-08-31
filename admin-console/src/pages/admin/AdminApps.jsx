@@ -104,8 +104,8 @@ const AdminApps = () => {
             )}
 
             <select value={tenantFilter} onChange={e => setTenantFilter(e.target.value)} style={{ background: '#0D1117', border: '1px solid #1F2B3A', color: '#DDE6F0', borderRadius: 8, padding: '7px 12px', fontSize: 12, width: 220 }}>
-                <option value="">All tenants</option>
-                {tenants.map(t => <option key={t} value={t}>{t}</option>)}
+                <option value="" style={{ background: '#0D1117', color: '#DDE6F0' }}>All tenants</option>
+                {tenants.map(t => <option key={t} value={t} style={{ background: '#0D1117', color: '#DDE6F0' }}>{t}</option>)}
             </select>
 
             <div style={{ background: '#0D1117', border: '1px solid #1F2B3A', borderRadius: 12, overflow: 'hidden' }}>

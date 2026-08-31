@@ -6,7 +6,6 @@ La Release 0 a livré le socle technique de la plateforme : cluster Kubernetes i
 
 Elle regroupe quatre sprints : le Sprint 3, qui met en place les accès et l'identité des utilisateurs, préalable à tout le reste ; le Sprint 4, qui livre le cycle de vie complet d'une application ; le Sprint 5, qui relie Kafka et Knative Eventing en un service de messagerie événementielle complet, de la brique backend jusqu'aux écrans du portail ; et le Sprint 6, qui livre l'observabilité applicative (journaux, métriques).
 
-\clearpage
 \section{Sprint 3 : Gestion des utilisateurs et des accès}
 
 \subsection{Introduction}
@@ -15,39 +14,93 @@ Ce sprint met en place l'identité et le contrôle d'accès de la plateforme : c
 
 L'authentification passe entièrement par Keycloak. Le backend ne gère ni mot de passe ni session : c'est un serveur de ressources OAuth2, qui valide les jetons émis par Keycloak et en extrait le rôle applicatif.
 
-\subsection{Sprint Backlog}
+% \subsection{Sprint Backlog}
 
+% Le tableau~\ref{tab:sb-sprint3} présente le backlog détaillé du Sprint 3, obtenu en décomposant chaque User Story retenue en tâches techniques.
+
+% \needspace{0.75\textheight}
+% {
+% \setlength{\LTleft}{-1.5cm}
+% \setlength{\LTright}{-1.5cm}
+% \setlength{\tabcolsep}{8pt}
+% \renewcommand{\arraystretch}{1.9}
+% \begin{longtable}{|p{6.6cm}|>{\raggedright\arraybackslash}p{8.1cm}|>{\centering\arraybackslash}p{2.3cm}|}
+
+% \hline
+% User Story & Tâches & Estimation \\
+% \hline
+% \endhead
+% \endfoot
+% \hline
+
+% \caption{Backlog du Sprint 3}
+% \label{tab:sb-sprint3}
+% \endlastfoot
+
+% \multirow{3}{6.6cm}{\centering En tant que CLIENT\_ADMIN, je veux créer un compte afin d'accéder à la plateforme et gérer mon équipe.}
+% & Créer le compte dans Keycloak. & 1 \\ \cline{2-3}
+% & Synchroniser l'utilisateur avec la plateforme. & 1 \\ \cline{2-3}
+% & Tester la création du compte. & 1 \\ \hline
+
+% \multirow{3}{6.6cm}{\centering En tant qu'ADMIN, CLIENT\_ADMIN ou MEMBER, je veux me connecter afin d'accéder à la plateforme.}
+% & Intégrer Keycloak au mécanisme d'authentification. & 1 \\ \cline{2-3}
+% & Développer l'interface de connexion. & 1 \\ \cline{2-3}
+% & Vérifier l'authentification et le rôle de l'utilisateur. & 1 \\ \hline
+
+% \multirow{3}{6.6cm}{\centering En tant qu'ADMIN, CLIENT\_ADMIN ou MEMBER, je veux consulter et modifier mon profil.}
+% & Développer la consultation du profil. & 1 \\ \cline{2-3}
+% & Développer la modification du profil. & 1 \\ \cline{2-3}
+% & Tester la mise à jour du profil. & 1 \\ \hline
+
+% \multirow{4}{6.6cm}{\centering En tant qu'ADMIN, je veux gérer les utilisateurs de la plateforme.}
+% & Développer la liste des utilisateurs. & 1 \\ \cline{2-3}
+% & Développer la modification du rôle d'un utilisateur. & 1 \\ \cline{2-3}
+% & Développer l'interface d'administration (admin-console). & 1 \\ \cline{2-3}
+% & Tester la gestion des utilisateurs. & 1 \\ \hline
+
+% \multirow{5}{6.6cm}{\centering En tant que CLIENT\_ADMIN, je veux gérer mon équipe.}
+% & Développer l'ajout d'un membre. & 1 \\ \cline{2-3}
+% & Développer la liste des membres. & 1 \\ \cline{2-3}
+% & Développer la modification des permissions. & 1 \\ \cline{2-3}
+% & Développer la suppression d'un membre. & 1 \\ \cline{2-3}
+% & Développer l'interface de gestion de l'équipe. & 1 \\ \hline
+
+% \end{longtable}
+% }
+
+\subsection{Sprint Backlog}
 Le tableau~\ref{tab:sb-sprint3} présente le backlog détaillé du Sprint 3, obtenu en décomposant chaque User Story retenue en tâches techniques.
 
-\needspace{0.75\textheight}
 {
 \setlength{\LTleft}{-1.5cm}
 \setlength{\LTright}{-1.5cm}
 \setlength{\tabcolsep}{8pt}
 \renewcommand{\arraystretch}{1.9}
 \begin{longtable}{|p{6.6cm}|>{\raggedright\arraybackslash}p{8.1cm}|>{\centering\arraybackslash}p{2.3cm}|}
+\caption{Backlog du Sprint 3}
+\label{tab:sb-sprint3} \\
 \hline
 User Story & Tâches & Estimation \\
 \hline
 \endfirsthead
+\multicolumn{3}{l}{\small\itshape Suite du tableau~\ref{tab:sb-sprint3}} \\
 \hline
 User Story & Tâches & Estimation \\
 \hline
 \endhead
+\hline
+\multicolumn{3}{r}{\small\itshape Suite page suivante} \\
 \endfoot
 \hline
-
-\caption{Backlog du Sprint 3}
-\label{tab:sb-sprint3}
 \endlastfoot
 
 \multirow{3}{6.6cm}{\centering En tant que CLIENT\_ADMIN, je veux créer un compte afin d'accéder à la plateforme et gérer mon équipe.}
 & Créer le compte dans Keycloak. & 1 \\ \cline{2-3}
-& Synchroniser l'utilisateur avec la plateforme. & 1 \\ \cline{2-3}
+& Synchroniser l'utilisateur avec la plateforme. & 2 \\ \cline{2-3}
 & Tester la création du compte. & 1 \\ \hline
 
 \multirow{3}{6.6cm}{\centering En tant qu'ADMIN, CLIENT\_ADMIN ou MEMBER, je veux me connecter afin d'accéder à la plateforme.}
-& Intégrer Keycloak au mécanisme d'authentification. & 1 \\ \cline{2-3}
+& Intégrer Keycloak au mécanisme d'authentification. & 3 \\ \cline{2-3}
 & Développer l'interface de connexion. & 1 \\ \cline{2-3}
 & Vérifier l'authentification et le rôle de l'utilisateur. & 1 \\ \hline
 
@@ -58,23 +111,23 @@ User Story & Tâches & Estimation \\
 
 \multirow{4}{6.6cm}{\centering En tant qu'ADMIN, je veux gérer les utilisateurs de la plateforme.}
 & Développer la liste des utilisateurs. & 1 \\ \cline{2-3}
-& Développer la modification du rôle d'un utilisateur. & 1 \\ \cline{2-3}
-& Développer l'interface d'administration (admin-console). & 1 \\ \cline{2-3}
+& Développer la modification du rôle d'un utilisateur. & 2 \\ \cline{2-3}
+& Développer l'interface d'administration (admin-console). & 2 \\ \cline{2-3}
 & Tester la gestion des utilisateurs. & 1 \\ \hline
 
 \multirow{5}{6.6cm}{\centering En tant que CLIENT\_ADMIN, je veux gérer mon équipe.}
-& Développer l'ajout d'un membre. & 1 \\ \cline{2-3}
+& Développer l'ajout d'un membre. & 2 \\ \cline{2-3}
 & Développer la liste des membres. & 1 \\ \cline{2-3}
-& Développer la modification des permissions. & 1 \\ \cline{2-3}
+& Développer la modification des permissions. & 2 \\ \cline{2-3}
 & Développer la suppression d'un membre. & 1 \\ \cline{2-3}
-& Développer l'interface de gestion de l'équipe. & 1 \\ \hline
+& Développer l'interface de gestion de l'équipe. & 2 \\ \hline
 
 \end{longtable}
 }
 
 \subsection{Diagramme de cas d'utilisation du Sprint 3}
 
-Le diagramme réunit les quatre acteurs de ce sprint (Visiteur, MEMBER, CLIENT\_ADMIN, ADMIN, les trois derniers généralisés sous un acteur commun « Utilisateur authentifié » pour les cas d'utilisation qu'ils partagent) et l'ensemble des dix fonctionnalités du sprint.
+Le diagramme réunit les quatre acteurs de ce sprint (Visiteur, MEMBER, CLIENT\_ADMIN, ADMIN, et l'ensemble des dix fonctionnalités du sprint.
 
 \begin{figure}[H]
  \centering
@@ -82,10 +135,7 @@ Le diagramme réunit les quatre acteurs de ce sprint (Visiteur, MEMBER, CLIENT\_
     \caption{Diagramme de cas d'utilisation du Sprint 3 — Gestion des utilisateurs et des accès}
     \label{fig:uc-sprint3}
 \end{figure}
-
 \subsection{Services Web}
-
-\needspace{0.55\textheight}
 {\setlength{\tabcolsep}{8pt}
 \begin{longtable}{|p{5.8cm}|p{8.4cm}|}
 \hline
@@ -99,17 +149,70 @@ Service Web & Description \\
 \endfoot
 \hline
 \endlastfoot
-\texttt{POST /api/auth/register} & Créer un compte. \\ \hline
+\texttt{POST\slash api\slash auth\slash register} & Créer un compte. \\ \hline
 Connexion (Keycloak, OIDC) & Échange des identifiants contre un jeton, hors API du backend. \\ \hline
-\texttt{GET /api/users/me} & Consulter son profil. \\ \hline
-\texttt{PATCH /api/users/me} & Modifier son profil. \\ \hline
-\texttt{GET /api/users} & Lister les utilisateurs (ADMIN). \\ \hline
-\texttt{PATCH /api/users/\{id\}/role} & Modifier le rôle d'un utilisateur (ADMIN). \\ \hline
-\texttt{GET /api/team/members} & Lister les membres de son équipe. \\ \hline
-\texttt{POST /api/team/members} & Ajouter un membre. \\ \hline
-\texttt{PUT /api/team/members/\{id\}/permissions} & Modifier les permissions d'un membre. \\ \hline
-\texttt{DELETE /api/team/members/\{id\}} & Supprimer un membre. \\ \hline
+\texttt{GET\slash api\slash users\slash me} & Consulter son profil. \\ \hline
+\texttt{PATCH\slash api\slash users\slash me} & Modifier son profil. \\ \hline
+\texttt{GET\slash api\slash users} & Lister les utilisateurs (ADMIN). \\ \hline
+\texttt{PATCH\slash api\slash users\slash\{id\}\slash role} & Modifier le rôle d'un utilisateur (ADMIN). \\ \hline
+\texttt{GET\slash api\slash team\slash members} & Lister les membres de son équipe. \\ \hline
+\texttt{POST\slash api\slash team\slash members} & Ajouter un membre. \\ \hline
+\texttt{PUT\slash api\slash team\slash members\slash\{id\}\slash permissions} & Modifier les permissions d'un membre. \\ \hline
+\texttt{DELETE\slash api\slash team\slash members\slash\{id\}} & Supprimer un membre. \\ \hline
 \end{longtable}}
+% \subsection{Services Web}
+% {\setlength{\tabcolsep}{8pt}
+% \begin{longtable}{|p{5.8cm}|p{8.4cm}|}
+% \hline
+% Service Web & Description \\
+% \hline
+% \endfirsthead
+% \hline
+% Service Web & Description \\
+% \hline
+% \endhead
+% \endfoot
+% \hline
+% \endlastfoot
+% \texttt{POST /api/auth/register} & Créer un compte. \\ \hline
+% Connexion (Keycloak, OIDC) & Échange des identifiants contre un jeton, hors API du backend. \\ \hline
+% \texttt{GET /api/users/me} & Consulter son profil. \\ \hline
+% \texttt{PATCH /api/users/me} & Modifier son profil. \\ \hline
+% \texttt{GET /api/users} & Lister les utilisateurs (ADMIN). \\ \hline
+% \texttt{PATCH /api/users/\{id\}/role} & Modifier le rôle d'un utilisateur (ADMIN). \\ \hline
+% \texttt{GET /api/team/members} & Lister les membres de son équipe. \\ \hline
+% \texttt{POST /api/team/members} & Ajouter un membre. \\ \hline
+% \texttt{PUT /api/team/members/\{id\}/permissions} & Modifier les permissions d'un membre. \\ \hline
+% \texttt{DELETE /api/team/members/\{id\}} & Supprimer un membre. \\ \hline
+% \end{longtable}}
+
+% % \subsection{Services Web}
+
+% % \needspace{0.55\textheight}
+% % {\setlength{\tabcolsep}{8pt}
+% % \begin{longtable}{|p{5.8cm}|p{8.4cm}|}
+% % \hline
+% % Service Web & Description \\
+% % \hline
+% % \endfirsthead
+% % \hline
+% % Service Web & Description \\
+% % \hline
+% % \endhead
+% % \endfoot
+% % \hline
+% % \endlastfoot
+% % \texttt{POST /api/auth/register} & Créer un compte. \\ \hline
+% % Connexion (Keycloak, OIDC) & Échange des identifiants contre un jeton, hors API du backend. \\ \hline
+% % \texttt{GET /api/users/me} & Consulter son profil. \\ \hline
+% % \texttt{PATCH /api/users/me} & Modifier son profil. \\ \hline
+% % \texttt{GET /api/users} & Lister les utilisateurs (ADMIN). \\ \hline
+% % \texttt{PATCH /api/users/\{id\}/role} & Modifier le rôle d'un utilisateur (ADMIN). \\ \hline
+% % \texttt{GET /api/team/members} & Lister les membres de son équipe. \\ \hline
+% % \texttt{POST /api/team/members} & Ajouter un membre. \\ \hline
+% % \texttt{PUT /api/team/members/\{id\}/permissions} & Modifier les permissions d'un membre. \\ \hline
+% % \texttt{DELETE /api/team/members/\{id\}} & Supprimer un membre. \\ \hline
+% % \end{longtable}}
 
 \subsection{Conception}
 
@@ -180,19 +283,14 @@ Fonctionnalité : Gérer son équipe (CLIENT\_ADMIN). Le CLIENT\_ADMIN consulte 
 \subsection{Conclusion}
 
 Ce sprint livre l'identité et le contrôle d'accès de la plateforme : connexion commune aux trois rôles, gestion des utilisateurs côté ADMIN, gestion d'équipe côté CLIENT\_ADMIN. Toutes les fonctionnalités développées dans les sprints suivants s'appuient sur ce socle de rôles et de permissions.
-
-\clearpage
 \section{Sprint 4 : Gestion des applications}
 
 \subsection{Introduction}
 
 Ce sprint livre le cycle de vie complet d'une application cliente : déploiement, consultation, mise à jour, suppression, historique des révisions et retour à une version antérieure, ainsi que les actions de suspension et de suppression forcée réservées à l'ADMIN. C'est la première fonctionnalité complète et accessible de bout en bout depuis le portail, appuyée sur les accès mis en place au Sprint 3 et sur Knative Serving (Release 0).
-
 \subsection{Sprint Backlog}
-
 Le tableau~\ref{tab:sb-sprint4} présente le backlog détaillé du Sprint 4, obtenu en décomposant chaque User Story retenue en tâches techniques.
 
-\needspace{0.75\textheight}
 {
 \setlength{\LTleft}{-1.5cm}
 \setlength{\LTright}{-1.5cm}
@@ -209,39 +307,93 @@ User Story & Tâches & Estimation \\
 \endhead
 \endfoot
 \hline
-
 \caption{Backlog du Sprint 4}
 \label{tab:sb-sprint4}
 \endlastfoot
 
 \multirow{4}{6.6cm}{\centering En tant que CLIENT\_ADMIN ou MEMBER (avec permission DEPLOY\_APP), je veux déployer une application à partir d'une image Docker afin de la mettre en service.}
-& Développer l'API de déploiement. & 1 \\* \cline{2-3}
+& Développer l'API de déploiement. & 3 \\* \cline{2-3}
 & Développer le formulaire de déploiement du portail. & 1 \\* \cline{2-3}
-& Intégrer la création de la ressource Knative correspondante. & 1 \\* \cline{2-3}
+& Intégrer la création de la ressource Knative correspondante. & 2 \\* \cline{2-3}
 & Tester le déploiement d'une application. & 1 \\ \hline
 
 \multirow{3}{6.6cm}{\centering En tant que CLIENT\_ADMIN ou MEMBER, je veux consulter mes applications et leur statut afin de suivre leur état.}
 & Développer la liste des applications. & 1 \\* \cline{2-3}
 & Développer la page de détail d'une application. & 1 \\* \cline{2-3}
-& Synchroniser le statut en temps réel depuis Kubernetes. & 1 \\ \hline
+& Synchroniser le statut en temps réel depuis Kubernetes. & 3 \\ \hline
+\pagebreak
 
 \multirow{3}{6.6cm}{\centering En tant que CLIENT\_ADMIN ou MEMBER (avec permission DEPLOY\_APP/DELETE\_APP), je veux modifier, redéployer ou supprimer une application afin d'en gérer le cycle de vie.}
-& Développer la mise à jour et le redéploiement. & 1 \\* \cline{2-3}
+& Développer la mise à jour et le redéploiement. & 2 \\* \cline{2-3}
 & Développer la suppression d'une application. & 1 \\* \cline{2-3}
 & Tester la suppression et la mise à jour. & 1 \\ \hline
 
 \multirow{3}{6.6cm}{\centering En tant que CLIENT\_ADMIN ou MEMBER (avec permission DEPLOY\_APP), je veux consulter l'historique des révisions et revenir à une version antérieure afin de corriger un déploiement défectueux.}
-& Développer la liste des révisions. & 1 \\* \cline{2-3}
-& Développer le retour à une révision antérieure. & 1 \\* \cline{2-3}
+& Développer la liste des révisions. & 2 \\* \cline{2-3}
+& Développer le retour à une révision antérieure. & 2 \\* \cline{2-3}
 & Tester ce retour en arrière. & 1 \\ \hline
 
 \multirow{3}{6.6cm}{\centering En tant qu'ADMIN, je veux suspendre, restaurer ou supprimer de force une application afin de gérer les abus ou incidents.}
-& Développer la suspension et la restauration d'une application. & 1 \\* \cline{2-3}
+& Développer la suspension et la restauration d'une application. & 2 \\* \cline{2-3}
 & Développer la suppression forcée. & 1 \\* \cline{2-3}
 & Tester ces actions administratives. & 1 \\ \hline
 
 \end{longtable}
 }
+
+% \subsection{Sprint Backlog}
+
+% Le tableau~\ref{tab:sb-sprint4} présente le backlog détaillé du Sprint 4, obtenu en décomposant chaque User Story retenue en tâches techniques.
+
+% \needspace{0.75\textheight}
+% {
+% \setlength{\LTleft}{-1.5cm}
+% \setlength{\LTright}{-1.5cm}
+% \setlength{\tabcolsep}{8pt}
+% \renewcommand{\arraystretch}{1.9}
+% \begin{longtable}{|p{6.6cm}|>{\raggedright\arraybackslash}p{8.1cm}|>{\centering\arraybackslash}p{2.3cm}|}
+% \hline
+% User Story & Tâches & Estimation \\
+% \hline
+% \endfirsthead
+
+% \endhead
+% \endfoot
+% \hline
+
+% \caption{Backlog du Sprint 4}
+% \label{tab:sb-sprint4}
+% \endlastfoot
+
+% \multirow{4}{6.6cm}{\centering En tant que CLIENT\_ADMIN ou MEMBER (avec permission DEPLOY\_APP), je veux déployer une application à partir d'une image Docker afin de la mettre en service.}
+% & Développer l'API de déploiement. & 1 \\* \cline{2-3}
+% & Développer le formulaire de déploiement du portail. & 1 \\* \cline{2-3}
+% & Intégrer la création de la ressource Knative correspondante. & 1 \\* \cline{2-3}
+% & Tester le déploiement d'une application. & 1 \\ \hline
+
+% \multirow{3}{6.6cm}{\centering En tant que CLIENT\_ADMIN ou MEMBER, je veux consulter mes applications et leur statut afin de suivre leur état.}
+% & Développer la liste des applications. & 1 \\* \cline{2-3}
+% & Développer la page de détail d'une application. & 1 \\* \cline{2-3}
+% & Synchroniser le statut en temps réel depuis Kubernetes. & 1 \\ \hline
+
+% \multirow{3}{6.6cm}{\centering En tant que CLIENT\_ADMIN ou MEMBER (avec permission DEPLOY\_APP/DELETE\_APP), je veux modifier, redéployer ou supprimer une application afin d'en gérer le cycle de vie.}
+% & Développer la mise à jour et le redéploiement. & 1 \\* \cline{2-3}
+% & Développer la suppression d'une application. & 1 \\* \cline{2-3}
+% & Tester la suppression et la mise à jour. & 1 \\ \hline
+
+% \multirow{3}{6.6cm}{\centering En tant que CLIENT\_ADMIN ou MEMBER (avec permission DEPLOY\_APP), je veux consulter l'historique des révisions et revenir à une version antérieure afin de corriger un déploiement défectueux.}
+% & Développer la liste des révisions. & 1 \\* \cline{2-3}
+% & Développer le retour à une révision antérieure. & 1 \\* \cline{2-3}
+% & Tester ce retour en arrière. & 1 \\ \hline
+
+% \multirow{3}{6.6cm}{\centering En tant qu'ADMIN, je veux suspendre, restaurer ou supprimer de force une application afin de gérer les abus ou incidents.}
+% & Développer la suspension et la restauration d'une application. & 1 \\* \cline{2-3}
+% & Développer la suppression forcée. & 1 \\* \cline{2-3}
+% & Tester ces actions administratives. & 1 \\ \hline
+
+% \end{longtable}
+% }
+
 
 \subsection{Diagramme de cas d'utilisation du Sprint 4}
 
@@ -253,10 +405,7 @@ Le diagramme réunit CLIENT\_ADMIN et MEMBER (généralisés sous « Utilisateur
     \caption{Diagramme de cas d'utilisation du Sprint 4 — Gestion des applications}
     \label{fig:uc-sprint4}
 \end{figure}
-
 \subsection{Services Web}
-
-\needspace{0.55\textheight}
 {\setlength{\tabcolsep}{8pt}
 \begin{longtable}{|p{5.8cm}|p{8.4cm}|}
 \hline
@@ -270,19 +419,49 @@ Service Web & Description \\
 \endfoot
 \hline
 \endlastfoot
-\texttt{POST /api/apps} & Déployer une application. \\ \hline
-\texttt{GET /api/apps} & Lister ses applications. \\ \hline
-\texttt{GET /api/apps/\{id\}} & Détail d'une application. \\ \hline
-\texttt{POST /api/apps/\{id\}/deploy} & Redéployer une application existante. \\ \hline
-\texttt{PUT /api/apps/\{id\}} & Modifier une application. \\ \hline
-\texttt{DELETE /api/apps/\{id\}} & Supprimer une application. \\ \hline
-\texttt{GET /api/apps/\{id\}/revisions} & Lister les révisions. \\ \hline
-\texttt{POST /api/apps/\{id\}/rollback/\{revisionName\}} & Revenir à une révision antérieure. \\ \hline
-\texttt{GET /api/admin/apps} & Lister toutes les applications, tous locataires confondus (ADMIN). \\ \hline
-\texttt{DELETE /api/admin/apps/\{id\}} & Suppression forcée (ADMIN). \\ \hline
-\texttt{POST /api/admin/apps/\{id\}/suspend} & Suspendre une application (ADMIN). \\ \hline
-\texttt{POST /api/admin/apps/\{id\}/restore} & Restaurer une application suspendue (ADMIN). \\ \hline
+\texttt{POST\slash api\slash apps} & Déployer une application. \\ \hline
+\texttt{GET\slash api\slash apps} & Lister ses applications. \\ \hline
+\texttt{GET\slash api\slash apps\slash\{id\}} & Détail d'une application. \\ \hline
+\texttt{POST\slash api\slash apps\slash\{id\}\slash deploy} & Redéployer une application existante. \\ \hline
+\texttt{PUT\slash api\slash apps\slash\{id\}} & Modifier une application. \\ \hline
+\texttt{DELETE\slash api\slash apps\slash\{id\}} & Supprimer une application. \\ \hline
+\texttt{GET\slash api\slash apps\slash\{id\}\slash revisions} & Lister les révisions. \\ \hline
+\texttt{POST\slash api\slash apps\slash\{id\}\slash rollback\slash\{revisionName\}} & Revenir à une révision antérieure. \\ \hline
+\texttt{GET\slash api\slash admin\slash apps} & Lister toutes les applications, tous locataires confondus (ADMIN). \\ \hline
+\texttt{DELETE\slash api\slash admin\slash apps\slash\{id\}} & Suppression forcée (ADMIN). \\ \hline
+\texttt{POST\slash api\slash admin\slash apps\slash\{id\}\slash suspend} & Suspendre une application (ADMIN). \\ \hline
+\texttt{POST\slash api\slash admin\slash apps\slash\{id\}\slash restore} & Restaurer une application suspendue (ADMIN). \\ \hline
 \end{longtable}}
+
+% \subsection{Services Web}
+
+% \needspace{0.55\textheight}
+% {\setlength{\tabcolsep}{8pt}
+% \begin{longtable}{|p{5.8cm}|p{8.4cm}|}
+% \hline
+% Service Web & Description \\
+% \hline
+% \endfirsthead
+% \hline
+% Service Web & Description \\
+% \hline
+% \endhead
+% \endfoot
+% \hline
+% \endlastfoot
+% \texttt{POST /api/apps} & Déployer une application. \\ \hline
+% \texttt{GET /api/apps} & Lister ses applications. \\ \hline
+% \texttt{GET /api/apps/\{id\}} & Détail d'une application. \\ \hline
+% \texttt{POST /api/apps/\{id\}/deploy} & Redéployer une application existante. \\ \hline
+% \texttt{PUT /api/apps/\{id\}} & Modifier une application. \\ \hline
+% \texttt{DELETE /api/apps/\{id\}} & Supprimer une application. \\ \hline
+% \texttt{GET /api/apps/\{id\}/revisions} & Lister les révisions. \\ \hline
+% \texttt{POST /api/apps/\{id\}/rollback/\{revisionName\}} & Revenir à une révision antérieure. \\ \hline
+% \texttt{GET /api/admin/apps} & Lister toutes les applications, tous locataires confondus (ADMIN). \\ \hline
+% \texttt{DELETE /api/admin/apps/\{id\}} & Suppression forcée (ADMIN). \\ \hline
+% \texttt{POST /api/admin/apps/\{id\}/suspend} & Suspendre une application (ADMIN). \\ \hline
+% \texttt{POST /api/admin/apps/\{id\}/restore} & Restaurer une application suspendue (ADMIN). \\ \hline
+% \end{longtable}}
 
 \subsection{Conception}
 
@@ -366,12 +545,9 @@ Ce sprint livre le cycle de vie complet de gestion d'une application, accessible
 \subsection{Introduction}
 
 Ce sprint livre, comme un seul domaine fonctionnel, la gestion des sujets Kafka et la configuration des déclencheurs qui relient un sujet à une application : la publication d'un message sur un sujet réveille alors automatiquement l'application concernée. Ces deux briques, Kafka (Strimzi) et Knative Eventing, ne prennent leur sens qu'ensemble ; les traiter comme un seul sprint évite de les documenter à deux endroits distincts.
-
 \subsection{Sprint Backlog}
-
 Le tableau~\ref{tab:sb-sprint5} présente le backlog détaillé du Sprint 5, obtenu en décomposant chaque User Story retenue en tâches techniques.
 
-\needspace{0.75\textheight}
 {
 \setlength{\LTleft}{-1.5cm}
 \setlength{\LTright}{-1.5cm}
@@ -382,13 +558,18 @@ Le tableau~\ref{tab:sb-sprint5} présente le backlog détaillé du Sprint 5, obt
 User Story & Tâches & Estimation \\
 \hline
 \endfirsthead
+
+\multicolumn{3}{l}{\small\itshape (suite du tableau~\ref{tab:sb-sprint5})}\\
 \hline
 User Story & Tâches & Estimation \\
 \hline
 \endhead
-\endfoot
-\hline
 
+\hline
+\multicolumn{3}{r}{\small\itshape (suite page suivante)}\\
+\endfoot
+
+\hline
 \caption{Backlog du Sprint 5}
 \label{tab:sb-sprint5}
 \endlastfoot
@@ -400,23 +581,72 @@ User Story & Tâches & Estimation \\
 & Développer la page de gestion des sujets Kafka. & 1 \\ \hline
 
 \multirow{5}{6.6cm}{\centering En tant que CLIENT\_ADMIN ou MEMBER (avec permission MANAGE\_EVENTING), je veux relier un sujet Kafka à une application afin qu'elle soit réveillée automatiquement à la réception d'un message.}
-& Développer la création d'une KafkaSource. & 1 \\* \cline{2-3}
-& Développer la création d'un Trigger. & 1 \\* \cline{2-3}
+& Développer la création d'une KafkaSource. & 3 \\* \cline{2-3}
+& Développer la création d'un Trigger. & 2 \\* \cline{2-3}
 & Développer la suppression d'un Trigger. & 1 \\* \cline{2-3}
-& Développer la page de configuration des déclencheurs. & 1 \\* \cline{2-3}
-& Tester le déclenchement d'une application. & 1 \\ \hline
+& Développer la page de configuration des déclencheurs. & 2 \\* \cline{2-3}
+& Tester le déclenchement d'une application. & 2 \\ \hline
 
 \multirow{2}{6.6cm}{\centering En tant que CLIENT\_ADMIN ou MEMBER, je veux publier un événement sur un sujet afin de déclencher un traitement.}
-& Développer l'API de publication d'un événement. & 1 \\* \cline{2-3}
+& Développer l'API de publication d'un événement. & 2 \\* \cline{2-3}
 & Tester la publication d'un événement. & 1 \\ \hline
 
 \multirow{3}{6.6cm}{\centering En tant qu'ADMIN, je veux consulter l'ensemble des sujets, sources et déclencheurs de tous les clients, et supprimer un sujet de force, afin de gérer les abus.}
-& Développer la vue globale des sujets, sources et déclencheurs. & 1 \\* \cline{2-3}
+& Développer la vue globale des sujets, sources et déclencheurs. & 2 \\* \cline{2-3}
 & Développer la suppression forcée d'un sujet. & 1 \\* \cline{2-3}
 & Tester ces actions. & 1 \\ \hline
-
 \end{longtable}
 }
+% \subsection{Sprint Backlog}
+
+% Le tableau~\ref{tab:sb-sprint5} présente le backlog détaillé du Sprint 5, obtenu en décomposant chaque User Story retenue en tâches techniques.
+
+% \needspace{0.75\textheight}
+% {
+% \setlength{\LTleft}{-1.5cm}
+% \setlength{\LTright}{-1.5cm}
+% \setlength{\tabcolsep}{8pt}
+% \renewcommand{\arraystretch}{1.9}
+% \begin{longtable}{|p{6.6cm}|>{\raggedright\arraybackslash}p{8.1cm}|>{\centering\arraybackslash}p{2.3cm}|}
+% \hline
+% User Story & Tâches & Estimation \\
+% \hline
+% \endfirsthead
+% \hline
+% User Story & Tâches & Estimation \\
+% \hline
+% \endhead
+% \endfoot
+% \hline
+
+% \caption{Backlog du Sprint 5}
+% \label{tab:sb-sprint5}
+% \endlastfoot
+
+% \multirow{4}{6.6cm}{\centering En tant que CLIENT\_ADMIN ou MEMBER (avec permission MANAGE\_KAFKA), je veux créer et gérer des sujets Kafka afin d'y publier des événements.}
+% & Développer la création d'un sujet Kafka. & 1 \\* \cline{2-3}
+% & Développer la liste et le détail d'un sujet. & 1 \\* \cline{2-3}
+% & Développer la suppression d'un sujet. & 1 \\* \cline{2-3}
+% & Développer la page de gestion des sujets Kafka. & 1 \\ \hline
+
+% \multirow{5}{6.6cm}{\centering En tant que CLIENT\_ADMIN ou MEMBER (avec permission MANAGE\_EVENTING), je veux relier un sujet Kafka à une application afin qu'elle soit réveillée automatiquement à la réception d'un message.}
+% & Développer la création d'une KafkaSource. & 1 \\* \cline{2-3}
+% & Développer la création d'un Trigger. & 1 \\* \cline{2-3}
+% & Développer la suppression d'un Trigger. & 1 \\* \cline{2-3}
+% & Développer la page de configuration des déclencheurs. & 1 \\* \cline{2-3}
+% & Tester le déclenchement d'une application. & 1 \\ \hline
+
+% \multirow{2}{6.6cm}{\centering En tant que CLIENT\_ADMIN ou MEMBER, je veux publier un événement sur un sujet afin de déclencher un traitement.}
+% & Développer l'API de publication d'un événement. & 1 \\* \cline{2-3}
+% & Tester la publication d'un événement. & 1 \\ \hline
+
+% \multirow{3}{6.6cm}{\centering En tant qu'ADMIN, je veux consulter l'ensemble des sujets, sources et déclencheurs de tous les clients, et supprimer un sujet de force, afin de gérer les abus.}
+% & Développer la vue globale des sujets, sources et déclencheurs. & 1 \\* \cline{2-3}
+% & Développer la suppression forcée d'un sujet. & 1 \\* \cline{2-3}
+% & Tester ces actions. & 1 \\ \hline
+
+% \end{longtable}
+% }
 
 \subsection{Diagramme de cas d'utilisation du Sprint 5}
 
@@ -428,11 +658,7 @@ Le diagramme réunit CLIENT\_ADMIN et MEMBER (sous permission \texttt{MANAGE\_KA
     \caption{Diagramme de cas d'utilisation du Sprint 5 — Gestion de la messagerie événementielle}
     \label{fig:uc-sprint5}
 \end{figure}
-
-
 \subsection{Services Web}
-
-\needspace{0.55\textheight}
 {\setlength{\tabcolsep}{8pt}
 \begin{longtable}{|p{5.8cm}|p{8.4cm}|}
 \hline
@@ -446,20 +672,51 @@ Service Web & Description \\
 \endfoot
 \hline
 \endlastfoot
-\texttt{POST /api/kafka/topics} & Créer un sujet Kafka. \\ \hline
-\texttt{GET /api/kafka/topics} & Lister ses sujets. \\ \hline
-\texttt{GET /api/kafka/topics/\{id\}} & Détail d'un sujet. \\ \hline
-\texttt{DELETE /api/kafka/topics/\{id\}} & Supprimer un sujet. \\ \hline
-\texttt{POST /api/eventing/sources} & Créer une KafkaSource. \\ \hline
-\texttt{GET /api/eventing/sources} & Lister ses KafkaSource. \\ \hline
-\texttt{POST /api/eventing/triggers} & Créer un déclencheur (Trigger). \\ \hline
-\texttt{GET /api/eventing/triggers} & Lister ses déclencheurs. \\ \hline
-\texttt{DELETE /api/eventing/triggers/\{id\}} & Supprimer un déclencheur. \\ \hline
-\texttt{POST /api/events} & Publier un événement (CloudEvent). \\ \hline
-\texttt{GET /api/admin/kafka/topics} & Lister tous les sujets, tous locataires confondus (ADMIN). \\ \hline
-\texttt{DELETE /api/admin/kafka/topics/\{id\}} & Suppression forcée d'un sujet (ADMIN). \\ \hline
-\texttt{GET /api/admin/eventing/sources}, \texttt{/triggers} & Vue globale des sources et déclencheurs (ADMIN). \\ \hline
+\texttt{POST\slash api\slash kafka\slash topics} & Créer un sujet Kafka. \\ \hline
+\texttt{GET\slash api\slash kafka\slash topics} & Lister ses sujets. \\ \hline
+\texttt{GET\slash api\slash kafka\slash topics\slash\{id\}} & Détail d'un sujet. \\ \hline
+\texttt{DELETE\slash api\slash kafka\slash topics\slash\{id\}} & Supprimer un sujet. \\ \hline
+\texttt{POST\slash api\slash eventing\slash sources} & Créer une KafkaSource. \\ \hline
+\texttt{GET\slash api\slash eventing\slash sources} & Lister ses KafkaSource. \\ \hline
+\texttt{POST\slash api\slash eventing\slash triggers} & Créer un déclencheur (Trigger). \\ \hline
+\texttt{GET\slash api\slash eventing\slash triggers} & Lister ses déclencheurs. \\ \hline
+\texttt{DELETE\slash api\slash eventing\slash triggers\slash\{id\}} & Supprimer un déclencheur. \\ \hline
+\texttt{POST\slash api\slash events} & Publier un événement (CloudEvent). \\ \hline
+\texttt{GET\slash api\slash admin\slash kafka\slash topics} & Lister tous les sujets, tous locataires confondus (ADMIN). \\ \hline
+\texttt{DELETE\slash api\slash admin\slash kafka\slash topics\slash\{id\}} & Suppression forcée d'un sujet (ADMIN). \\ \hline
+\texttt{GET\slash api\slash admin\slash eventing\slash sources\slash triggers} & Vue globale des sources et déclencheurs (ADMIN). \\ \hline
 \end{longtable}}
+
+% \subsection{Services Web}
+
+% \needspace{0.55\textheight}
+% {\setlength{\tabcolsep}{8pt}
+% \begin{longtable}{|p{5.8cm}|p{8.4cm}|}
+% \hline
+% Service Web & Description \\
+% \hline
+% \endfirsthead
+% \hline
+% Service Web & Description \\
+% \hline
+% \endhead
+% \endfoot
+% \hline
+% \endlastfoot
+% \texttt{POST /api/kafka/topics} & Créer un sujet Kafka. \\ \hline
+% \texttt{GET /api/kafka/topics} & Lister ses sujets. \\ \hline
+% \texttt{GET /api/kafka/topics/\{id\}} & Détail d'un sujet. \\ \hline
+% \texttt{DELETE /api/kafka/topics/\{id\}} & Supprimer un sujet. \\ \hline
+% \texttt{POST /api/eventing/sources} & Créer une KafkaSource. \\ \hline
+% \texttt{GET /api/eventing/sources} & Lister ses KafkaSource. \\ \hline
+% \texttt{POST /api/eventing/triggers} & Créer un déclencheur (Trigger). \\ \hline
+% \texttt{GET /api/eventing/triggers} & Lister ses déclencheurs. \\ \hline
+% \texttt{DELETE /api/eventing/triggers/\{id\}} & Supprimer un déclencheur. \\ \hline
+% \texttt{POST /api/events} & Publier un événement (CloudEvent). \\ \hline
+% \texttt{GET /api/admin/kafka/topics} & Lister tous les sujets, tous locataires confondus (ADMIN). \\ \hline
+% \texttt{DELETE /api/admin/kafka/topics/\{id\}} & Suppression forcée d'un sujet (ADMIN). \\ \hline
+% \texttt{GET /api/admin/eventing/sources}, \texttt{/triggers} & Vue globale des sources et déclencheurs (ADMIN). \\ \hline
+% \end{longtable}}
 
 \subsection{Conception}
 
@@ -556,7 +813,7 @@ Ce processus, du message Kafka au réveil et au traitement par l'application, es
 \node[lbl, anchor=south, align=center] at (7.6,0.1) {nouveau message Kafka};
 
 \end{tikzpicture}
-\caption{Processus événementiel : d'un message Kafka au réveil et au traitement par l'application Knative}
+\caption{Processus événementiel Kafka vers Knative}
 \label{fig:seq-eventing}
 \end{adjustwidth}
 \end{figure}
@@ -635,18 +892,14 @@ Le déploiement d'une application (Sprint 4) peut également câbler automatique
 
 Ce sprint relie Kafka et Knative Eventing en un service de messagerie événementielle complet et exposé au client : sujets, sources et déclencheurs sont créés, consultés et supprimés depuis le portail, avec une supervision globale côté ADMIN. La plateforme dispose désormais des trois grandes fonctions applicatives — accès, applications, événements — sur lesquelles s'appuie l'observabilité, objet du sprint suivant.
 
-\clearpage
 \section{Sprint 6 : Gestion de l'observabilité applicative}
 
 \subsection{Introduction}
 
 Ce sprint dote le portail client des capacités d'observation de ses propres applications : journaux de déploiement et applicatifs en temps réel, métriques de charge. La supervision de l'ensemble du cluster, réservée à l'ADMIN, est un domaine distinct traité au Sprint 9.
-
 \subsection{Sprint Backlog}
-
 Le tableau~\ref{tab:sb-sprint6} présente le backlog détaillé du Sprint 6, obtenu en décomposant chaque User Story retenue en tâches techniques.
 
-\needspace{0.75\textheight}
 {
 \setlength{\LTleft}{-1.5cm}
 \setlength{\LTright}{-1.5cm}
@@ -657,37 +910,92 @@ Le tableau~\ref{tab:sb-sprint6} présente le backlog détaillé du Sprint 6, obt
 User Story & Tâches & Estimation \\
 \hline
 \endfirsthead
+
+\multicolumn{3}{l}{\small\itshape (suite du tableau~\ref{tab:sb-sprint6})}\\
 \hline
 User Story & Tâches & Estimation \\
 \hline
 \endhead
-\endfoot
-\hline
 
+\hline
+\multicolumn{3}{r}{\small\itshape (suite page suivante)}\\
+\endfoot
+
+\hline
 \caption{Backlog du Sprint 6}
 \label{tab:sb-sprint6}
 \endlastfoot
 
 \multirow{3}{6.6cm}{\centering En tant que CLIENT\_ADMIN, je veux consulter les journaux de déploiement de mes applications afin de diagnostiquer un problème.}
-& Développer la consultation des journaux de déploiement. & 1 \\ \cline{2-3}
-& Développer le filtrage par niveau. & 1 \\ \cline{2-3}
+& Développer la consultation des journaux de déploiement. & 1 \\* \cline{2-3}
+& Développer le filtrage par niveau. & 1 \\* \cline{2-3}
 & Développer la page de consultation des journaux. & 1 \\ \hline
+\pagebreak
 
 \multirow{2}{6.6cm}{\centering En tant que CLIENT\_ADMIN, je veux suivre les journaux applicatifs en temps réel afin d'observer le comportement de mon application en direct.}
-& Développer le flux temps réel des journaux de déploiement. & 1 \\ \cline{2-3}
-& Développer le flux temps réel des journaux bruts du conteneur. & 1 \\ \hline
+& Développer le flux temps réel des journaux de déploiement. & 3 \\*
+\cline{2-3}
+& Développer le flux temps réel des journaux bruts du conteneur. & 2 \\ \hline
 
 \multirow{3}{6.6cm}{\centering En tant que CLIENT\_ADMIN, je veux consulter les métriques de mes applications afin d'évaluer leur charge et leurs performances.}
-& Développer les métriques par application. & 1 \\ \cline{2-3}
-& Développer le flux temps réel des métriques. & 1 \\ \cline{2-3}
+& Développer les métriques par application. & 2 \\* \cline{2-3}
+& Développer le flux temps réel des métriques. & 2 \\* \cline{2-3}
 & Développer la page de monitoring. & 1 \\ \hline
 
 \multirow{2}{6.6cm}{\centering En tant qu'ADMIN, je veux consulter les journaux de déploiement de tous les locataires afin de superviser la plateforme.}
-& Développer la vue administrateur des journaux. & 1 \\ \cline{2-3}
+& Développer la vue administrateur des journaux. & 1 \\* \cline{2-3}
 & Tester l'accès transversal aux journaux. & 1 \\ \hline
+
 
 \end{longtable}
 }
+
+% \subsection{Sprint Backlog}
+
+% Le tableau~\ref{tab:sb-sprint6} présente le backlog détaillé du Sprint 6, obtenu en décomposant chaque User Story retenue en tâches techniques.
+
+% \needspace{0.75\textheight}
+% {
+% \setlength{\LTleft}{-1.5cm}
+% \setlength{\LTright}{-1.5cm}
+% \setlength{\tabcolsep}{8pt}
+% \renewcommand{\arraystretch}{1.9}
+% \begin{longtable}{|p{6.6cm}|>{\raggedright\arraybackslash}p{8.1cm}|>{\centering\arraybackslash}p{2.3cm}|}
+% \hline
+% User Story & Tâches & Estimation \\
+% \hline
+% \endfirsthead
+% \hline
+% User Story & Tâches & Estimation \\
+% \hline
+% \endhead
+% \endfoot
+% \hline
+
+% \caption{Backlog du Sprint 6}
+% \label{tab:sb-sprint6}
+% \endlastfoot
+
+% \multirow{3}{6.6cm}{\centering En tant que CLIENT\_ADMIN, je veux consulter les journaux de déploiement de mes applications afin de diagnostiquer un problème.}
+% & Développer la consultation des journaux de déploiement. & 1 \\ \cline{2-3}
+% & Développer le filtrage par niveau. & 1 \\ \cline{2-3}
+% & Développer la page de consultation des journaux. & 1 \\ \hline
+
+% \multirow{2}{6.6cm}{\centering En tant que CLIENT\_ADMIN, je veux suivre les journaux applicatifs en temps réel afin d'observer le comportement de mon application en direct.}
+% & Développer le flux temps réel des journaux de déploiement. & 1 \\ \cline{2-3}
+% & Développer le flux temps réel des journaux bruts du conteneur. & 1 \\ \hline
+
+% \multirow{3}{6.6cm}{\centering En tant que CLIENT\_ADMIN, je veux consulter les métriques de mes applications afin d'évaluer leur charge et leurs performances.}
+% & Développer les métriques par application. & 1 \\ \cline{2-3}
+% & Développer le flux temps réel des métriques. & 1 \\ \cline{2-3}
+% & Développer la page de monitoring. & 1 \\ \hline
+
+% \multirow{2}{6.6cm}{\centering En tant qu'ADMIN, je veux consulter les journaux de déploiement de tous les locataires afin de superviser la plateforme.}
+% & Développer la vue administrateur des journaux. & 1 \\ \cline{2-3}
+% & Tester l'accès transversal aux journaux. & 1 \\ \hline
+
+% \end{longtable}
+% }
 
 \subsection{Diagramme de cas d'utilisation du Sprint 6}
 
@@ -699,10 +1007,7 @@ Le diagramme réunit CLIENT\_ADMIN et MEMBER (sous permission \texttt{VIEW\_LOGS
     \caption{Diagramme de cas d'utilisation du Sprint 6 — Gestion de l'observabilité applicative}
     \label{fig:uc-sprint6}
 \end{figure}
-
 \subsection{Services Web}
-
-\needspace{0.55\textheight}
 {\setlength{\tabcolsep}{8pt}
 \begin{longtable}{|p{5.8cm}|p{8.4cm}|}
 \hline
@@ -716,14 +1021,65 @@ Service Web & Description \\
 \endfoot
 \hline
 \endlastfoot
-\texttt{GET /api/logs/apps/\{id\}} & Journaux de déploiement d'une application, filtrables par niveau. \\ \hline
-\texttt{GET /api/logs/me} & Ses propres journaux. \\ \hline
-\texttt{GET /api/logs/stream} (SSE) & Flux temps réel des journaux de déploiement. \\ \hline
-\texttt{GET /api/logs/apps/\{id\}/pod-logs/stream} (SSE) & Flux temps réel des journaux bruts du conteneur. \\ \hline
-\texttt{GET /api/metrics/apps/\{id\}} & Métriques d'une application (requêtes/s, latence, CPU, mémoire). \\ \hline
-\texttt{GET /api/metrics/apps/\{id\}/stream} (SSE) & Flux temps réel des métriques d'une application. \\ \hline
-\texttt{GET /api/admin/logs} & Journaux de déploiement de tous les locataires (ADMIN). \\ \hline
+\texttt{GET\slash api\slash logs\slash apps\slash\{id\}} & Journaux de déploiement d'une application, filtrables par niveau. \\ \hline
+\texttt{GET\slash api\slash logs\slash me} & Ses propres journaux. \\ \hline
+\texttt{GET\slash api\slash logs\slash stream} (SSE) & Flux temps réel des journaux de déploiement. \\ \hline
+\texttt{GET\slash api\slash logs\slash apps\slash\{id\}\slash pod-logs\slash stream} (SSE) & Flux temps réel des journaux bruts du conteneur. \\ \hline
+\texttt{GET\slash api\slash metrics\slash apps\slash\{id\}} & Métriques d'une application (requêtes/s, latence, CPU, mémoire). \\ \hline
+\texttt{GET\slash api\slash metrics\slash apps\slash\{id\}\slash stream} (SSE) & Flux temps réel des métriques d'une application. \\ \hline
+\texttt{GET\slash api\slash admin\slash logs} & Journaux de déploiement de tous les locataires (ADMIN). \\ \hline
 \end{longtable}}
+% \subsection{Services Web}
+
+% \needspace{0.55\textheight}
+% {\setlength{\tabcolsep}{8pt}
+% \begin{longtable}{|p{5.8cm}|p{8.4cm}|}
+% \hline
+% Service Web & Description \\
+% \hline
+% \endfirsthead
+% \hline
+% Service Web & Description \\
+% \hline
+% \endhead
+% \endfoot
+% \hline
+% \endlastfoot
+% \texttt{GET /api/logs/apps/\{id\}} & Journaux de déploiement d'une application, filtrables par niveau. \\ \hline
+% \texttt{GET /api/logs/me} & Ses propres journaux. \\ \hline
+% \texttt{GET /api/logs/stream} (SSE) & Flux temps réel des journaux de déploiement. \\ \hline
+% \texttt{GET /api/logs/apps/\{id\}/pod-logs/stream} (SSE) & Flux temps réel des journaux bruts du conteneur. \\ \hline
+% \texttt{GET /api/metrics/apps/\{id\}} & Métriques d'une application (requêtes/s, latence, CPU, mémoire). \\ \hline
+% \texttt{GET /api/metrics/apps/\{id\}/stream} (SSE) & Flux temps réel des métriques d'une application. \\ \hline
+% \texttt{GET /api/admin/logs} & Journaux de déploiement de tous les locataires (ADMIN). \\ \hline
+% \end{longtable}}
+
+
+
+% % \subsection{Services Web}
+
+% % \needspace{0.55\textheight}
+% % {\setlength{\tabcolsep}{8pt}
+% % \begin{longtable}{|p{5.8cm}|p{8.4cm}|}
+% % \hline
+% % Service Web & Description \\
+% % \hline
+% % \endfirsthead
+% % \hline
+% % Service Web & Description \\
+% % \hline
+% % \endhead
+% % \endfoot
+% % \hline
+% % \endlastfoot
+% % \texttt{GET /api/logs/apps/\{id\}} & Journaux de déploiement d'une application, filtrables par niveau. \\ \hline
+% % \texttt{GET /api/logs/me} & Ses propres journaux. \\ \hline
+% % \texttt{GET /api/logs/stream} (SSE) & Flux temps réel des journaux de déploiement. \\ \hline
+% % \texttt{GET /api/logs/apps/\{id\}/pod-logs/stream} (SSE) & Flux temps réel des journaux bruts du conteneur. \\ \hline
+% % \texttt{GET /api/metrics/apps/\{id\}} & Métriques d'une application (requêtes/s, latence, CPU, mémoire). \\ \hline
+% % \texttt{GET /api/metrics/apps/\{id\}/stream} (SSE) & Flux temps réel des métriques d'une application. \\ \hline
+% % \texttt{GET /api/admin/logs} & Journaux de déploiement de tous les locataires (ADMIN). \\ \hline
+% % \end{longtable}}
 
 \subsection{Conception}
 

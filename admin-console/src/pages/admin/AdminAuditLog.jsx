@@ -195,8 +195,10 @@ const AdminAuditLog = () => {
                     onChange={e => setFilters(f => ({ ...f, action: e.target.value }))}
                     style={inputStyle}
                 >
-                    <option value="">All actions</option>
-                    {ACTIONS.map(a => <option key={a} value={a}>{a}</option>)}
+                    <option value="" style={{ background: '#0B1220', color: '#F1F5F9' }}>All actions</option>
+                    {ACTIONS.map(a => (
+                        <option key={a} value={a} style={{ background: '#0B1220', color: '#F1F5F9' }}>{a}</option>
+                    ))}
                 </select>
                 <input
                     placeholder="Target ID"

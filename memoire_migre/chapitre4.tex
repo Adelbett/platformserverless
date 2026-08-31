@@ -4,7 +4,6 @@
 
 Les releases précédentes ont livré l'ensemble des capacités fonctionnelles de la plateforme, backend et interfaces graphiques confondus, pour les trois acteurs identifiés (CLIENT\_ADMIN, MEMBER, ADMIN). Cette dernière release ne porte plus sur des fonctionnalités nouvelles mais sur la solidité technique de la plateforme : consolider les mesures de sécurité mises en place au fil des sprints précédents (Sprint 10), puis harmoniser et fiabiliser les chaînes d'intégration continue de l'ensemble de ses composants (Sprint 11).
 
-\clearpage
 \section{Sprint 10 : Durcissement et sécurité}
 
 \subsection{Introduction}
@@ -17,17 +16,11 @@ Ce sprint a pour objectif de consolider, en un point unique, les mesures de séc
     \item Vérifier et compléter les rôles Kubernetes (RBAC) du backend, au-delà des extensions déjà apportées ponctuellement (Sprint 3, Sprint 9).
     \item Restreindre la configuration CORS du backend à une liste explicite d'origines autorisées.
     \item Identifier et corriger les accès non contrôlés à des ressources appartenant à d'autres tenants (IDOR) sur les points d'accès les plus sensibles.
-    \item Documenter, sans les corriger si le délai du projet ne le permet pas, les risques résiduels identifiés.
+
 \end{itemize}
-
 \subsection{Sprint Backlog}
-
 Le tableau~\ref{tab:sb-sprint10} présente le backlog détaillé du Sprint 10, obtenu en décomposant chaque User Story retenue en tâches techniques.
 
-% \needspace garantit qu'il reste assez de place sur la page : sans cela une
-% coupure peut tomber au milieu d'un groupe \multirow, dont le contenu deborde
-% alors hors du cadre et laisse une cellule vide sur la page suivante.
-\needspace{0.75\textheight}
 {
 % Le tableau deborde volontairement de 1,5 cm dans chaque marge afin de laisser
 % respirer les trois colonnes ; LTleft/LTright sont les parametres propres a
@@ -42,13 +35,18 @@ Le tableau~\ref{tab:sb-sprint10} présente le backlog détaillé du Sprint 10, o
 User Story & Tâches & Estimation \\
 \hline
 \endfirsthead
+
+\multicolumn{3}{l}{\small\itshape (suite du tableau~\ref{tab:sb-sprint10})}\\
 \hline
 User Story & Tâches & Estimation \\
 \hline
 \endhead
-\endfoot
-\hline
 
+\hline
+\multicolumn{3}{r}{\small\itshape (suite page suivante)}\\
+\endfoot
+
+\hline
 \caption{Backlog du Sprint 10}
 \label{tab:sb-sprint10}
 \endlastfoot
@@ -59,7 +57,7 @@ En tant qu'ADMIN, je veux que le \texttt{ClusterRole} du backend soit limité au
 }
 &
 Reconstruire le \texttt{ClusterRole} à partir des ressources effectivement manipulées, vérifier avec \texttt{kubectl auth can-i}.
-& — \\
+& 2 \\
 \hline
 
 \multirow{1}{6.6cm}{
@@ -68,7 +66,7 @@ En tant qu'ADMIN, je veux restreindre les origines autorisées à appeler l'API.
 }
 &
 Configurer \texttt{app.cors.allowed-origins} en liste explicite.
-& — \\
+& 1 \\
 \hline
 
 \multirow{1}{6.6cm}{
@@ -77,11 +75,73 @@ En tant qu'ADMIN, je veux qu'un client ne puisse pas accéder aux ressources d'u
 }
 &
 Auditer et corriger les accès directs par identifiant sur les points d'accès sensibles (journaux, moyens de paiement).
-& — \\
+& 3 \\
 \hline
-
 \end{longtable}
 }
+
+% \subsection{Sprint Backlog}
+
+% Le tableau~\ref{tab:sb-sprint10} présente le backlog détaillé du Sprint 10, obtenu en décomposant chaque User Story retenue en tâches techniques.
+
+% % \needspace garantit qu'il reste assez de place sur la page : sans cela une
+% % coupure peut tomber au milieu d'un groupe \multirow, dont le contenu deborde
+% % alors hors du cadre et laisse une cellule vide sur la page suivante.
+% \needspace{0.75\textheight}
+% {
+% % Le tableau deborde volontairement de 1,5 cm dans chaque marge afin de laisser
+% % respirer les trois colonnes ; LTleft/LTright sont les parametres propres a
+% % longtable (adjustwidth n'a aucun effet sur cet environnement).
+% % Largeur totale : 18,8 cm, soit 1 cm de blanc conserve de chaque cote de la page.
+% \setlength{\LTleft}{-1.5cm}
+% \setlength{\LTright}{-1.5cm}
+% \setlength{\tabcolsep}{8pt}
+% \renewcommand{\arraystretch}{1.9}
+% \begin{longtable}{|p{6.6cm}|>{\raggedright\arraybackslash}p{8.1cm}|>{\centering\arraybackslash}p{2.3cm}|}
+% \hline
+% User Story & Tâches & Estimation \\
+% \hline
+% \endfirsthead
+% \hline
+% User Story & Tâches & Estimation \\
+% \hline
+% \endhead
+% \endfoot
+% \hline
+
+% \caption{Backlog du Sprint 10}
+% \label{tab:sb-sprint10}
+% \endlastfoot
+
+% \multirow{1}{6.6cm}{
+% \centering
+% En tant qu'ADMIN, je veux que le \texttt{ClusterRole} du backend soit limité aux permissions réellement nécessaires.
+% }
+% &
+% Reconstruire le \texttt{ClusterRole} à partir des ressources effectivement manipulées, vérifier avec \texttt{kubectl auth can-i}.
+% & — \\
+% \hline
+
+% \multirow{1}{6.6cm}{
+% \centering
+% En tant qu'ADMIN, je veux restreindre les origines autorisées à appeler l'API.
+% }
+% &
+% Configurer \texttt{app.cors.allowed-origins} en liste explicite.
+% & — \\
+% \hline
+
+% \multirow{1}{6.6cm}{
+% \centering
+% En tant qu'ADMIN, je veux qu'un client ne puisse pas accéder aux ressources d'un autre tenant par manipulation d'identifiant.
+% }
+% &
+% Auditer et corriger les accès directs par identifiant sur les points d'accès sensibles (journaux, moyens de paiement).
+% & — \\
+% \hline
+
+% \end{longtable}
+% }
 
 \subsection{Conception}
 
@@ -306,7 +366,6 @@ Une limite doit être signalée : cette création automatique ayant été introd
 
 Au terme de ce sprint, les mesures de durcissement identifiées au fil du projet sont consolidées et présentées comme une chaîne cohérente : authentification par jeton, autorisation par rôle et permission, vérification de propriété des ressources, restriction des origines autorisées, et isolation réseau des locataires. Les risques résiduels sont documentés plutôt que passés sous silence.
 
-\clearpage
 \section{Sprint 11 : Pipeline CI/CD complet}
 
 \subsection{Introduction}
@@ -361,12 +420,12 @@ En tant qu'ADMIN, je veux que le portail client et la console d'administration s
 }
 &
 Mettre en place le pipeline Jenkins portail (\texttt{npm run build}, Kaniko, Docker Hub).
-& — \\
+& 3 \\
 \cline{2-3}
 
 &
 Mettre en place le pipeline Jenkins admin-console.
-& — \\
+& 2 \\
 \hline
 
 \multirow{2}{6.6cm}{
@@ -375,12 +434,12 @@ En tant qu'ADMIN, je veux fiabiliser l'exécution du pipeline backend.
 }
 &
 Ajouter un réessai automatique à l'étape Checkout.
-& — \\
+& 1 \\
 \cline{2-3}
 
 &
 Ajouter \texttt{--use-new-run}/\texttt{--snapshot-mode=redo} + redémarrage systématique de Jenkins.
-& — \\
+& 2 \\
 \hline
 
 \multirow{1}{6.6cm}{
@@ -389,7 +448,7 @@ En tant qu'ADMIN, je veux un pipeline unique et cohérent pour tous les composan
 }
 &
 Aligner les 4 pipelines sur le socle backend (non réalisé).
-& — \\
+& 2 \\
 \hline
 
 \multirow{1}{6.6cm}{
@@ -398,7 +457,7 @@ En tant qu'ADMIN, je veux une étape de tests automatisés dans les pipelines.
 }
 &
 Retirer \texttt{-DskipTests} et ajouter une étape de test (non réalisé).
-& — \\
+& 2 \\
 \hline
 
 \multirow{1}{6.6cm}{
@@ -407,7 +466,7 @@ En tant qu'ADMIN, je veux une analyse de sécurité des images construites.
 }
 &
 Intégrer un scanner de vulnérabilités dans le pipeline (non réalisé).
-& — \\
+& 2 \\
 \hline
 
 \end{longtable}

@@ -10,7 +10,7 @@ Après avoir présenté, au chapitre précédent, le contexte général du proje
 
 L'analyse de la documentation fonctionnelle de la plateforme permet d'identifier trois acteurs principaux, correspondant aux rôles gérés par le module de sécurité (Keycloak et couche d'autorisation applicative) :
 
-\begin{itemize}[label=\ding{109}]
+\begin{itemize}[label=--]
 \item Administrateur de la plateforme (ADMIN) : représente l'équipe opérationnelle de NextStep IT en charge de l'exploitation de la plateforme. Il supervise l'ensemble des clients (tenants), le cluster Kubernetes, la facturation globale, les quotas, et intervient via la console d'administration dédiée.
 
 \item Administrateur de compte client (CLIENT\_ADMIN) : représente le responsable, côté client, d'un compte locataire de la plateforme. Il gère son équipe (invitation de membres), configure et déploie ses applications, consulte sa facturation, et dispose de la totalité des permissions sur les ressources de son compte.
@@ -21,47 +21,118 @@ L'analyse de la documentation fonctionnelle de la plateforme permet d'identifier
 \subsection{Spécification des besoins}
 
 \medskip
-Besoins fonctionnels
+\textbf{Besoins fonctionnels}
 \medskip
 
 Les besoins fonctionnels sont organisés ci-dessous selon les grands blocs fonctionnels et techniques de la plateforme, qui seront repris sous forme d'epics dans le Product Backlog présenté en section~\ref{sec:scrum}.
 
 \begin{itemize}
-    \item Infrastructure Cloud Native : le système doit reposer sur un cluster Kubernetes offrant l'isolation des ressources par tenant (espace de noms dédié par client), un adressage réseau maîtrisé (répartiteur de charge, passerelle d'entrée) et des règles d'isolation réseau entre locataires.
+    \item \textbf{Gestion des utilisateurs \& de l'authentification}
+    \begin{itemize}[label=--]
+        \item Inscription/connexion via Keycloak (SSO, OIDC).
+        \item Modification du profil (email, mot de passe) synchronisée avec Keycloak.
+    \end{itemize}
 
-    \item Plateforme Serverless : le système doit permettre à un client de déployer une application à partir d'une image Docker existante, de définir le port d'écoute, les ressources allouées (CPU, mémoire), ainsi que les bornes de mise à l'échelle (nombre minimum et maximum de réplicas, y compris la possibilité de descendre à zéro instance en l'absence de trafic). Le système doit assurer le suivi de l'état de déploiement de l'application en temps réel, permettre sa mise à jour, sa suppression logique (conservation de l'historique de facturation), la consultation de son historique de révisions et le retour (rollback) vers une révision antérieure.
+    \item \textbf{Gestion des déploiements d'applications}
+    \begin{itemize}[label=--]
+        \item Déployer une image Docker (Docker Hub ou registre privé) comme service serverless (Knative).
+        \item Configuration : nom, image et tag, port, ressources CPU/RAM, réplicas minimum/maximum (scale-to-zero inclus).
+        \item Suivi du statut en temps réel (RUNNING / SCALED\_TO\_ZERO / DEPLOYING / FAILED / SUSPENDED).
+        \item Mise à jour d'une application (image, réplicas, ressources) et redéploiement.
+        \item Retour (rollback) vers une révision antérieure.
+        \item Suppression d'une application (libère les ressources Knative).
+    \end{itemize}
 
-    \item Messaging Kafka : le système doit permettre à un client de créer et de gérer des sujets (topics) Kafka associés à son compte, en vue d'un usage applicatif de messagerie asynchrone.
+    \item \textbf{Gestion de la messagerie Kafka \& de l'Eventing}
+    \begin{itemize}[label=--]
+        \item Création et gestion de sujets (topics) Kafka par tenant.
+        \item Création de sources d'événements (KafkaSource) reliant un sujet à une application Knative.
+        \item Création de déclencheurs (triggers Broker~$\rightarrow$~Subscriber) pour le routage d'événements CloudEvents.
+    \end{itemize}
 
-    \item Backend Spring Boot : le système doit exposer une API REST sécurisée couvrant l'ensemble des fonctionnalités métier (gestion des utilisateurs et des permissions, gestion des applications, facturation, clés d'API, journaux de déploiement), et orchestrer les ressources Kubernetes/Knative/Strimzi correspondantes de manière transparente pour l'utilisateur.
+    \item \textbf{Gestion du monitoring \& des journaux}
+    \begin{itemize}[label=--]
+        \item Journaux de déploiement en temps réel (streaming SSE).
+        \item Tableau de bord de métriques (CPU, RAM, requêtes/s) via Prometheus/Grafana.
+        \item Alertes (échec de déploiement, boucle de redémarrage, dépassement de budget).
+        \item Notifications in-app configurables par type d'événement.
+    \end{itemize}
 
-    \item Knative Eventing : le système doit permettre de relier un sujet Kafka à une application déployée, de sorte qu'un message publié sur ce sujet puisse déclencher automatiquement le réveil (remise à l'échelle depuis zéro instance) et l'invocation de l'application concernée.
+    \item \textbf{Gestion de la facturation \& du paiement}
+    \begin{itemize}[label=--]
+        \item Calcul du coût à l'usage (CPU-heure, RAM-heure) par application et par tenant.
+        \item Génération automatique de factures mensuelles (1\textsuperscript{er} du mois).
+        \item Paiement par carte bancaire (Stripe) — enregistrement de cartes, paiement de facture.
+        \item Historique des transactions.
+        \item Alerte J-3 avant échéance, passage automatique au statut OVERDUE en cas d'impayé.
+        \item Suspension automatique du service en cas de facture impayée après échéance.
+        \item Export du relevé de facturation (Excel).
+    \end{itemize}
 
-    \item Frontend React : le système doit fournir un portail web pour les clients (déploiement et supervision de leurs applications, consultation de la facturation, gestion d'équipe) ainsi qu'une console d'administration séparée pour l'équipe exploitant la plateforme (supervision du cluster, gestion des comptes clients, facturation globale, journal d'audit).
-
-    \item Monitoring \& Observabilité : le système doit fournir aux clients une visibilité sur l'état et les journaux de leurs applications (journaux de déploiement, journaux applicatifs, métriques), et à l'équipe d'exploitation une visibilité sur l'état global du cluster (nœuds, charge, alertes actives), ainsi qu'un mécanisme de détection automatique des redémarrages en boucle des applications.
-
-    \item CI/CD : le système doit permettre la construction, la publication et le déploiement automatisés des composants de la plateforme elle-même (backend, portail client, console d'administration) à chaque évolution du code source.
+    \item \textbf{Gestion administrative (rôle ADMIN)}
+    \begin{itemize}[label=--]
+        \item Vue d'ensemble du cluster (nœuds, pods, namespaces, alertes actives).
+        \item Gestion des clients : liste, suspension/restauration globale d'un compte.
+        \item Gestion des quotas par tenant (CPU/RAM/nombre d'applications maximum) avec synchronisation des ResourceQuota Kubernetes.
+        \item Gestion des applications tous tenants confondus (suppression forcée, suspension/restauration).
+        \item Tableau de bord des revenus (facturation du mois en cours, projection de fin de mois, revenu par client, revenu Kafka).
+        \item Génération manuelle des factures mensuelles (hors tâche planifiée).
+        \item Suspension d'un service précis pour facture impayée.
+        \item Journal d'audit des actions administratives (qui a fait quoi, quand), exportable en CSV.
+    \end{itemize}
 \end{itemize}
 \label{sec:besoins-fonctionnels}
 
 \medskip
-Besoins non fonctionnels
+\textbf{Besoins non fonctionnels}
 \medskip
 
 \begin{itemize}
-    \item Isolation multi-tenant : les ressources et les données d'un client ne doivent en aucun cas être accessibles par un autre client. Cette isolation doit être assurée à la fois au niveau applicatif (contrôle d'accès basé sur le propriétaire effectif de la ressource) et au niveau réseau (règles d'isolation entre espaces de noms Kubernetes).
-    \item Élasticité et efficience des ressources : la plateforme doit permettre à une application de ne consommer aucune ressource de calcul lorsqu'elle est inactive (mise à l'échelle à zéro), et de monter en charge automatiquement en fonction du trafic reçu.
-    \item Facturation à l'usage : le coût facturé à un client doit refléter la consommation réelle de ses applications (temps d'activité, ressources allouées), et non un forfait fixe indépendant de l'usage.
-    \item Sécurité : l'authentification des utilisateurs doit reposer sur un fournisseur d'identité centralisé, les autorisations doivent être vérifiées à chaque accès à une ressource, et les échanges sensibles (jetons d'authentification) ne doivent pas être exposés inutilement (par exemple dans les journaux ou les paramètres d'URL).
-    \item Disponibilité : les composants de la plateforme elle-même (backend, portails, briques d'infrastructure) doivent pouvoir être redéployés sans interruption prolongée de service, et le système doit permettre de détecter automatiquement une dégradation (redémarrages en boucle, alertes).
-    \item Observabilité : l'état du système, à tous les niveaux (infrastructure, plateforme, applications clientes), doit pouvoir être supervisé au travers d'outils de métriques et de tableaux de bord.
-    \item Automatisation : la construction et le déploiement des composants de la plateforme doivent être automatisés afin de réduire les erreurs manuelles et le délai de mise en production d'une évolution.
+    \item \textbf{Isolation multi-tenant}
+    \begin{itemize}[label=--]
+        \item Les ressources et les données d'un client ne doivent en aucun cas être accessibles par un autre client, ni par un tenant vers les composants internes de la plateforme (base de données, service d'authentification).
+        \item Isolation au niveau applicatif : contrôle d'accès basé sur le propriétaire effectif de la ressource.
+        \item Isolation au niveau réseau : règles d'isolation entre espaces de noms Kubernetes, appliquées automatiquement à la création de chaque namespace tenant.
+        \item Isolation au niveau des droits d'accès au cluster : contrôle d'accès basé sur les rôles limitant le compte de service du backend aux seules ressources strictement nécessaires, secrets Kubernetes pour les identifiants sensibles.
+    \end{itemize}
+
+    \item \textbf{Élasticité et efficience des ressources}
+    \begin{itemize}[label=--]
+        \item Une application ne doit consommer aucune ressource de calcul lorsqu'elle est inactive (mise à l'échelle à zéro).
+        \item La plateforme doit monter en charge automatiquement en fonction du trafic reçu, dans les bornes de réplicas configurées par le client.
+        \item Le temps de réveil d'une application mise à l'échelle à zéro (cold start) doit rester acceptable pour l'utilisateur final.
+    \end{itemize}
+
+    \item \textbf{Sécurité}
+    \begin{itemize}[label=--]
+        \item L'authentification des utilisateurs doit reposer sur un fournisseur d'identité centralisé (Keycloak).
+        \item Les autorisations doivent être vérifiées à chaque accès à une ressource, en fonction du rôle et du propriétaire effectif.
+        \item Les échanges sensibles (jetons d'authentification, identifiants) ne doivent pas être exposés inutilement (journaux, paramètres d'URL, code source).
+    \end{itemize}
+
+    \item \textbf{Disponibilité}
+    \begin{itemize}[label=--]
+        \item Les composants de la plateforme elle-même (backend, portails, briques d'infrastructure) doivent pouvoir être redéployés sans interruption prolongée de service.
+        \item Le système doit permettre de détecter automatiquement une dégradation (redémarrages en boucle, alertes) et, si possible, la corriger sans intervention manuelle.
+    \end{itemize}
+
+    \item \textbf{Observabilité}
+    \begin{itemize}[label=--]
+        \item L'état du système, à tous les niveaux (infrastructure, plateforme, applications clientes), doit pouvoir être supervisé au travers d'outils de métriques et de tableaux de bord (Prometheus/Grafana).
+        \item Les journaux applicatifs et de déploiement doivent être consultables en temps réel.
+        \item Les actions administratives sensibles doivent être tracées dans un journal d'audit consultable a posteriori.
+    \end{itemize}
+
+    \item \textbf{Automatisation}
+    \begin{itemize}[label=--]
+        \item La construction, la publication et le déploiement des composants de la plateforme doivent être automatisés à chaque évolution du code source.
+        \item L'automatisation doit couvrir l'ensemble des composants déployables de la plateforme (backend, portail client, console d'administration).
+    \end{itemize}
 \end{itemize}
 
 \subsection{Diagramme de cas d'utilisation général}
-
-Les diagrammes de cas d'utilisation globaux des figures~\ref{fig:uc-global} et~\ref{fig:uc-global-admin} synthétisent les interactions entre les trois acteurs identifiés et les grandes fonctionnalités de la plateforme, respectivement côté client (CLIENT\_ADMIN/MEMBER) et côté administration (ADMIN). Les cas d'utilisation spécifiques à chaque fonctionnalité (par exemple : « Déployer une application », « Créer un sujet Kafka », « Configurer un déclencheur d'événement ») sont détaillés, avec leur description textuelle et, le cas échéant, leur diagramme de séquence, dans le chapitre de réalisation correspondant au Sprint qui les a implémentés.
+ Dans cette section, nous décrivons les exigences du système de manière formelle en utilisant le diagramme de cas d’utilisation global.
+~\ref{fig:uc-global-admin}
 
 \captionsetup[figure]{name=FIGURE}
 \begin{figure}[H]
@@ -78,50 +149,50 @@ Les diagrammes de cas d'utilisation globaux des figures~\ref{fig:uc-global} et~\
     \label{fig:uc-global-admin}
 \end{figure}
 
-Le tableau~\ref{tab:uc-global} récapitule les principaux cas d'utilisation du système, l'acteur concerné, ainsi que le sprint de réalisation correspondant, permettant au lecteur de faire le lien avec les chapitres de réalisation.
+% Le tableau~\ref{tab:uc-global} récapitule les principaux cas d'utilisation du système, l'acteur concerné, ainsi que le sprint de réalisation correspondant, permettant au lecteur de faire le lien avec les chapitres de réalisation.
 
-\renewcommand{\arraystretch}{1.4}
-\begin{longtable}{|p{7cm}|p{4cm}|p{2cm}|}
-\hline
-Cas d'utilisation & Acteur(s) & Sprint \\
-\hline
-\endfirsthead
-\hline
-Cas d'utilisation & Acteur(s) & Sprint \\
-\hline
-\endhead
-\hline
-\multicolumn{3}{r}{Suite du tableau à la page suivante} \\
-\endfoot
-\endlastfoot
+% \renewcommand{\arraystretch}{1.4}
+% \begin{longtable}{|p{7cm}|p{4cm}|p{2cm}|}
+% \hline
+% Cas d'utilisation & Acteur(s) & Sprint \\
+% \hline
+% \endfirsthead
+% \hline
+% Cas d'utilisation & Acteur(s) & Sprint \\
+% \hline
+% \endhead
+% \hline
+% \multicolumn{3}{r}{Suite du tableau à la page suivante} \\
+% \endfoot
+% \endlastfoot
 
-Se connecter à la plateforme & CLIENT\_ADMIN, MEMBER, ADMIN & Sprint 3 \\
-\hline
-Gérer les membres de l'équipe & CLIENT\_ADMIN & Sprint 3 \\
-\hline
-Déployer une application & CLIENT\_ADMIN, MEMBER & Sprint 4 \\
-\hline
-Mettre à jour / supprimer une application & CLIENT\_ADMIN, MEMBER & Sprint 4 \\
-\hline
-Consulter l'historique de révisions et effectuer un rollback & CLIENT\_ADMIN, MEMBER & Sprint 4 \\
-\hline
-Créer et gérer un sujet Kafka & CLIENT\_ADMIN, MEMBER & Sprint 5 \\
-\hline
-Configurer un déclencheur d'événement (Trigger/KafkaSource) & CLIENT\_ADMIN, MEMBER & Sprint 5 \\
-\hline
-Consulter les journaux et les métriques d'une application & CLIENT\_ADMIN, MEMBER & Sprint 6 \\
-\hline
-Consulter sa facturation & CLIENT\_ADMIN & Sprint 7 \\
-\hline
-Superviser le cluster (nœuds, alertes, tenants) & ADMIN & Sprint 9 \\
-\hline
-Gérer les comptes clients et les quotas & ADMIN & Sprint 8 \\
-\hline
-Générer une clé d'API pour un pipeline CI/CD & CLIENT\_ADMIN & Sprint 3 \\
-\hline
-\caption{Principaux cas d'utilisation de la plateforme et sprint de réalisation associé}
-\label{tab:uc-global}
-\end{longtable}
+% Se connecter à la plateforme & CLIENT\_ADMIN, MEMBER, ADMIN & Sprint 3 \\
+% \hline
+% Gérer les membres de l'équipe & CLIENT\_ADMIN & Sprint 3 \\
+% \hline
+% Déployer une application & CLIENT\_ADMIN, MEMBER & Sprint 4 \\
+% \hline
+% Mettre à jour / supprimer une application & CLIENT\_ADMIN, MEMBER & Sprint 4 \\
+% \hline
+% Consulter l'historique de révisions et effectuer un rollback & CLIENT\_ADMIN, MEMBER & Sprint 4 \\
+% \hline
+% Créer et gérer un sujet Kafka & CLIENT\_ADMIN, MEMBER & Sprint 5 \\
+% \hline
+% Configurer un déclencheur d'événement (Trigger/KafkaSource) & CLIENT\_ADMIN, MEMBER & Sprint 5 \\
+% \hline
+% Consulter les journaux et les métriques d'une application & CLIENT\_ADMIN, MEMBER & Sprint 6 \\
+% \hline
+% Consulter sa facturation & CLIENT\_ADMIN & Sprint 7 \\
+% \hline
+% Superviser le cluster (nœuds, alertes, tenants) & ADMIN & Sprint 9 \\
+% \hline
+% Gérer les comptes clients et les quotas & ADMIN & Sprint 8 \\
+% \hline
+% Générer une clé d'API pour un pipeline CI/CD & CLIENT\_ADMIN & Sprint 3 \\
+% \hline
+% \caption{Principaux cas d'utilisation de la plateforme et sprint de réalisation associé}
+% \label{tab:uc-global}
+% \end{longtable}
 
 \section{Analyse Globale}
 
@@ -129,7 +200,7 @@ Cette section donne une vue d'ensemble cohérente de l'architecture logique et p
 
 \subsection{Diagramme de classes d'analyse}
 
-Le diagramme de classes de la figure~\ref{fig:classes-global} présente les entités métier centrales du système et leurs relations : \texttt{User} (avec son rôle \texttt{UserRole} (ADMIN, CLIENT\_ADMIN, MEMBER) et ses permissions individuelles), \texttt{App} (l'application déployée par un client, avec son statut et ses paramètres de mise à l'échelle), \texttt{DeploymentLog} (historique des événements de cycle de vie d'une application), \texttt{BillingSnapshot} et \texttt{AppInvoice} (facturation), ainsi que les entités liées aux clés d'API. La classe \texttt{User} est reliée à \texttt{App} par une relation de propriété, résolue à l'exécution par le service \texttt{UserContextService} qui rattache systématiquement les ressources d'un \texttt{MEMBER} à son \texttt{CLIENT\_ADMIN} (modèle de délégation de propriété).
+La figure~\ref{fig:classes-global} présente les principales entités métier du système et leurs relations : \texttt{User}, \texttt{App}, \texttt{DeploymentLog}, \texttt{BillingSnapshot}, \texttt{AppInvoice} et les clés d'API. La propriété des applications est gérée par \texttt{UserContextService}, qui rattache les ressources d'un \texttt{MEMBER} à son \texttt{CLIENT\_ADMIN}.
 
 \captionsetup[figure]{name=FIGURE}
 \begin{figure}[H]
@@ -143,22 +214,125 @@ Le diagramme de classes de la figure~\ref{fig:classes-global} présente les enti
 
 \subsubsection{Architecture logique de la plateforme}
 
-L'architecture logique de la plateforme est organisée en quatre couches, représentées à la figure~\ref{fig:archi-logique} :
+L'architecture logique de la plateforme est organisée en trois couches, représentées à la figure ~\ref{fig:architecture-logique} :
+
+\begin{figure}[H]
+\begin{adjustwidth}{-1.0cm}{-1.0cm}
+\centering
+\begin{tikzpicture}[
+  x=1cm, y=1cm,
+  every node/.style={font=\normalsize},
+  pres/.style={draw=figBleu, line width=1pt, rounded corners, minimum width=7.0cm,
+               minimum height=1.5cm, align=center, fill=figBleuFond},
+  mod/.style={draw=figVert, line width=1pt, rounded corners, minimum width=3.6cm,
+              minimum height=1.4cm, align=center, fill=figVertFond, font=\small},
+  infra/.style={draw=figOrange, line width=1pt, rounded corners, minimum width=4.8cm,
+                minimum height=1.5cm, align=center, fill=figOrangeFond, font=\small},
+  note/.style={draw=figVert!70, line width=0.9pt, dashed, rounded corners,
+               minimum width=14.6cm, minimum height=0.9cm, align=center,
+               fill=white, font=\footnotesize},
+  zone/.style={rounded corners, inner sep=12pt, line width=1.2pt},
+  fl/.style={->, line width=1.4pt, black!65},
+  lbl/.style={font=\small},
+  num/.style={circle, draw, line width=1pt, fill=white, inner sep=3pt, font=\bfseries}
+]
+
+% ═══════════ COUCHE 1 — PRESENTATION ═══════════
+\node[pres] (portail) at (-3.9,0)
+     {\textbf{Portail Client} (React)\\[1pt]
+      \footnotesize Dashboard · Applications · Déployer\\
+      \footnotesize Kafka Topics · Monitoring · Facturation · Équipe};
+\node[pres] (console) at (3.9,0)
+     {\textbf{Console d'Administration} (React)\\[1pt]
+      \footnotesize Dashboard · Clients · Utilisateurs\\
+      \footnotesize Facturation · Audit · Cluster · Paramètres};
+
+\begin{scope}[on background layer]
+  \node[zone, draw=figBleu, fill=figBleu!4, fit=(portail)(console)] (z1) {};
+\end{scope}
+\node[font=\small\bfseries, text=figBleu, anchor=west, fill=white, inner sep=3pt]
+      at ([xshift=8pt]z1.north west) {COUCHE 1 — PRÉSENTATION};
+\node[num, text=figBleu] at ([xshift=-13pt]z1.west) {1};
+
+% ═══════════ COUCHE 2 — SERVICE ═══════════
+\node[mod] (m1) at (-5.7,-4.3) {\textbf{Applications}\\\textbf{\& Déploiement}};
+\node[mod] (m2) at (-1.9,-4.3) {\textbf{Sécurité}\\\textbf{\& Utilisateurs}};
+\node[mod] (m3) at ( 1.9,-4.3) {\textbf{Kafka}\\\textbf{\& Eventing}};
+\node[mod] (m4) at ( 5.7,-4.3) {\textbf{Facturation}\\\textbf{\& Paiement}};
+
+\node[mod] (m5) at (-3.8,-6.2) {\textbf{Quotas}\\\textbf{\& Administration}};
+\node[mod] (m6) at ( 0.0,-6.2) {\textbf{Logs}\\\textbf{\& Monitoring}};
+\node[mod] (m7) at ( 3.8,-6.2) {\textbf{Support}\\\footnotesize configuration, erreurs};
+
+\node[note] (fab) at (0,-7.9)
+     {Client \textbf{Fabric8} : bibliothèque Java exécutée dans le processus du backend,
+      et non une couche distincte};
+
+\begin{scope}[on background layer]
+  \node[zone, draw=figVert, fill=figVert!4, fit=(m1)(m4)(m5)(m7)(fab)] (z2) {};
+\end{scope}
+\node[font=\small\bfseries, text=figVert, anchor=west, fill=white, inner sep=3pt]
+      at ([xshift=8pt]z2.north west) {COUCHE 2 — SERVICE : Backend API (Spring Boot)};
+\node[num, text=figVert] at ([xshift=-13pt]z2.west) {2};
+
+% ═══════════ COUCHE 3 — INFRASTRUCTURE ═══════════
+\node[infra] (i1) at (-5.1,-11.5) {\textbf{Serving \& Eventing}\\[1pt]
+      \footnotesize Knative Serving, Knative Eventing};
+\node[infra] (i2) at ( 0.0,-11.5) {\textbf{Messagerie}\\[1pt]
+      \footnotesize Kafka opéré par Strimzi};
+\node[infra] (i3) at ( 5.1,-11.5) {\textbf{Sécurité \& Réseau}\\[1pt]
+      \footnotesize Keycloak, Cilium (CNI), Kourier};
+
+\node[infra] (i4) at (-2.6,-13.5) {\textbf{Stockage \& Données}\\[1pt]
+      \footnotesize PostgreSQL, volumes persistants};
+\node[infra] (i5) at ( 2.6,-13.5) {\textbf{Observabilité}\\[1pt]
+      \footnotesize Prometheus, Grafana, Alertmanager};
+
+\begin{scope}[on background layer]
+  \node[zone, draw=figOrange, fill=figOrange!4, fit=(i1)(i3)(i4)(i5)] (z3) {};
+\end{scope}
+\node[font=\small\bfseries, text=figOrange, anchor=west, fill=white, inner sep=3pt]
+      at ([xshift=8pt]z3.north west) {COUCHE 3 — INFRASTRUCTURE : cluster Kubernetes};
+\node[num, text=figOrange] at ([xshift=-13pt]z3.west) {3};
+
+% ═══════════ FLUX PRINCIPAL ═══════════
+\draw[fl] (z1.south) -- (z2.north);
+\node[lbl, fill=white, inner sep=4pt] at (0,-2.15)
+     {HTTPS / REST / SSE — jeton JWT (Keycloak)};
+
+\draw[fl] (z2.south) -- (z3.north);
+\node[lbl, fill=white, inner sep=4pt] at (0,-9.75)
+     {API Kubernetes — ServiceAccount et RBAC, via Fabric8};
+
+% ═══════════ PRINCIPE ARCHITECTURAL ═══════════
+\node[draw=figVert, line width=1.2pt, rounded corners, fill=figVertFond!50,
+      align=center, font=\footnotesize, text width=14.2cm, inner sep=7pt] at (0,-16.2)
+     {\textbf{Principe architectural} — le backend est l'unique point d'entrée vers le cluster.
+      Aucune connexion directe n'est autorisée entre la couche de présentation ou un système
+      externe et l'API Kubernetes.};
+
+\end{tikzpicture}
+\caption{Architecture logique de la plateforme}
+\label{fig:architecture-logique}
+\end{adjustwidth}
+\end{figure}
+
 
 \begin{itemize}
-    \item Couche présentation : deux applications monopage (SPA) développées en React (le portail client (déploiement et supervision des applications, facturation, gestion d'équipe) et la console d'administration (supervision du cluster, gestion des comptes clients, facturation globale, audit)) toutes deux servies statiquement via Nginx.
-    \item Couche service : une API REST unique développée en Spring Boot (module \texttt{backend-api}), organisée par domaine métier (applications, facturation, utilisateurs, Kafka, Eventing, clés d'API, journaux, administration), qui centralise l'ensemble de la logique métier et constitue le point d'entrée unique vers le cluster Kubernetes.
-    \item Couche orchestration : le client Kubernetes Java Fabric8, utilisé par la couche service pour créer, lire, modifier et surveiller les ressources Kubernetes natives ainsi que les ressources personnalisées (CRD) de Knative Serving, Knative Eventing et Strimzi.
-    \item Couche infrastructure : le cluster Kubernetes et les opérateurs qui y sont déployés (Knative Serving, Knative Eventing, Strimzi/Kafka), ainsi que les briques transverses, Keycloak (identité), PostgreSQL (persistance), Prometheus/Grafana (supervision), Jenkins/Kaniko (intégration et déploiement continus).
+    \item Couche présentation : deux applications monopages (SPA) React — le portail client (déploiement et supervision des applications, facturation, gestion d'équipe) et la console d'administration (supervision du cluster, gestion des comptes clients, facturation globale, audit) — toutes deux servies statiquement via Nginx.
+    \item Couche service : une API REST unique en Spring Boot (module \texttt{backend-api}), organisée par domaine métier (applications, facturation, utilisateurs, Kafka, Eventing, clés d'API, journaux, administration), qui centralise la logique métier et constitue l'unique point d'entrée vers le cluster Kubernetes. Elle s'appuie en interne sur le client Kubernetes Java Fabric8 — une bibliothèque exécutée dans le même processus, non une couche distincte — pour créer, lire, modifier et surveiller les ressources Kubernetes natives et les CRD de Knative Serving, Knative Eventing et Strimzi.
+    \item Couche infrastructure : le cluster Kubernetes et les opérateurs qui y sont déployés (Knative Serving, Knative Eventing, Strimzi/Kafka), ainsi que les briques transverses Keycloak (identité), PostgreSQL (persistance), Prometheus/Grafana (supervision), Jenkins/Kaniko (intégration et déploiement continus).
 \end{itemize}
 
-\captionsetup[figure]{name=Figure}
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=1.02\textwidth]{image/logique.png}
-    \caption{Architecture logique de la plateforme}
-    \label{fig:archi-logique}
-\end{figure}
+Un principe central de cette architecture : le backend Spring Boot est l'unique point d'entrée autorisé vers le cluster — ni les portails React, ni les clients externes (pipelines CI/CD via clé d'API) n'interagissent directement avec l'API Kubernetes, garantissant que toute action passe par les contrôles d'authentification, d'autorisation et d'isolation multi-tenant de la couche service.
+
+% \captionsetup[figure]{name=Figure}
+% \begin{figure}[H]
+%     \centering
+%     \includegraphics[width=1.02\textwidth]{image/logique.png}
+%     \caption{Architecture logique de la plateforme}
+%     \label{fig:archi-logique}
+% \end{figure}
 
 Un principe de conception central de cette architecture est que le backend Spring Boot est l'unique point d'entrée autorisé vers le cluster : ni les portails React, ni les clients externes (pipelines CI/CD via clé d'API) n'interagissent directement avec l'API Kubernetes. Ce choix garantit que toute action sur le cluster passe par les contrôles d'authentification, d'autorisation et d'appartenance (isolation multi-tenant) implémentés dans la couche service.
 
@@ -176,17 +350,19 @@ La figure~\ref{fig:archi-physique} présente l'architecture physique (diagramme 
 Les éléments principaux de ce déploiement sont :
 
 \begin{itemize}
-    \item Chaque tenant (client) dispose de son propre espace de noms (namespace) Kubernetes, isolé des autres tenants par une ressource \texttt{NetworkPolicy} créée automatiquement à la première utilisation.
-    \item Les applications des clients sont déployées comme des ressources \texttt{Service} de Knative Serving à l'intérieur de leur espace de noms respectif ; chaque service Knative peut être instancié en zéro, une ou plusieurs révisions actives (Revision) selon la charge.
-    \item Le backend, les deux portails React, Keycloak et PostgreSQL sont déployés dans un espace de noms dédié à la plateforme (\texttt{platform}), distinct des espaces de noms des tenants.
-    \item Un cluster Kafka, opéré par Strimzi, héberge les sujets (topics) créés par les clients ; Knative Eventing s'interface avec ce cluster via les ressources \texttt{KafkaSource}, \texttt{Broker} et \texttt{Trigger}.
-    \item L'accès externe au cluster est assuré par MetalLB (attribution d'adresses IP de type LoadBalancer) et par la passerelle Kourier pour le trafic à destination des services Knative.
+    \item Le réseau et l'accès externe reposent sur trois briques déployées sur l'ensemble des nœuds : Cilium (CNI, application des \texttt{NetworkPolicy}), MetalLB (attribution d'adresses IP externes de type LoadBalancer) et Kourier (passerelle d'entrée HTTP pour les services Knative).
+    \item Le cluster est organisé en plusieurs espaces de noms : \texttt{platform} (backend, portails React, PostgreSQL, Keycloak, supervision Prometheus/Grafana/Alertmanager), \texttt{kafka} (cluster Kafka opéré par Strimzi), \texttt{knative-serving}/\texttt{kourier-system} (plan de contrôle Knative), et un espace de noms \texttt{user-<client>} créé dynamiquement pour chaque tenant.
+    \item Chaque tenant dispose de son propre espace de noms, isolé des autres et de la plateforme par une ressource \texttt{NetworkPolicy} créée automatiquement à sa première utilisation.
+    \item Les applications des clients sont déployées comme des ressources \texttt{Service} de Knative Serving dans leur espace de noms respectif, instanciées en zéro à N révisions actives (Revision) selon la charge.
+    \item Tous les pods, quel que soit leur espace de noms, s'exécutent sur les nœuds de travail vm02 ou vm03 ; vm01 assure le plan de contrôle du cluster.
 \end{itemize}
 
 \section{Pilotage du projet avec SCRUM}
 \label{sec:scrum}
 
 Le cadre agile Scrum, retenu au chapitre précédent pour la conduite de ce projet, structure le développement en itérations courtes et fixes appelées sprints, à l'issue desquelles un incrément de produit potentiellement livrable est produit.
+
+Dans les tableaux de backlog présentés dans ce chapitre et les suivants, chaque tâche est associée à une estimation exprimée sur une échelle de complexité relative à trois niveaux : \textbf{1} (faible complexité — modification simple ou localisée), \textbf{2} (complexité moyenne — développement impliquant plusieurs composants ou une logique métier non triviale) et \textbf{3} (complexité élevée — intégration de plusieurs systèmes, gestion d'états asynchrones ou risques techniques significatifs).
 
 \subsection{Backlog du produit}
 
@@ -212,15 +388,13 @@ ID & Module & ID US & User Story & Complexité\\
 
 \endlastfoot
 
-\multirow{5}{*}{M1} & \multirow{5}{2.9cm}{\centering Authentification \& Sécurité} & M1.1 & En tant qu'ADMIN, CLIENT\_ADMIN ou MEMBER, je souhaite me connecter à la plateforme via Keycloak. & Moyenne\\
+\multirow{4}{*}{M1} & \multirow{4}{2.9cm}{\centering Authentification \& Sécurité} & M1.1 & En tant qu'ADMIN, CLIENT\_ADMIN ou MEMBER, je souhaite me connecter à la plateforme via Keycloak. & Moyenne\\
 \cline{3-5}
 && M1.2 & En tant qu'ADMIN, CLIENT\_ADMIN ou MEMBER, je souhaite me déconnecter du système. & Faible\\
 \cline{3-5}
 && M1.3 & En tant qu'ADMIN, CLIENT\_ADMIN ou MEMBER, je souhaite que mon jeton d'authentification (JWT) soit automatiquement rafraîchi. & Moyenne\\
 \cline{3-5}
 && M1.4 & En tant qu'ADMIN, je souhaite définir les rôles et les permissions des utilisateurs. & Élevée\\
-\cline{3-5}
-&& M1.5 & En tant qu'ADMIN, CLIENT\_ADMIN ou MEMBER, je souhaite générer une clé d'API pour piloter mes déploiements depuis un pipeline CI/CD externe. & Moyenne\\
 \hline
 
 \multirow{4}{*}{M2} & \multirow{4}{2.9cm}{\centering Utilisateurs \& équipes} & M2.1 & En tant que CLIENT\_ADMIN, je souhaite inviter un membre dans mon équipe. & Moyenne\\
@@ -239,7 +413,7 @@ ID & Module & ID US & User Story & Complexité\\
 && M3.3 & En tant qu'ADMIN, je souhaite superviser l'état des nœuds du cluster Kubernetes. & Moyenne\\
 \hline
 
-\multirow{7}{*}{M4} & \multirow{7}{2.9cm}{\centering Gestion des applications} & M4.1 & En tant que CLIENT\_ADMIN ou MEMBER, je souhaite déployer une application à partir d'une image Docker. & Élevée\\
+\multirow{1}{*}{M4} & \multirow{1}{2.9cm}{\centering Gestion des applications} & M4.1 & En tant que CLIENT\_ADMIN ou MEMBER, je souhaite déployer une application à partir d'une image Docker. & Élevée\\
 \cline{3-5}
 && M4.2 & En tant que CLIENT\_ADMIN ou MEMBER, je souhaite définir les ressources (CPU, mémoire) et les bornes de mise à l'échelle de mon application. & Moyenne\\
 \cline{3-5}
@@ -366,9 +540,9 @@ Le déploiement et l'exploitation de la plateforme se sont appuyés sur un clust
 \begin{table}[H]
 \centering
 \renewcommand{\arraystretch}{1.3}
-\begin{tabular}{|l|l|l|l|}
+\begin{tabular}{|l|p{4cm}|c|p{5cm}|}
 \hline
-Nom de la VM & Ressources & Système & Rôle \\
+\textbf{Nom de la VM} & \textbf{Ressources} & \textbf{Système} & \textbf{Rôle} \\
 \hline
 Master   & 4 vCPU, 8 Go RAM, 50 Go disque & Ubuntu 24 & Plan de contrôle (control-plane) \\
 \hline
@@ -380,6 +554,23 @@ Worker 2 & 4 vCPU, 8 Go RAM, 50 Go disque & Ubuntu 24 & Nœud de travail \\
 \caption{Caractéristiques des machines virtuelles du cluster Kubernetes}
 \label{tab:vms-cluster}
 \end{table}
+% \begin{table}[H]
+% \centering
+% \renewcommand{\arraystretch}{1.3}
+% \begin{tabular}{|l|l|l|l|}
+% \hline
+% Nom de la VM & Ressources & Système & Rôle \\
+% \hline
+% Master   & 4 vCPU, 8 Go RAM, 50 Go disque & Ubuntu 24 & Plan de contrôle (control-plane) \\
+% \hline
+% Worker 1 & 4 vCPU, 8 Go RAM, 50 Go disque & Ubuntu 24 & Nœud de travail \\
+% \hline
+% Worker 2 & 4 vCPU, 8 Go RAM, 50 Go disque & Ubuntu 24 & Nœud de travail \\
+% \hline
+% \end{tabular}
+% \caption{Caractéristiques des machines virtuelles du cluster Kubernetes}
+% \label{tab:vms-cluster}
+% \end{table}
 
 Le cluster utilise Cilium comme interface réseau de conteneurs (CNI), MetalLB pour l'attribution d'adresses IP aux services de type LoadBalancer dans un environnement dépourvu de répartiteur de charge natif, et Kourier comme passerelle d'entrée (ingress gateway) pour Knative Serving.
 
@@ -418,13 +609,35 @@ Les frameworks et bibliothèques retenus ont été sélectionnés pour leur matu
 
 \renewcommand{\arraystretch}{1.3}
 \begin{center}
-\begin{tabular}{|m{3cm}|m{10cm}|}
+\begingroup
+\centering
+\renewcommand{\arraystretch}{1.2}
+\begin{longtable}{|m{3cm}|m{11.5cm}|}
+\caption{Frameworks et bibliothèques utilisés}
+\label{tab:frameworks}\\
 \hline
-\multicolumn{1}{|c|}{Framework} & \multicolumn{1}{c|}{Description} \\
+\multicolumn{1}{|c|}{\textbf{Framework}} & \multicolumn{1}{c|}{\textbf{Description}} \\
 \hline
+\endfirsthead
+
+\multicolumn{2}{l}{\small\itshape (suite du tableau~\ref{tab:frameworks})}\\
+\hline
+\multicolumn{1}{|c|}{\textbf{Framework}} & \multicolumn{1}{c|}{\textbf{Description}} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{2}{r}{\small\itshape (suite page suivante)}\\
+\endfoot
+
+\hline
+\endlastfoot
+
 Spring Boot & Framework backend utilisé pour l'exposition de l'API REST, l'injection de dépendances, la sécurité (Spring Security) et l'accès aux données (Spring Data JPA). \\
 \hline
-Fabric8 Kubernetes Client & Bibliothèque Java utilisée par le backend pour orchestrer les ressources Kubernetes natives et les ressources personnalisées (CRD) de Knative et Strimzi. \\
+Fabric8 Kubernetes Client & Bibliothèque Java utilisée par le backend pour orchestrer les ressources Kubernetes natives et les ressources personnalisées (CRD) de Knative Serving, Knative Eventing et Strimzi. \\
+\hline
+Kafka Clients (Apache Kafka) & Bibliothèque cliente utilisée par le backend (API Admin Kafka) pour créer et gérer les sujets (topics) des tenants. \\
 \hline
 React & Bibliothèque utilisée pour le développement des interfaces graphiques du portail client et de la console d'administration. \\
 \hline
@@ -432,42 +645,131 @@ PostgreSQL / JPA-Hibernate & Système de gestion de base de données relationnel
 \hline
 Keycloak (OpenID Connect) & Bibliothèque d'intégration utilisée côté backend et frontend pour l'authentification et la validation des jetons JWT. \\
 \hline
-\end{tabular}
+\end{longtable}
+\endgroup
+% \begin{tabular}{|m{3cm}|m{10cm}|}
+% \hline
+% \multicolumn{1}{|c|}{Framework} & \multicolumn{1}{c|}{Description} \\
+% \hline
+% Spring Boot & Framework backend utilisé pour l'exposition de l'API REST, l'injection de dépendances, la sécurité (Spring Security) et l'accès aux données (Spring Data JPA). \\
+% \hline
+% Fabric8 Kubernetes Client & Bibliothèque Java utilisée par le backend pour orchestrer les ressources Kubernetes natives et les ressources personnalisées (CRD) de Knative et Strimzi. \\
+% \hline
+% React & Bibliothèque utilisée pour le développement des interfaces graphiques du portail client et de la console d'administration. \\
+% \hline
+% PostgreSQL / JPA-Hibernate & Système de gestion de base de données relationnelle et couche de mapping objet-relationnel utilisés pour la persistance des entités métier. \\
+% \hline
+% Keycloak (OpenID Connect) & Bibliothèque d'intégration utilisée côté backend et frontend pour l'authentification et la validation des jetons JWT. \\
+% \hline
+% \end{tabular}
 \captionof{table}{Frameworks et bibliothèques utilisés}
 \label{tab:frameworks}
 \end{center}
 
 \vspace{1em}
 
-\subsubsection{Outils DevOps et déploiement}
+\subsubsection{Outils de développement et de modélisation}
 
-La mise en production de la plateforme repose sur une chaîne DevOps automatisée garantissant la fiabilité et la répétabilité des déploiements. Le tableau~\ref{tab:outils-devops} présente les outils utilisés pour le développement, les tests, la conteneurisation, l'intégration continue et la modélisation UML.
+Le tableau~\ref{tab:outils-dev} présente les outils utilisés pour l'écriture du code, la gestion de versions, les tests manuels d'API et la modélisation UML du présent mémoire.
 
-\renewcommand{\arraystretch}{1.3}
-\begin{center}
-\begin{tabular}{|m{3cm}|m{10cm}|}
+\begingroup
+\centering
+\renewcommand{\arraystretch}{1.2}
+\begin{longtable}{|m{3cm}|m{11.5cm}|}
+\caption{Outils de développement et de modélisation utilisés}
+\label{tab:outils-dev}\\
 \hline
-\multicolumn{1}{|c|}{Outil} & \multicolumn{1}{c|}{Description} \\
+\multicolumn{1}{|c|}{\textbf{Outil}} & \multicolumn{1}{c|}{\textbf{Description}} \\
 \hline
+\endfirsthead
+
+\multicolumn{2}{l}{\small\itshape (suite du tableau~\ref{tab:outils-dev})}\\
+\hline
+\multicolumn{1}{|c|}{\textbf{Outil}} & \multicolumn{1}{c|}{\textbf{Description}} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{2}{r}{\small\itshape (suite page suivante)}\\
+\endfoot
+
+\hline
+\endlastfoot
+
 Visual Studio Code & Environnement de développement intégré léger et extensible, utilisé pour le développement du backend Spring Boot, des deux applications frontend React, ainsi que pour la rédaction des manifestes Kubernetes et des scripts de déploiement. \\
 \hline
 GitHub & Plateforme d'hébergement du code source et de gestion de versions, utilisée pour le suivi des évolutions du projet et le déclenchement des pipelines d'intégration continue. \\
 \hline
 Postman & Outil de test et de documentation des API REST, utilisé pour valider manuellement le comportement des différents points d'accès exposés par le backend avant leur intégration dans les interfaces graphiques. \\
 \hline
+PlantUML & Outil de modélisation UML en tant que code, utilisé pour la production des diagrammes de cas d'utilisation, de classes, de composants, de déploiement et de séquence présentés dans ce mémoire, à partir de scripts textuels versionnés avec le code source. \\
+\hline
+\end{longtable}
+\endgroup
+
+\vspace{1em}
+
+\subsubsection{Outils DevOps et déploiement}
+
+La mise en production de la plateforme repose sur une chaîne DevOps automatisée garantissant la fiabilité et la répétabilité des déploiements. Le tableau~\ref{tab:outils-devops} présente les outils utilisés pour la conteneurisation, l'intégration continue et l'exploitation du cluster.
+
+\renewcommand{\arraystretch}{1.3}
+% \begin{center}
+% \begin{tabular}{|m{3cm}|m{10cm}|}
+% \hline
+% \multicolumn{1}{|c|}{Outil} & \multicolumn{1}{c|}{Description} \\
+% \hline
+% Visual Studio Code & Environnement de développement intégré léger et extensible, utilisé pour le développement du backend Spring Boot, des deux applications frontend React, ainsi que pour la rédaction des manifestes Kubernetes et des scripts de déploiement. \\
+% \hline
+% GitHub & Plateforme d'hébergement du code source et de gestion de versions, utilisée pour le suivi des évolutions du projet et le déclenchement des pipelines d'intégration continue. \\
+% \hline
+% Postman & Outil de test et de documentation des API REST, utilisé pour valider manuellement le comportement des différents points d'accès exposés par le backend avant leur intégration dans les interfaces graphiques. \\
+% \hline
+% Docker & Utilisé pour la construction et l'exécution locale des images de conteneurs avant leur publication sur le registre Docker Hub par la chaîne CI/CD. \\
+% \hline
+% Jenkins et Kaniko & Utilisés pour l'automatisation de la construction, de la publication et du déploiement continu des composants de la plateforme, Kaniko permettant de construire les images sans démon Docker privilégié à l'intérieur du cluster. \\
+% \hline
+% kubectl & Interface en ligne de commande de Kubernetes, utilisée quotidiennement pour l'inspection de l'état du cluster, le déploiement manuel de ressources lors des phases de mise au point, et le diagnostic des incidents. \\
+% \hline
+% PlantUML & Outil de modélisation UML en tant que code, utilisé pour la production des diagrammes de cas d'utilisation, de classes, de composants, de déploiement et de séquence présentés dans ce mémoire, à partir de scripts textuels versionnés avec le code source. \\
+% \hline
+% \end{tabular}
+% \captionof{table}{Outils DevOps et de déploiement utilisés}
+% \label{tab:outils-devops}
+% \end{center}
+
+\begingroup
+\centering
+\renewcommand{\arraystretch}{1.2}
+\begin{longtable}{|m{3cm}|m{11.5cm}|}
+\caption{Outils DevOps et de déploiement utilisés}
+\label{tab:outils-devops}\\
+\hline
+\multicolumn{1}{|c|}{\textbf{Outil}} & \multicolumn{1}{c|}{\textbf{Description}} \\
+\hline
+\endfirsthead
+
+\multicolumn{2}{l}{\small\itshape (suite du tableau~\ref{tab:outils-devops})}\\
+\hline
+\multicolumn{1}{|c|}{\textbf{Outil}} & \multicolumn{1}{c|}{\textbf{Description}} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{2}{r}{\small\itshape (suite page suivante)}\\
+\endfoot
+
+\hline
+\endlastfoot
+
 Docker & Utilisé pour la construction et l'exécution locale des images de conteneurs avant leur publication sur le registre Docker Hub par la chaîne CI/CD. \\
 \hline
 Jenkins et Kaniko & Utilisés pour l'automatisation de la construction, de la publication et du déploiement continu des composants de la plateforme, Kaniko permettant de construire les images sans démon Docker privilégié à l'intérieur du cluster. \\
 \hline
 kubectl & Interface en ligne de commande de Kubernetes, utilisée quotidiennement pour l'inspection de l'état du cluster, le déploiement manuel de ressources lors des phases de mise au point, et le diagnostic des incidents. \\
 \hline
-PlantUML & Outil de modélisation UML en tant que code, utilisé pour la production des diagrammes de cas d'utilisation, de classes, de composants, de déploiement et de séquence présentés dans ce mémoire, à partir de scripts textuels versionnés avec le code source. \\
-\hline
-\end{tabular}
-\captionof{table}{Outils DevOps et de déploiement utilisés}
-\label{tab:outils-devops}
-\end{center}
-
+\end{longtable}
+\endgroup
 \section{Conclusion}
 
 Ce chapitre a permis de formaliser les besoins fonctionnels et non fonctionnels de la plateforme, de préciser les acteurs qui interagissent avec le système et le diagramme de cas d'utilisation général qui en découle, puis de présenter l'analyse globale de la plateforme (diagramme de classes, architecture logique et physique, processus métier principaux) et le pilotage du projet au travers du Product Backlog et de la planification des sprints selon la méthode Scrum. L'environnement de travail matériel et logiciel utilisé pour la réalisation du projet a également été détaillé. Le détail de chaque sprint (description textuelle des cas d'utilisation, diagrammes de séquence spécifiques, réalisation) est développé progressivement dans les chapitres suivants, regroupés par release.

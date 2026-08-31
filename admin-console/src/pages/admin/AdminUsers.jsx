@@ -202,7 +202,7 @@ const AdminUsers = () => {
                                                     cursor: 'pointer',
                                                 }}
                                             >
-                                                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                                                {ROLES.map(r => <option key={r} value={r} style={{ background: '#1F2937', color: '#F1F5F9' }}>{r}</option>)}
                                             </select>
                                         )}
                                     </td>
