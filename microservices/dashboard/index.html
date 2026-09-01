@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>NextStep IT — Démo Event-Driven</title>
+<style>
+  :root{--bg:#0f1420;--panel:#161d2e;--border:#2a3450;--text:#e8ecf5;--muted:#8b96b3;
+        --order:#3b82f6;--payment:#10b981;--notif:#f59e0b;--danger:#ef4444}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,Segoe UI,Arial,sans-serif;padding:24px}
+  h1{font-size:20px;margin:0 0 4px}
+  .sub{color:var(--muted);margin:0 0 20px;font-size:13px}
+  .config{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
+  .config input{background:var(--panel);border:1px solid var(--border);color:var(--text);
+        padding:8px 10px;border-radius:6px;font-size:12px;width:100%}
+  .config label{font-size:11px;color:var(--muted);display:block;margin-bottom:4px}
+  .flow{display:flex;align-items:center;justify-content:center;gap:8px;margin:24px 0;flex-wrap:wrap}
+  .node{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 18px;
+        text-align:center;min-width:130px}
+  .node .dot{width:10px;height:10px;border-radius:50%;margin:0 auto 6px}
+  .node.order .dot{background:var(--order)} .node.payment .dot{background:var(--payment)}
+  .node.notif .dot{background:var(--notif)} .node.kafka .dot{background:#888}
+  .node b{font-size:13px} .node span{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+  .arrow{color:var(--muted);font-size:18px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:16px}
+  .panel h2{font-size:14px;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+  form{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:4px}
+  .field label{font-size:11px;color:var(--muted)}
+  .field input{background:#0f1420;border:1px solid var(--border);color:var(--text);
+        padding:8px 10px;border-radius:6px;width:140px}
+  button{background:var(--order);color:#fff;border:none;padding:9px 18px;border-radius:6px;
+        cursor:pointer;font-size:13px;font-weight:600}
+  button:hover{opacity:.9}
+  button.secondary{background:#374151}
+  .status{font-size:12px;color:var(--muted);margin-top:8px}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .feed{max-height:340px;overflow-y:auto;font-size:12px}
+  .item{border-left:3px solid var(--border);padding:8px 10px;margin-bottom:6px;background:#0f1420;border-radius:0 6px 6px 0}
+  .item.APPROVED{border-color:var(--payment)} .item.REJECTED{border-color:var(--danger)}
+  .item .id{color:var(--muted);font-size:10px}
+  .badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700}
+  .badge.APPROVED{background:rgba(16,185,129,.2);color:var(--payment)}
+  .badge.REJECTED{background:rgba(239,68,68,.2);color:var(--danger)}
+  .badge.notif{background:rgba(245,158,11,.2);color:var(--notif)}
+  .empty{color:var(--muted);font-size:12px;text-align:center;padding:20px 0}
+  .health{display:flex;gap:16px;font-size:12px;margin-bottom:16px}
+  .health .hb{display:flex;align-items:center;gap:6px}
+  .health .led{width:8px;height:8px;border-radius:50%;background:#555}
+  .health .led.up{background:var(--payment)} .health .led.down{background:var(--danger)}
+</style>
+</head>
+<body>
+
+<h1>🔗 NextStep IT — Démo chorégraphie event-driven</h1>
+<p class="sub">Order Service → Kafka → Payment Service → Kafka → Notification Service (via Knative Eventing / Triggers)</p>
+
+<div class="panel">
+  <h2>⚙️ Configuration des endpoints déployés</h2>
+  <div class="config">
+    <div><label>Order Service URL</label><input id="orderUrl" placeholder="http://order-service-6b312a.user-user.xxx.xxx"></div>
+    <div><label>Payment Service URL</label><input id="paymentUrl" placeholder="http://payment-service-6b312a.user-user.xxx.xxx"></div>
+    <div><label>Notification Service URL</label><input id="notifUrl" placeholder="http://notification-service-6b312a.user-user.xxx.xxx"></div>
+  </div>
+  <div class="health" id="health"></div>
+</div>
+
+<div class="flow">
+  <div class="node order"><div class="dot"></div><b>Order Service</b><span>POST /orders</span></div>
+  <div class="arrow">→</div>
+  <div class="node kafka"><div class="dot"></div><b>Kafka</b><span>topic: orders</span></div>
+  <div class="arrow">→</div>
+  <div class="node payment"><div class="dot"></div><b>Payment Service</b><span>Trigger HTTP</span></div>
+  <div class="arrow">→</div>
+  <div class="node kafka"><div class="dot"></div><b>Kafka</b><span>topic: payments</span></div>
+  <div class="arrow">→</div>
+  <div class="node notif"><div class="dot"></div><b>Notification Service</b><span>Trigger HTTP</span></div>
+</div>
+
+<div class="panel">
+  <h2>🛒 Créer une commande de test</h2>
+  <form id="orderForm">
+    <div class="field"><label>User ID</label><input name="userId" value="user-demo"></div>
+    <div class="field"><label>Montant (€)</label><input name="amount" type="number" value="149.90"></div>
+    <button type="submit">Envoyer la commande</button>
+    <button type="button" class="secondary" id="autoBtn">▶ Démo auto (5 commandes)</button>
+  </form>
+  <div class="status" id="orderStatus"></div>
+</div>
+
+<div class="cols">
+  <div class="panel">
+    <h2>💳 Paiements traités <span id="paymentCount" class="badge" style="background:#2a3450;color:#e8ecf5"></span></h2>
+    <div class="feed" id="paymentFeed"><div class="empty">Aucun paiement pour l'instant</div></div>
+  </div>
+  <div class="panel">
+    <h2>📩 Notifications envoyées <span id="notifCount" class="badge" style="background:#2a3450;color:#e8ecf5"></span></h2>
+    <div class="feed" id="notifFeed"><div class="empty">Aucune notification pour l'instant</div></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const cfg = () => ({
+  order: $('orderUrl').value.trim().replace(/\/$/,''),
+  payment: $('paymentUrl').value.trim().replace(/\/$/,''),
+  notif: $('notifUrl').value.trim().replace(/\/$/,''),
+});
+
+['orderUrl','paymentUrl','notifUrl'].forEach(id=>{
+  const saved = localStorage.getItem(id);
+  if(saved) $(id).value = saved;
+  $(id).addEventListener('change', () => localStorage.setItem(id, $(id).value));
+});
+
+async function checkHealth() {
+  const c = cfg();
+  const targets = [['Order', c.order], ['Payment', c.payment], ['Notification', c.notif]];
+  const html = await Promise.all(targets.map(async ([name, url]) => {
+    if (!url) return `<div class="hb"><span class="led"></span>${name} (non configuré)</div>`;
+    try {
+      const r = await fetch(url + '/health', { cache: 'no-store' });
+      const ok = r.ok;
+      return `<div class="hb"><span class="led ${ok?'up':'down'}"></span>${name}</div>`;
+    } catch {
+      return `<div class="hb"><span class="led down"></span>${name}</div>`;
+    }
+  }));
+  $('health').innerHTML = html.join('');
+}
+
+async function refreshFeeds() {
+  const c = cfg();
+  if (c.payment) {
+    try {
+      const r = await fetch(c.payment + '/payments', { cache: 'no-store' });
+      const data = await r.json();
+      $('paymentCount').textContent = data.length;
+      $('paymentFeed').innerHTML = data.length ? data.slice().reverse().map(p => `
+        <div class="item ${p.status}">
+          <span class="badge ${p.status}">${p.status}</span>
+          <b>${p.amount}€</b> — commande <code>${p.orderId.slice(0,8)}</code>
+          <div class="id">${p.processedAt}</div>
+        </div>`).join('') : '<div class="empty">Aucun paiement pour l\'instant</div>';
+    } catch {}
+  }
+  if (c.notif) {
+    try {
+      const r = await fetch(c.notif + '/notifications', { cache: 'no-store' });
+      const data = await r.json();
+      $('notifCount').textContent = data.length;
+      $('notifFeed').innerHTML = data.length ? data.slice().reverse().map(n => `
+        <div class="item">
+          <span class="badge notif">ENVOYÉE</span>
+          ${n.message}
+          <div class="id">${n.sentAt}</div>
+        </div>`).join('') : '<div class="empty">Aucune notification pour l\'instant</div>';
+    } catch {}
+  }
+}
+
+$('orderForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const c = cfg();
+  if (!c.order) { $('orderStatus').textContent = '⚠ Configure d\'abord l\'URL du Order Service.'; return; }
+  const fd = new FormData(e.target);
+  const body = { userId: fd.get('userId'), amount: parseFloat(fd.get('amount')) };
+  $('orderStatus').textContent = 'Envoi en cours...';
+  try {
+    const r = await fetch(c.order + '/orders', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+    const data = await r.json();
+    $('orderStatus').textContent = `✅ Commande ${data.orderId} créée — en attente de traitement Kafka/Eventing...`;
+  } catch (err) {
+    $('orderStatus').textContent = '❌ Erreur : ' + err.message;
+  }
+});
+
+$('autoBtn').addEventListener('click', async () => {
+  const c = cfg();
+  if (!c.order) { $('orderStatus').textContent = '⚠ Configure d\'abord l\'URL du Order Service.'; return; }
+  for (let i = 0; i < 5; i++) {
+    const amount = Math.round((Math.random() * 1500) * 100) / 100;
+    $('orderStatus').textContent = `Envoi commande ${i+1}/5 (${amount}€)...`;
+    try {
+      await fetch(c.order + '/orders', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-demo-' + (i+1), amount })
+      });
+    } catch {}
+    await new Promise(r => setTimeout(r, 1500));
+  }
+  $('orderStatus').textContent = '✅ 5 commandes envoyées.';
+});
+
+checkHealth();
+refreshFeeds();
+setInterval(checkHealth, 5000);
+setInterval(refreshFeeds, 3000);
+</script>
+</body>
+</html>

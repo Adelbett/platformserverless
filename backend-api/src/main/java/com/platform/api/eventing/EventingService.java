@@ -80,7 +80,14 @@ public class EventingService {
 
     @Transactional
     public KafkaSourceDto createKafkaSource(String userId, String kafkaTopicId, String name, String namespace, String config) {
-        String consumerGroup = name + "-group";
+        return createKafkaSource(userId, kafkaTopicId, name, namespace, config, null);
+    }
+
+    @Transactional
+    public KafkaSourceDto createKafkaSource(String userId, String kafkaTopicId, String name, String namespace, String config, String consumerGroupOverride) {
+        String consumerGroup = (consumerGroupOverride != null && !consumerGroupOverride.isBlank())
+                ? consumerGroupOverride
+                : name + "-group";
         String ns = namespace != null ? namespace : "default";
 
         KafkaSource source = KafkaSource.builder()
@@ -243,7 +250,7 @@ public class EventingService {
                 .kafkaSourceId(kafkaSourceId)
                 .userId(userId)
                 .filter(filter)
-                .filterType("exact")
+                .filterType(filter != null && !filter.isBlank() ? "exact" : "none")
                 .action(action)
                 .active(true)
                 .updatedAt(LocalDateTime.now())
@@ -345,6 +352,20 @@ public class EventingService {
 
     // Trigger must be in the same namespace as its Broker (user namespace).
     private void createKnativeTrigger(String triggerName, String eventType, String subscriberUrl, String namespace) {
+        // Only attach a filter when the caller actually wants one — an unfiltered
+        // Trigger must NOT carry spec.filter at all, otherwise every event is
+        // silently dropped for not matching a type nobody asked to filter on.
+        Map<String, Object> spec = eventType != null && !eventType.isBlank()
+                ? Map.of(
+                    "broker", "default",
+                    "filter", Map.of("attributes", Map.of("type", eventType)),
+                    "subscriber", Map.of("uri", subscriberUrl)
+                  )
+                : Map.of(
+                    "broker", "default",
+                    "subscriber", Map.of("uri", subscriberUrl)
+                  );
+
         GenericKubernetesResource knativeTrigger = new GenericKubernetesResourceBuilder()
                 .withApiVersion("eventing.knative.dev/v1")
                 .withKind("Trigger")
@@ -352,15 +373,7 @@ public class EventingService {
                     .withName(triggerName)
                     .withNamespace(namespace)
                 .endMetadata()
-                .addToAdditionalProperties("spec", Map.of(
-                    "broker", "default",
-                    "filter", Map.of(
-                        "attributes", Map.of("type", eventType)
-                    ),
-                    "subscriber", Map.of(
-                        "uri", subscriberUrl
-                    )
-                ))
+                .addToAdditionalProperties("spec", spec)
                 .build();
 
         try {

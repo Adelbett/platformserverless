@@ -47,12 +47,13 @@ public class AppDeploymentAsyncRunner {
             // Auto-create KafkaSource + Trigger if kafka integration requested
             if (Boolean.TRUE.equals(req.getKafkaEnabled()) && req.getKafkaTopicId() != null) {
                 String sourceName = app.getServiceName() + "-source";
-                String filter = req.getFilterEventType() != null
-                        ? req.getFilterEventType()
-                        : "order.created";
+                // Null/blank means "no filter" — the caller (Filter Mode "none") is
+                // explicit about that, so it must NOT be defaulted to a hardcoded type.
+                String filter = req.getFilterEventType();
 
                 var source = eventingService.createKafkaSource(
-                        app.getUserId(), req.getKafkaTopicId(), sourceName, app.getNamespace(), null);
+                        app.getUserId(), req.getKafkaTopicId(), sourceName, app.getNamespace(), null,
+                        req.getConsumerGroup());
 
                 eventingService.createTrigger(
                         app.getUserId(), source.getId(), filter, url);
