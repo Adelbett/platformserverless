@@ -1,6 +1,9 @@
 const express = require('express');
 const app = express();
-app.use(express.json());
+// Knative's KafkaSource doesn't always set Content-Type: application/json
+// when forwarding the raw Kafka record — express.json() silently skips
+// parsing (leaving req.body = {}) unless the type matcher accepts anything.
+app.use(express.json({ type: () => true }));
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Headers', '*');
@@ -33,6 +36,7 @@ app.post('/', (req, res) => {
     console.log(`  ID      : ${ceId}`);
     console.log(`  Time    : ${ceTime}`);
     console.log(`  Payload :`, JSON.stringify(body?.data || body, null, 2));
+    console.log('[RAW BODY]', JSON.stringify(body));
     console.log('══════════════════════════════════════');
 
     if (ceType === 'order.created' || ceType === 'payment.completed' || ceType === 'payment.failed') {
@@ -54,7 +58,7 @@ app.post('/', (req, res) => {
         console.log(`✅ Notification envoyée → user ${order.userId} | commande ${order.orderId} | ${order.amount}€`);
     }
 
-    res.status(200).send('OK');
+    res.status(204).end();
 });
 
 // Voir toutes les notifications reçues

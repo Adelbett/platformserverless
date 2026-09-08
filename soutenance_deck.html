@@ -1,0 +1,548 @@
+<title>PlatformServerless — Soutenance</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap');
+
+:root{
+  --bg:#f4f7fb; --surface:#ffffff; --surface-2:#eef2f8;
+  --text:#101728; --muted:#57657a; --border:#dfe6ef;
+  --accent:#1b4f85; --accent-soft:#dfecf8;
+  --vert:#1b6642; --vert-soft:#dbf0e4;
+  --orange:#af5f0f; --orange-soft:#fcedd8;
+  --danger:#a3352f; --danger-soft:#fbe4e1;
+  --shadow: 0 1px 2px rgba(16,23,40,.04), 0 8px 24px -12px rgba(16,23,40,.12);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0b1220; --surface:#121b2e; --surface-2:#182338;
+    --text:#e8edf5; --muted:#93a3bb; --border:#243350;
+    --accent:#6fa3d9; --accent-soft:#1c3554;
+    --vert:#5cc593; --vert-soft:#173829;
+    --orange:#e0a25c; --orange-soft:#3a2a15;
+    --danger:#f0837f; --danger-soft:#3a1e1d;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0b1220; --surface:#121b2e; --surface-2:#182338;
+  --text:#e8edf5; --muted:#93a3bb; --border:#243350;
+  --accent:#6fa3d9; --accent-soft:#1c3554;
+  --vert:#5cc593; --vert-soft:#173829;
+  --orange:#e0a25c; --orange-soft:#3a2a15;
+  --danger:#f0837f; --danger-soft:#3a1e1d;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:"IBM Plex Sans", system-ui, sans-serif;
+  scroll-snap-type:y mandatory; overflow-y:scroll; height:100vh;
+}
+h1,h2,h3{font-family:"Sora", system-ui, sans-serif; text-wrap:balance; margin:0}
+code, .mono{font-family:"IBM Plex Mono", monospace}
+
+.slide{
+  min-height:100vh; scroll-snap-align:start; scroll-snap-stop:always;
+  display:flex; flex-direction:column; justify-content:center;
+  padding:64px 8vw 56px; position:relative;
+  border-bottom:1px solid var(--border);
+}
+.eyebrow{
+  font-family:"IBM Plex Mono", monospace; font-size:12px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--muted); margin-bottom:14px;
+  display:flex; align-items:center; gap:10px;
+}
+.eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+h2.title{font-size:clamp(28px,4vw,44px); font-weight:700; line-height:1.12; max-width:16ch}
+.subtitle{color:var(--muted); font-size:17px; margin-top:12px; max-width:60ch; line-height:1.55}
+
+.pagenum{
+  position:absolute; bottom:24px; right:8vw; font-family:"IBM Plex Mono",monospace;
+  font-size:12px; color:var(--muted);
+}
+
+/* nav dots */
+#nav{
+  position:fixed; right:22px; top:50%; transform:translateY(-50%);
+  display:flex; flex-direction:column; gap:9px; z-index:50;
+}
+#nav a{
+  width:7px; height:7px; border-radius:50%; background:var(--border);
+  display:block; transition:background .2s, transform .2s;
+}
+#nav a.active{background:var(--accent); transform:scale(1.5)}
+
+/* ===== Cover ===== */
+.cover{
+  background:
+    radial-gradient(560px 560px at 88% -6%, color-mix(in srgb, var(--accent) 34%, transparent), transparent 60%),
+    radial-gradient(700px 700px at 8% 118%, color-mix(in srgb, var(--vert) 22%, transparent), transparent 60%),
+    var(--surface);
+  color:var(--text);
+  justify-content:space-between;
+}
+.cover .brandrow{display:flex; justify-content:space-between; align-items:flex-start}
+.cover .brand{font-family:"IBM Plex Mono",monospace; font-size:13px; letter-spacing:.08em; color:var(--muted)}
+.cover h1{font-size:clamp(48px,8vw,104px); font-weight:800; letter-spacing:-0.02em; line-height:.98; max-width:14ch}
+.cover .rule{width:64px; height:3px; background:var(--accent); margin:26px 0 22px}
+.cover .tag{font-size:19px; color:var(--muted); max-width:44ch; line-height:1.5}
+.cover .meta{display:flex; gap:48px; flex-wrap:wrap; font-size:14px; color:var(--muted); border-top:1px solid var(--border); padding-top:22px}
+.cover .meta b{color:var(--text); display:block; font-size:14px; margin-bottom:3px}
+
+/* ===== generic building blocks ===== */
+.grid{display:grid; gap:16px}
+.g2{grid-template-columns:1fr 1fr}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g4{grid-template-columns:repeat(4,1fr)}
+
+.card{
+  background:var(--surface); border:1px solid var(--border); border-radius:14px;
+  padding:20px 22px; box-shadow:var(--shadow);
+}
+.card h3{font-size:16px; font-weight:600; margin-bottom:6px}
+.card p{color:var(--muted); font-size:14px; line-height:1.5; margin:0}
+.card .num{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--accent); margin-bottom:10px; display:block}
+
+.tone-bleu{border-left:3px solid var(--accent)}
+.tone-vert{border-left:3px solid var(--vert)}
+.tone-orange{border-left:3px solid var(--orange)}
+.tone-danger{border-left:3px solid var(--danger)}
+
+.pill{
+  display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600;
+  padding:4px 11px; border-radius:99px; font-family:"IBM Plex Mono",monospace;
+}
+.pill-bleu{background:var(--accent-soft); color:var(--accent)}
+.pill-vert{background:var(--vert-soft); color:var(--vert)}
+.pill-orange{background:var(--orange-soft); color:var(--orange)}
+.pill-danger{background:var(--danger-soft); color:var(--danger)}
+
+/* workflow chain */
+.chain{display:flex; align-items:stretch; gap:0; flex-wrap:wrap; margin-top:28px}
+.chain .step{
+  background:var(--surface); border:1px solid var(--border); border-radius:12px;
+  padding:14px 18px; min-width:150px; box-shadow:var(--shadow);
+  display:flex; flex-direction:column; gap:4px; justify-content:center;
+}
+.chain .step b{font-size:14px}
+.chain .step span{font-size:12px; color:var(--muted)}
+.chain .arrow{
+  display:flex; align-items:center; justify-content:center; width:34px; color:var(--muted); font-size:18px;
+}
+.chain.vertical{flex-direction:column; align-items:flex-start}
+.chain.vertical .arrow{width:auto; height:24px; padding-left:22px}
+
+.codebox{
+  background:var(--surface-2); border:1px solid var(--border); border-radius:12px;
+  padding:16px 18px; font-family:"IBM Plex Mono",monospace; font-size:12.5px; line-height:1.7;
+  overflow-x:auto; white-space:pre; color:var(--text);
+}
+.codebox .k{color:var(--vert)} .codebox .s{color:var(--orange)} .codebox .c{color:var(--muted)}
+
+.speech{
+  margin-top:22px; padding:14px 18px; border-radius:12px; background:var(--surface-2);
+  border:1px dashed var(--border); font-size:13.5px; color:var(--muted); max-width:70ch;
+}
+.speech b{color:var(--text)}
+
+.split{display:grid; grid-template-columns:1.1fr .9fr; gap:44px; align-items:center}
+.split.rev{grid-template-columns:.9fr 1.1fr}
+@media (max-width:900px){ .split, .split.rev{grid-template-columns:1fr} }
+
+.kpi{font-family:"Sora",sans-serif; font-weight:700; font-size:34px; color:var(--accent)}
+.kpi.vert{color:var(--vert)} .kpi.orange{color:var(--orange)} .kpi.danger{color:var(--danger)}
+
+.status-ok{color:var(--vert)} .status-warn{color:var(--orange)} .status-limit{color:var(--danger)}
+
+ul.clean{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px}
+ul.clean li{display:flex; gap:10px; font-size:14.5px; color:var(--text); align-items:flex-start}
+ul.clean li::before{content:"—"; color:var(--muted); flex-shrink:0}
+
+@media print{
+  body{overflow:visible; height:auto}
+  .slide{min-height:auto; page-break-after:always; border:none}
+  #nav{display:none}
+}
+</style>
+
+<div id="nav"></div>
+
+<!-- 1 — COVER -->
+<section class="slide cover" id="s1">
+  <div class="brandrow">
+    <div class="brand">ESPRIT — HONORIS UNITED UNIVERSITIES<br>NEXT STEP IT</div>
+    <div class="brand">2025 – 2026</div>
+  </div>
+  <div>
+    <h1>PlatformServerless</h1>
+    <div class="rule"></div>
+    <p class="tag">Plateforme Cloud Native serverless multi-tenant — Kubernetes, Knative, Kafka.</p>
+  </div>
+  <div class="meta">
+    <div><b>Élaboré par</b>Adel Bettaieb</div>
+    <div><b>Encadrant professionnel</b>M. Arafet Ben Kilani</div>
+    <div><b>Encadrante académique</b>Mme Ines Chouchane</div>
+  </div>
+</section>
+
+<!-- 2 — PROBLEME -->
+<section class="slide" id="s2">
+  <div class="eyebrow"><span class="dot"></span>Cadre général — problématique</div>
+  <h2 class="title">Déployer sur Kubernetes reste un métier à part entière</h2>
+  <div class="grid g3" style="margin-top:34px">
+    <div class="card tone-bleu"><span class="num">01</span><h3>Complexité de configuration</h3><p>Chaque déploiement exige plusieurs manifestes YAML (Deployment, Service, Ingress, RBAC, Secrets).</p></div>
+    <div class="card tone-bleu"><span class="num">02</span><h3>Event-driven manuel</h3><p>Un pipeline Kafka + Knative Eventing s'assemble à la main : KafkaSource, Broker, Trigger, un par un.</p></div>
+    <div class="card tone-bleu"><span class="num">03</span><h3>Absence de multi-tenancy</h3><p>Aucune isolation entre équipes, ni quotas, ni contrôle d'accès par développeur.</p></div>
+    <div class="card tone-bleu"><span class="num">04</span><h3>Gaspillage de ressources</h3><p>Les apps tournent en continu, même sans trafic — pas de scale-to-zero natif.</p></div>
+    <div class="card tone-bleu"><span class="num">05</span><h3>Visibilité éclatée</h3><p>Logs, métriques et statuts dispersés dans des outils séparés, sans tableau de bord unifié.</p></div>
+  </div>
+  <div class="pagenum">02 / 20</div>
+</section>
+
+<!-- 3 — REPONSE -->
+<section class="slide" id="s3">
+  <div class="eyebrow"><span class="dot"></span>Cadre général — solution</div>
+  <h2 class="title">Une plateforme qui absorbe cette complexité pour le développeur</h2>
+  <div class="grid g3" style="margin-top:34px">
+    <div class="card tone-vert"><h3>Déploiement simplifié</h3><p>Nom de l'app + image Docker → le reste est automatisé.</p></div>
+    <div class="card tone-vert"><h3>Scalabilité automatique</h3><p>Scale-to-zero et remontée en charge pilotés par Knative.</p></div>
+    <div class="card tone-vert"><h3>Multi-tenancy</h3><p>Un namespace isolé par client, créé à la volée.</p></div>
+    <div class="card tone-orange"><h3>Event-driven intégré</h3><p>Kafka + Knative Eventing configurés depuis le portail.</p></div>
+    <div class="card tone-orange"><h3>Observabilité unifiée</h3><p>Logs temps réel, métriques, alertes — un seul endroit.</p></div>
+    <div class="card tone-orange"><h3>CI/CD réel</h3><p>4 pipelines Jenkins en production, build → Kaniko → cluster.</p></div>
+  </div>
+  <div class="pagenum">03 / 20</div>
+</section>
+
+<!-- 4 — EXISTANT -->
+<section class="slide" id="s4">
+  <div class="eyebrow"><span class="dot"></span>Cadre général — étude de l'existant</div>
+  <h2 class="title">Pourquoi pas Vercel, Heroku ou EKS managé ?</h2>
+  <div class="grid g3" style="margin-top:34px">
+    <div class="card"><h3>Vercel</h3><p>Scale-to-zero natif, mais limité au frontend JavaScript. Pas de Kafka, pas de multi-tenancy, pas d'on-premise.</p></div>
+    <div class="card"><h3>Heroku</h3><p>Déploiement Git + image Docker simple. Pas de scale-to-zero, pas de Kafka natif, coûteux à l'échelle.</p></div>
+    <div class="card"><h3>Amazon EKS</h3><p>Kubernetes managé puissant mais brut : multi-tenancy et event-driven restent entièrement manuels, expertise avancée requise.</p></div>
+  </div>
+  <div class="speech">Aucune de ces solutions ne réunit scale-to-zero, event-driven natif <b>et</b> multi-tenancy on-premise dans un seul produit — c'est l'espace que PlatformServerless occupe.</div>
+  <div class="pagenum">04 / 20</div>
+</section>
+
+<!-- 5 — ARCHI LOGIQUE -->
+<section class="slide" id="s5">
+  <div class="eyebrow"><span class="dot"></span>Conception — architecture logique</div>
+  <h2 class="title">Trois couches, un seul point d'entrée vers le cluster</h2>
+  <div class="chain vertical" style="margin-top:30px; gap:14px">
+    <div class="step tone-bleu" style="width:100%"><b>Couche présentation</b><span>Portail client + Console admin — React 18.2, Vite, JavaScript (JSX), Tailwind CSS</span></div>
+    <div class="arrow">↓ HTTPS / REST / SSE — JWT Keycloak</div>
+    <div class="step tone-vert" style="width:100%"><b>Couche service — Backend Spring Boot 3.2 / Java 21</b><span>Applications · Sécurité · Kafka & Eventing · Facturation · Logs · Administration — s'appuie sur Fabric8 (in-process, pas un service séparé)</span></div>
+    <div class="arrow">↓ API Kubernetes — ServiceAccount &amp; RBAC, via Fabric8</div>
+    <div class="step tone-orange" style="width:100%"><b>Couche infrastructure — cluster Kubernetes</b><span>Knative Serving/Eventing · Kafka (Strimzi) · Keycloak · PostgreSQL · Prometheus/Grafana/Alertmanager</span></div>
+  </div>
+  <div class="speech"><b>Principe central :</b> ni les portails, ni un système externe n'appellent directement l'API Kubernetes — tout passe par le backend, seul point d'entrée autorisé.</div>
+  <div class="pagenum">05 / 20</div>
+</section>
+
+<!-- 6 — ARCHI PHYSIQUE -->
+<section class="slide" id="s6">
+  <div class="eyebrow"><span class="dot"></span>Conception — architecture physique</div>
+  <h2 class="title">Un cluster à 3 nœuds, un namespace par tenant</h2>
+  <div class="grid g3" style="margin-top:30px">
+    <div class="card tone-bleu"><h3>vm01 — control-plane</h3><p>API Server, etcd, Scheduler, Controller Manager.</p></div>
+    <div class="card tone-vert"><h3>vm02 / vm03 — workers</h3><p>Tous les pods de la plateforme et des tenants s'y exécutent.</p></div>
+    <div class="card tone-orange"><h3>Réseau &amp; accès</h3><p>MetalLB (IP externe) → Kourier (ingress HTTP) → Cilium (CNI + NetworkPolicy).</p></div>
+  </div>
+  <div class="grid g4" style="margin-top:16px">
+    <div class="card"><span class="pill pill-bleu">platform</span><p style="margin-top:8px">backend, portails, PostgreSQL, Keycloak, supervision</p></div>
+    <div class="card"><span class="pill pill-vert">kafka</span><p style="margin-top:8px">cluster Kafka opéré par Strimzi</p></div>
+    <div class="card"><span class="pill pill-orange">knative-*</span><p style="margin-top:8px">plan de contrôle Knative Serving / Eventing</p></div>
+    <div class="card"><span class="pill pill-danger">user-&lt;client&gt;</span><p style="margin-top:8px">créé dynamiquement, un par tenant, isolé par NetworkPolicy</p></div>
+  </div>
+  <div class="pagenum">06 / 20</div>
+</section>
+
+<!-- 7 — ISOLATION -->
+<section class="slide" id="s7">
+  <div class="eyebrow"><span class="dot"></span>Réalisation — infrastructure réseau</div>
+  <h2 class="title">Comment un tenant reste isolé d'un autre</h2>
+  <div class="split" style="margin-top:20px">
+    <ul class="clean">
+      <li><b>MetalLB</b> — attribue une IP externe de type LoadBalancer (bare-metal, pas de cloud provider).</li>
+      <li><b>Kourier</b> — passerelle HTTP/HTTPS d'entrée pour tous les Knative Services.</li>
+      <li><b>Cilium</b> — CNI du cluster, applique les <code>NetworkPolicy</code> qui isolent chaque tenant.</li>
+      <li>Chaque client obtient un namespace <code>user-&lt;client&gt;</code> créé à sa première utilisation, avec sa NetworkPolicy générée automatiquement.</li>
+    </ul>
+    <div class="chain vertical">
+      <div class="step tone-bleu"><b>Internet</b><span>requête entrante</span></div>
+      <div class="arrow">↓</div>
+      <div class="step tone-bleu"><b>MetalLB</b><span>IP externe</span></div>
+      <div class="arrow">↓</div>
+      <div class="step tone-vert"><b>Kourier</b><span>ingress HTTP</span></div>
+      <div class="arrow">↓</div>
+      <div class="step tone-orange"><b>Cilium</b><span>namespace A ⊘ namespace B</span></div>
+    </div>
+  </div>
+  <div class="pagenum">07 / 20</div>
+</section>
+
+<!-- 8 — SERVERLESS -->
+<section class="slide" id="s8">
+  <div class="eyebrow"><span class="dot"></span>Réalisation — serverless</div>
+  <h2 class="title">Knative Serving : des pods qui apparaissent et disparaissent</h2>
+  <div class="chain" style="margin-top:30px">
+    <div class="step tone-bleu"><b>Requête HTTP</b><span>via Kourier</span></div>
+    <div class="arrow">→</div>
+    <div class="step tone-vert"><b>Activator</b><span>intercepte si 0 pod actif</span></div>
+    <div class="arrow">→</div>
+    <div class="step tone-vert"><b>Autoscaler (KPA)</b><span>décide du nombre de pods</span></div>
+    <div class="arrow">→</div>
+    <div class="step tone-orange"><b>Pod créé</b><span>queue-proxy + conteneur applicatif</span></div>
+  </div>
+  <div class="grid g2" style="margin-top:26px">
+    <div class="card tone-vert"><h3>Trafic présent</h3><p>Le nombre de pods (Revision) grandit selon la charge réelle mesurée.</p></div>
+    <div class="card tone-danger"><h3>60 secondes sans trafic</h3><p>Scale-to-zero automatique — aucune ressource consommée à vide.</p></div>
+  </div>
+  <div class="pagenum">08 / 20</div>
+</section>
+
+<!-- 9 — EVENT DRIVEN -->
+<section class="slide" id="s9">
+  <div class="eyebrow"><span class="dot"></span>Réalisation — event-driven</div>
+  <h2 class="title">Kafka + Knative Eventing : le découplage entre services</h2>
+  <div class="chain" style="margin-top:30px; flex-wrap:wrap">
+    <div class="step tone-bleu"><b>Producer</b><span>publie sur un topic</span></div>
+    <div class="arrow">→</div>
+    <div class="step tone-bleu"><b>Kafka (Strimzi)</b><span>topic, partitions</span></div>
+    <div class="arrow">→</div>
+    <div class="step tone-vert"><b>KafkaSource</b><span>lit le topic → CloudEvent</span></div>
+    <div class="arrow">→</div>
+    <div class="step tone-vert"><b>Broker</b><span>reçoit l'événement</span></div>
+    <div class="arrow">→</div>
+    <div class="step tone-orange"><b>Trigger</b><span>filtre &amp; route</span></div>
+    <div class="arrow">→</div>
+    <div class="step tone-orange"><b>Knative Service</b><span>consommateur final, HTTP POST</span></div>
+  </div>
+  <div class="speech">Producteur et consommateur ne se connaissent jamais directement — toute la communication transite par Kafka et le Broker Knative, en asynchrone.</div>
+  <div class="pagenum">09 / 20</div>
+</section>
+
+<!-- 10 — FABRIC8 vs ADMINCLIENT -->
+<section class="slide" id="s10">
+  <div class="eyebrow"><span class="dot"></span>Réalisation — le backend comme cerveau</div>
+  <h2 class="title">Fabric8 et Kafka AdminClient : deux bibliothèques, deux rôles</h2>
+  <div class="grid g2" style="margin-top:30px">
+    <div class="card tone-bleu">
+      <h3>Fabric8 Kubernetes Client</h3>
+      <p>Bibliothèque Java exécutée dans le process du backend. Crée / lit / modifie les ressources Kubernetes et les CRD Knative (Service, Revision, KafkaSource, Trigger).</p>
+    </div>
+    <div class="card tone-vert">
+      <h3>Kafka AdminClient</h3>
+      <p>Bibliothèque Java dédiée à Kafka. Crée / supprime les topics eux-mêmes — une opération d'administration Kafka, indépendante de Kubernetes.</p>
+    </div>
+  </div>
+  <div class="codebox" style="margin-top:22px"><span class="c">// EventingService.java — deux clients distincts, même process</span>
+<span class="k">private void</span> createKnativeKafkaSource(...) { <span class="c">// Fabric8 → CRD KafkaSource</span>
+    kubernetesClient.genericKubernetesResources(<span class="s">"sources.knative.dev/v1beta1"</span>, <span class="s">"KafkaSource"</span>)...
+}
+<span class="k">// KafkaService.java</span>
+adminClient.createTopics(...); <span class="c">// Kafka AdminClient → topic Kafka réel</span></div>
+  <div class="pagenum">10 / 20</div>
+</section>
+
+<!-- 11 — DEPLOIEMENT -->
+<section class="slide" id="s11">
+  <div class="eyebrow"><span class="dot"></span>Réalisation — workflow prioritaire</div>
+  <h2 class="title">De la demande utilisateur au pod actif</h2>
+  <div class="chain vertical" style="margin-top:22px">
+    <div class="step tone-bleu" style="width:100%"><b>Utilisateur</b><span>formulaire de déploiement</span></div>
+    <div class="arrow">↓</div>
+    <div class="step tone-bleu" style="width:100%"><b>Portail React → POST /api/apps</b><span>backend Spring Boot</span></div>
+    <div class="arrow">↓</div>
+    <div class="step tone-vert" style="width:100%"><b>Keycloak / JWT / permission DEPLOY_APP</b><span>authentification et autorisation</span></div>
+    <div class="arrow">↓</div>
+    <div class="step tone-vert" style="width:100%"><b>App enregistrée en base — statut DEPLOYING</b><span>puis traitement asynchrone (<code>@Async</code>)</span></div>
+    <div class="arrow">↓</div>
+    <div class="step tone-orange" style="width:100%"><b>Fabric8 → Knative Service → Revision → Pod</b><span>URL générée, statut RUNNING</span></div>
+  </div>
+  <div class="codebox" style="margin-top:20px"><span class="c">// AppDeploymentAsyncRunner.java</span>
+<span class="k">@Async</span>
+<span class="k">public void</span> triggerDeploy(App app, AppRequest req) {
+    String url = knativeService.deploy(...);   <span class="c">// via Fabric8</span>
+    app.setStatus(<span class="s">"RUNNING"</span>);
+}</div>
+  <div class="speech">Le déploiement ne bloque jamais la réponse HTTP : il est traité en tâche de fond, pendant que le frontend reçoit les mises à jour de statut en temps réel.</div>
+  <div class="pagenum">11 / 20</div>
+</section>
+
+<!-- 12 — SECURITE -->
+<section class="slide" id="s12">
+  <div class="eyebrow"><span class="dot"></span>Réalisation — sécurité applicative</div>
+  <h2 class="title">Keycloak, JWT, et une permission par endpoint</h2>
+  <div class="chain vertical" style="margin-top:20px">
+    <div class="step tone-bleu" style="width:100%"><b>Keycloak</b><span>authentifie, émet le JWT</span></div>
+    <div class="arrow">↓</div>
+    <div class="step tone-vert" style="width:100%"><b>Spring Security (oauth2-resource-server)</b><span>valide le JWT contre l'issuer Keycloak</span></div>
+    <div class="arrow">↓</div>
+    <div class="step tone-orange" style="width:100%"><b>Rôle → Permission → @PreAuthorize</b><span>ADMIN · CLIENT_ADMIN · DEVELOPER</span></div>
+  </div>
+  <div class="codebox" style="margin-top:20px"><span class="k">@PreAuthorize</span>(<span class="s">"@permissionService.has(authentication.name, 'MANAGE_EVENTING')"</span>)
+<span class="k">public</span> ResponseEntity&lt;Void&gt; createTrigger(...)</div>
+  <div class="speech">La vérification de permission se fait <b>avant</b> d'entrer dans le contrôleur — un rôle DEVELOPER ne peut jamais atteindre un endpoint réservé à MANAGE_EVENTING.</div>
+  <div class="pagenum">12 / 20</div>
+</section>
+
+<!-- 13 — OBSERVABILITE -->
+<section class="slide" id="s13">
+  <div class="eyebrow"><span class="dot"></span>Réalisation — observabilité</div>
+  <h2 class="title">Trois flux, un seul portail</h2>
+  <div class="grid g3" style="margin-top:30px">
+    <div class="card tone-bleu"><h3>Logs</h3><p>Poussés en direct via <code>SseEmitter</code> (Server-Sent Events) — pas de polling côté frontend.</p></div>
+    <div class="card tone-vert"><h3>Métriques</h3><p>Micrometer / Actuator exposent les métriques, scrapées par Prometheus, visualisées dans Grafana.</p></div>
+    <div class="card tone-orange"><h3>Alertes</h3><p>Alertmanager déclenche sur seuils — et la facturation a sa propre alerte J-3.</p></div>
+  </div>
+  <div class="pagenum">13 / 20</div>
+</section>
+
+<!-- 14 — BILLING -->
+<section class="slide" id="s14">
+  <div class="eyebrow"><span class="dot"></span>Réalisation — facturation à l'usage</div>
+  <h2 class="title">Un snapshot horaire, une alerte avant l'échéance</h2>
+  <div class="chain" style="margin-top:30px; flex-wrap:wrap">
+    <div class="step tone-bleu"><b>BillingScheduler</b><span>@Scheduled — toutes les heures</span></div>
+    <div class="arrow">→</div>
+    <div class="step tone-vert"><b>Snapshot</b><span>CPU + RAM + replicas + statut</span></div>
+    <div class="arrow">→</div>
+    <div class="step tone-orange"><b>Facture</b><span>échéance = fin de période + 5 jours</span></div>
+    <div class="arrow">→</div>
+    <div class="step tone-danger"><b>Alerte J-3</b><span>envoyée 3 jours avant l'échéance</span></div>
+  </div>
+  <div class="codebox" style="margin-top:20px"><span class="k">@Scheduled</span>(cron = <span class="s">"0 0 * * * *"</span>)  <span class="c">// snapshot horaire</span>
+<span class="k">@Scheduled</span>(cron = <span class="s">"0 0 8 * * *"</span>)  <span class="c">// alertes J-3, chaque jour à 8h</span></div>
+  <div class="pagenum">14 / 20</div>
+</section>
+
+<!-- 15 — STRIPE -->
+<section class="slide" id="s15">
+  <div class="eyebrow"><span class="dot"></span>Réalisation — paiement</div>
+  <h2 class="title">Le webhook Stripe : sécurisé, mais pas par JWT</h2>
+  <div class="chain vertical" style="margin-top:20px">
+    <div class="step tone-bleu" style="width:100%"><b>Stripe</b><span>paiement effectué</span></div>
+    <div class="arrow">↓</div>
+    <div class="step tone-danger" style="width:100%"><b>Vérification de la signature</b><span>webhook secret — aucun JWT sur cet endpoint</span></div>
+    <div class="arrow">↓</div>
+    <div class="step tone-vert" style="width:100%"><b>PaymentController → PaymentService</b><span>mise à jour du statut de la facture</span></div>
+  </div>
+  <div class="speech">Ce endpoint est appelé par Stripe, pas par un utilisateur connecté — sa sécurité repose sur la signature cryptographique du payload, pas sur un token JWT.</div>
+  <div class="pagenum">15 / 20</div>
+</section>
+
+<!-- 16 — CI/CD -->
+<section class="slide" id="s16">
+  <div class="eyebrow"><span class="dot"></span>Réalisation — intégration continue</div>
+  <h2 class="title">4 pipelines Jenkins réels, du commit au cluster</h2>
+  <div class="chain" style="margin-top:30px; flex-wrap:wrap">
+    <div class="step tone-bleu"><b>GitHub</b><span>push</span></div>
+    <div class="arrow">→</div>
+    <div class="step tone-bleu"><b>Jenkins</b><span>build Maven / npm, tests</span></div>
+    <div class="arrow">→</div>
+    <div class="step tone-vert"><b>Kaniko</b><span>build d'image sans daemon Docker</span></div>
+    <div class="arrow">→</div>
+    <div class="step tone-orange"><b>Docker Hub</b><span>push de l'image</span></div>
+    <div class="arrow">→</div>
+    <div class="step tone-orange"><b>Kubernetes</b><span>rollout</span></div>
+  </div>
+  <div class="speech">Kaniko construit l'image directement dans un pod Kubernetes, sans accès privilégié au socket Docker — un choix de sécurité pour un pipeline qui tourne dans le cluster.</div>
+  <div class="pagenum">16 / 20</div>
+</section>
+
+<!-- 17 — TECH -->
+<section class="slide" id="s17">
+  <div class="eyebrow"><span class="dot"></span>Réalisation — outils &amp; technologies</div>
+  <h2 class="title">La stack, telle qu'elle tourne réellement</h2>
+  <div class="grid g4" style="margin-top:30px">
+    <div class="card tone-orange"><h3>Infrastructure</h3><p>Kubernetes 1.28 · Knative Serving/Eventing · Kafka/Strimzi · MetalLB · Kourier · Cilium</p></div>
+    <div class="card tone-bleu"><h3>Frontend</h3><p>React 18.2 · Vite · JavaScript (JSX) · Tailwind CSS</p></div>
+    <div class="card tone-vert"><h3>Backend</h3><p>Spring Boot 3.2 · Java 21 · Fabric8 6.10 · Keycloak · JPA/Hibernate · PostgreSQL</p></div>
+    <div class="card tone-danger"><h3>DevOps &amp; Supervision</h3><p>Jenkins · Kaniko · Docker Hub · GitHub · Prometheus · Grafana · Alertmanager</p></div>
+  </div>
+  <div class="pagenum">17 / 20</div>
+</section>
+
+<!-- 18 — LIMITES -->
+<section class="slide" id="s18">
+  <div class="eyebrow"><span class="dot"></span>Validation — limites</div>
+  <h2 class="title">Une limite réelle, testée cette semaine</h2>
+  <div class="split" style="margin-top:10px">
+    <div>
+      <p class="subtitle" style="margin-top:0">Knative Serving ne route que du HTTP/HTTP2/gRPC — un PostgreSQL déployé comme Knative Service est injoignable en TCP brut.</p>
+      <ul class="clean" style="margin-top:18px">
+        <li>Testé avec un vrai microservice Spring Boot (<code>order-service</code>).</li>
+        <li>Résultat : CrashLoopBackOff au démarrage.</li>
+        <li>Perspective : les ressources stateful nécessitent un StatefulSet Kubernetes classique, hors du moteur serverless.</li>
+      </ul>
+    </div>
+    <div class="codebox">org.postgresql.util.PSQLException:
+Connection to order-db:5432 refused.
+Caused by:
+java.net.ConnectException: Connection refused</div>
+  </div>
+  <div class="pagenum">18 / 20</div>
+</section>
+
+<!-- 19 — PERSPECTIVES -->
+<section class="slide" id="s19">
+  <div class="eyebrow"><span class="dot"></span>Conclusion — perspectives</div>
+  <h2 class="title">Ce qui suit une fois la limite posée</h2>
+  <div class="grid g3" style="margin-top:30px">
+    <div class="card tone-bleu"><h3>Ressources stateful</h3><p>Introduire un second type de déploiement (StatefulSet) à côté des apps serverless.</p></div>
+    <div class="card tone-vert"><h3>BD managée par tenant</h3><p>Provisionner une base par client hors du moteur Knative, credentials fournis au client.</p></div>
+    <div class="card tone-orange"><h3>Sécurité M2M</h3><p>Étendre le contrôle d'accès machine-à-machine au-delà du webhook Stripe.</p></div>
+  </div>
+  <div class="pagenum">19 / 20</div>
+</section>
+
+<!-- 20 — MERCI -->
+<section class="slide cover" id="s20" style="justify-content:center; align-items:flex-start">
+  <div>
+    <div class="eyebrow"><span class="dot"></span>PlatformServerless</div>
+    <h1 style="font-size:clamp(40px,7vw,84px)">Merci pour<br>votre attention.</h1>
+    <p class="tag" style="margin-top:20px">Questions bienvenues.</p>
+  </div>
+</section>
+
+<script>
+const slides = [...document.querySelectorAll('.slide')];
+const nav = document.getElementById('nav');
+slides.forEach((s,i)=>{
+  const a = document.createElement('a');
+  a.href = '#'+s.id;
+  nav.appendChild(a);
+});
+const dots = [...nav.children];
+const io = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      const idx = slides.indexOf(e.target);
+      dots.forEach(d=>d.classList.remove('active'));
+      dots[idx].classList.add('active');
+    }
+  });
+},{threshold:.6});
+slides.forEach(s=>io.observe(s));
+
+document.addEventListener('keydown', (e)=>{
+  const cur = slides.findIndex(s=>{
+    const r = s.getBoundingClientRect();
+    return r.top > -10 && r.top < window.innerHeight/2;
+  });
+  if(e.key==='ArrowDown' || e.key==='ArrowRight' || e.key===' '){
+    e.preventDefault();
+    const next = slides[Math.min(cur+1, slides.length-1)];
+    next?.scrollIntoView({behavior:'smooth'});
+  }
+  if(e.key==='ArrowUp' || e.key==='ArrowLeft'){
+    e.preventDefault();
+    const prev = slides[Math.max(cur-1,0)];
+    prev?.scrollIntoView({behavior:'smooth'});
+  }
+});
+</script>

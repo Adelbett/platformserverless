@@ -80,68 +80,6 @@ Auditer et corriger les accès directs par identifiant sur les points d'accès s
 \end{longtable}
 }
 
-% \subsection{Sprint Backlog}
-
-% Le tableau~\ref{tab:sb-sprint10} présente le backlog détaillé du Sprint 10, obtenu en décomposant chaque User Story retenue en tâches techniques.
-
-% % \needspace garantit qu'il reste assez de place sur la page : sans cela une
-% % coupure peut tomber au milieu d'un groupe \multirow, dont le contenu deborde
-% % alors hors du cadre et laisse une cellule vide sur la page suivante.
-% \needspace{0.75\textheight}
-% {
-% % Le tableau deborde volontairement de 1,5 cm dans chaque marge afin de laisser
-% % respirer les trois colonnes ; LTleft/LTright sont les parametres propres a
-% % longtable (adjustwidth n'a aucun effet sur cet environnement).
-% % Largeur totale : 18,8 cm, soit 1 cm de blanc conserve de chaque cote de la page.
-% \setlength{\LTleft}{-1.5cm}
-% \setlength{\LTright}{-1.5cm}
-% \setlength{\tabcolsep}{8pt}
-% \renewcommand{\arraystretch}{1.9}
-% \begin{longtable}{|p{6.6cm}|>{\raggedright\arraybackslash}p{8.1cm}|>{\centering\arraybackslash}p{2.3cm}|}
-% \hline
-% User Story & Tâches & Estimation \\
-% \hline
-% \endfirsthead
-% \hline
-% User Story & Tâches & Estimation \\
-% \hline
-% \endhead
-% \endfoot
-% \hline
-
-% \caption{Backlog du Sprint 10}
-% \label{tab:sb-sprint10}
-% \endlastfoot
-
-% \multirow{1}{6.6cm}{
-% \centering
-% En tant qu'ADMIN, je veux que le \texttt{ClusterRole} du backend soit limité aux permissions réellement nécessaires.
-% }
-% &
-% Reconstruire le \texttt{ClusterRole} à partir des ressources effectivement manipulées, vérifier avec \texttt{kubectl auth can-i}.
-% & — \\
-% \hline
-
-% \multirow{1}{6.6cm}{
-% \centering
-% En tant qu'ADMIN, je veux restreindre les origines autorisées à appeler l'API.
-% }
-% &
-% Configurer \texttt{app.cors.allowed-origins} en liste explicite.
-% & — \\
-% \hline
-
-% \multirow{1}{6.6cm}{
-% \centering
-% En tant qu'ADMIN, je veux qu'un client ne puisse pas accéder aux ressources d'un autre tenant par manipulation d'identifiant.
-% }
-% &
-% Auditer et corriger les accès directs par identifiant sur les points d'accès sensibles (journaux, moyens de paiement).
-% & — \\
-% \hline
-
-% \end{longtable}
-% }
 
 \subsection{Conception}
 
@@ -151,7 +89,7 @@ Plusieurs mesures de sécurité ont été introduites au fil des sprints précé
 
 \subsubsection{Workflow global de sécurisation d'une requête}
 
-Toute requête adressée à l'API traverse une chaîne de contrôles ordonnée, dont chaque étage peut interrompre le traitement. Ces contrôles se répartissent en deux natures distinctes, qu'il importe de ne pas confondre : l'\emph{authentification} établit l'identité de l'appelant, l'\emph{autorisation} détermine ce que cette identité a le droit de faire. La figure~\ref{fig:workflow-securite} représente cette chaîne.
+Toute requête adressée à l'API et provenant d'un utilisateur authentifié (portail client ou console d'administration) traverse une chaîne de contrôles ordonnée, dont chaque étage peut interrompre le traitement. Ces contrôles se répartissent en deux natures distinctes, qu'il importe de ne pas confondre : l'\emph{authentification} établit l'identité de l'appelant, l'\emph{autorisation} détermine ce que cette identité a le droit de faire. La figure~\ref{fig:workflow-securite} représente cette chaîne.
 
 \begin{figure}[H]
 \begin{adjustwidth}{-1.2cm}{-1.2cm}
@@ -223,6 +161,8 @@ Toute requête adressée à l'API traverse une chaîne de contrôles ordonnée, 
 \end{figure}
 
 Le backend ne gère ni mot de passe ni session : configuré en mode \texttt{STATELESS}, il agit comme serveur de ressources OAuth2 et se contente de valider les jetons émis par Keycloak. Un filtre de synchronisation crée l'utilisateur local à sa première requête, ce qui rattache l'identité Keycloak au modèle de rôles de la plateforme.
+
+Cette chaîne ne couvre toutefois pas l'ensemble des points d'entrée de l'API. Le point de terminaison recevant les notifications de paiement Stripe (\texttt{/api/payment/webhook}) est volontairement exclu de l'authentification par jeton, puisqu'il est appelé par Stripe lui-même et non par un utilisateur muni d'un compte sur la plateforme : sa sécurité repose sur un mécanisme différent, la vérification de la signature cryptographique du corps de la requête à l'aide du secret partagé avec Stripe.
 
 \subsubsection{Configuration CORS}
 
@@ -370,7 +310,7 @@ Au terme de ce sprint, les mesures de durcissement identifiées au fil du projet
 
 \subsection{Introduction}
 
-Ce sprint a pour objectif de doter chacun des composants de la plateforme (backend, portail client, console d'administration) d'un pipeline d'intégration continue, puis de consolider et d'harmoniser ces pipelines sur un socle commun plus robuste, en généralisant les mécanismes de fiabilisation mis au point empiriquement lors du Sprint 4 pour le pipeline backend.
+Ce sprint a pour objectif de doter chacun des composants de la plateforme (backend, portail client, console d'administration, microservices de démonstration) d'un pipeline d'intégration continue, puis de consolider et d'harmoniser ces pipelines sur un socle commun plus robuste, en généralisant les mécanismes de fiabilisation mis au point empiriquement lors du Sprint 4 pour le pipeline backend.
 
 \subsection{Objectifs du Sprint}
 
@@ -558,7 +498,7 @@ Le pipeline est décrit en syntaxe déclarative dans le fichier \textit{Jenkinsf
   label={lst:jenkinsfile}]
 pipeline {
     agent any
-    options { retry(2) }            // relance le pipeline sur echec transitoire
+    options { retry(2) }            // relance le pipeline sur échec transitoire
     tools   { maven 'maven-3'; jdk 'jdk-21' }
 
     environment {
@@ -568,6 +508,17 @@ pipeline {
     }
 
     stages {
+        stage('Cleanup') {
+            steps {
+                sh '''
+                    # nettoie les repertoires temporaires laisses par un
+                    # precedent build interrompu, avant que Kaniko ne demarre
+                    mkdir -p /var/jenkins_home/.jna-tmp
+                    mkdir -p /var/jenkins_home/.java-tmp
+                '''
+            }
+        }
+
         stage('Checkout') {
             steps {
                 retry(3) {          // fiabilisation du clone Git

@@ -68,61 +68,6 @@ User Story & Tâches & Estimation \\
 & Tester ce mécanisme. & 1 \\ \hline
 \end{longtable}
 }
-% \subsection{Sprint Backlog}
-
-% Le tableau~\ref{tab:sb-sprint7} présente le backlog détaillé du Sprint 7, obtenu en décomposant chaque User Story retenue en tâches techniques.
-
-% \needspace{0.75\textheight}
-% {
-% \setlength{\LTleft}{-1.5cm}
-% \setlength{\LTright}{-1.5cm}
-% \setlength{\tabcolsep}{8pt}
-% \renewcommand{\arraystretch}{1.9}
-% \begin{longtable}{|p{6.6cm}|>{\raggedright\arraybackslash}p{8.1cm}|>{\centering\arraybackslash}p{2.3cm}|}
-% \hline
-% User Story & Tâches & Estimation \\
-% \hline
-% \endfirsthead
-% \hline
-% User Story & Tâches & Estimation \\
-% \hline
-% \endhead
-% \endfoot
-% \hline
-
-% \caption{Backlog du Sprint 7}
-% \label{tab:sb-sprint7}
-% \endlastfoot
-
-% \multirow{3}{6.6cm}{\centering En tant que CLIENT\_ADMIN ou MEMBER, je veux consulter mon historique d'usage et de facturation afin de suivre mes dépenses.}
-% & Développer le calcul périodique de l'usage. & 1 \\ \cline{2-3}
-% & Développer la consultation de sa facturation. & 1 \\ \cline{2-3}
-% & Développer la page de facturation du portail. & 1 \\ \hline
-
-% \multirow{7}{6.6cm}{\centering En tant que CLIENT\_ADMIN ou MEMBER, je veux gérer mes moyens de paiement, régler mes factures et consulter mes transactions afin de rester en règle.}
-% & Intégrer le prestataire de paiement. & 1 \\ \cline{2-3}
-% & Développer l'enregistrement d'un moyen de paiement. & 1 \\ \cline{2-3}
-% & Développer la suppression d'un moyen de paiement. & 1 \\ \cline{2-3}
-% & Développer la liste de ses factures. & 1 \\ \cline{2-3}
-% & Développer le paiement d'une facture. & 1 \\ \cline{2-3}
-% & Développer la consultation de ses transactions. & 1 \\ \cline{2-3}
-% & Tester le paiement. & 1 \\ \hline
-
-% \multirow{1}{6.6cm}{\centering En tant que CLIENT\_ADMIN ou MEMBER, je veux exporter un rapport de facturation afin de le transmettre à ma comptabilité.}
-% & Développer l'export du rapport de facturation. & 1 \\ \hline
-
-% \multirow{4}{6.6cm}{\centering En tant qu'ADMIN, je veux consulter la facturation de tous les clients, les factures impayées, et générer les factures mensuelles afin de piloter la facturation globale.}
-% & Développer la vue de facturation globale. & 1 \\ \cline{2-3}
-% & Développer la consultation des factures impayées. & 1 \\ \cline{2-3}
-% & Développer la génération mensuelle des factures. & 1 \\ \cline{2-3}
-% & Développer le déclenchement manuel d'un instantané d'usage. & 1 \\ \hline
-
-% \multirow{2}{6.6cm}{\centering En tant qu'ADMIN, je veux suspendre manuellement un client en situation d'impayé afin de limiter les pertes.}
-% & Développer la suspension manuelle pour non-paiement. & 1 \\ \cline{2-3}
-% & Tester ce mécanisme. & 1 \\ \hline
-
-% \end{longtable}
-% }
 
 \subsection{Diagramme de cas d'utilisation du Sprint 7}
 
@@ -166,39 +111,6 @@ Service Web & Description \\
 \texttt{POST\slash api\slash payment\slash webhook} & Notification du prestataire de paiement. \\ \hline
 \end{longtable}}
 
-% \subsection{Services Web}
-
-% \needspace{0.55\textheight}
-% {\setlength{\tabcolsep}{8pt}
-% \begin{longtable}{|p{5.8cm}|p{8.4cm}|}
-% \hline
-% Service Web & Description \\
-% \hline
-% \endfirsthead
-% \hline
-% Service Web & Description \\
-% \hline
-% \endhead
-% \endfoot
-% \hline
-% \endlastfoot
-% \texttt{GET /api/billing/me} & Consulter sa facturation. \\ \hline
-% \texttt{GET /api/billing/export} & Exporter un rapport de facturation. \\ \hline
-% \texttt{GET /api/billing/admin} & Facturation globale, tous clients confondus (ADMIN). \\ \hline
-% \texttt{POST /api/billing/admin/snapshot} & Déclencher un instantané d'usage (ADMIN). \\ \hline
-% \texttt{GET /api/invoices} & Lister ses factures. \\ \hline
-% \texttt{POST /api/invoices/\{id\}/pay} & Payer une facture. \\ \hline
-% \texttt{GET /api/invoices/admin/overdue} & Factures impayées (ADMIN). \\ \hline
-% \texttt{POST /api/invoices/generate} & Générer les factures mensuelles (ADMIN). \\ \hline
-% \texttt{POST /api/invoices/apps/\{appId\}/suspend} & Suspendre une application pour impayé (ADMIN). \\ \hline
-% \texttt{GET /api/payment/config} & Configuration publique du prestataire de paiement. \\ \hline
-% \texttt{POST /api/payment/setup-intent} & Enregistrer un moyen de paiement. \\ \hline
-% \texttt{GET /api/payment/methods} & Lister ses moyens de paiement. \\ \hline
-% \texttt{DELETE /api/payment/methods/\{id\}} & Supprimer un moyen de paiement. \\ \hline
-% \texttt{POST /api/payment/pay} & Payer. \\ \hline
-% \texttt{GET /api/payment/transactions} & Historique des transactions. \\ \hline
-% \texttt{POST /api/payment/webhook} & Notification du prestataire de paiement. \\ \hline
-% \end{longtable}}
 
 \subsection{Conception}
 
@@ -321,50 +233,6 @@ User Story & Tâches & Estimation \\
 \end{longtable}
 }
 
-% \subsection{Sprint Backlog}
-
-% Le tableau~\ref{tab:sb-sprint8} présente le backlog détaillé du Sprint 8, obtenu en décomposant chaque User Story retenue en tâches techniques.
-
-% \needspace{0.75\textheight}
-% {
-% \setlength{\LTleft}{-1.5cm}
-% \setlength{\LTright}{-1.5cm}
-% \setlength{\tabcolsep}{8pt}
-% \renewcommand{\arraystretch}{1.9}
-% \begin{longtable}{|p{6.6cm}|>{\raggedright\arraybackslash}p{8.1cm}|>{\centering\arraybackslash}p{2.3cm}|}
-% \hline
-% User Story & Tâches & Estimation \\
-% \hline
-% \endfirsthead
-% \hline
-% User Story & Tâches & Estimation \\
-% \hline
-% \endhead
-% \endfoot
-% \hline
-
-% \caption{Backlog du Sprint 8}
-% \label{tab:sb-sprint8}
-% \endlastfoot
-
-% \multirow{4}{6.6cm}{\centering En tant qu'ADMIN, je veux lister et suspendre ou réactiver un compte client afin de gérer les abus ou les impayés.}
-% & Développer la liste des comptes clients avec leur état. & 1 \\ \cline{2-3}
-% & Développer la suspension d'un compte. & 1 \\ \cline{2-3}
-% & Développer la réactivation d'un compte. & 1 \\ \cline{2-3}
-% & Tester ces actions. & 1 \\ \hline
-
-% \multirow{3}{6.6cm}{\centering En tant qu'ADMIN, je veux consulter et modifier le quota de ressources d'un client afin d'encadrer sa consommation.}
-% & Développer la consultation du quota. & 1 \\ \cline{2-3}
-% & Développer la modification du quota. & 1 \\ \cline{2-3}
-% & Propager le quota vers le cluster. & 1 \\ \hline
-
-% \multirow{3}{6.6cm}{\centering En tant qu'ADMIN, je veux consulter et exporter le journal d'audit des actions administratives afin de garder une traçabilité.}
-% & Développer l'enregistrement automatique des actions administratives. & 1 \\ \cline{2-3}
-% & Développer la consultation paginée et filtrable du journal. & 1 \\ \cline{2-3}
-% & Développer l'export CSV. & 1 \\ \hline
-
-% \end{longtable}
-% }
 
 \subsection{Diagramme de cas d'utilisation du Sprint 8}
 
@@ -398,30 +266,6 @@ Service Web & Description \\
 \texttt{GET\slash api\slash admin\slash audit-log} & Consulter le journal d'audit, paginé et filtrable. \\ \hline
 \texttt{GET\slash api\slash admin\slash audit-log\slash export} & Exporter le journal d'audit (CSV). \\ \hline
 \end{longtable}}
-% \subsection{Services Web}
-
-% \needspace{0.55\textheight}
-% {\setlength{\tabcolsep}{8pt}
-% \begin{longtable}{|p{5.8cm}|p{8.4cm}|}
-% \hline
-% Service Web & Description \\
-% \hline
-% \endfirsthead
-% \hline
-% Service Web & Description \\
-% \hline
-% \endhead
-% \endfoot
-% \hline
-% \endlastfoot
-% \texttt{GET /api/admin/clients} & Lister les comptes clients avec leur état de suspension. \\ \hline
-% \texttt{POST /api/admin/clients/\{userId\}/suspend} & Suspendre un compte client. \\ \hline
-% \texttt{POST /api/admin/clients/\{userId\}/restore} & Réactiver un compte client. \\ \hline
-% \texttt{GET /api/admin/clients/\{userId\}/quota} & Consulter le quota d'un client. \\ \hline
-% \texttt{PUT /api/admin/clients/\{userId\}/quota} & Modifier le quota d'un client. \\ \hline
-% \texttt{GET /api/admin/audit-log} & Consulter le journal d'audit, paginé et filtrable. \\ \hline
-% \texttt{GET /api/admin/audit-log/export} & Exporter le journal d'audit (CSV). \\ \hline
-% \end{longtable}}
 
 \subsection{Conception}
 
@@ -562,30 +406,6 @@ Service Web & Description \\
 \texttt{GET\slash api\slash admin\slash cluster\slash overview} & Vue d'ensemble consolidée du cluster (ADMIN). \\ \hline
 \texttt{GET\slash api\slash metrics\slash cluster} & Métriques agrégées du cluster (ADMIN). \\ \hline
 \end{longtable}}
-% \subsection{Services Web}
-
-% \needspace{0.55\textheight}
-% {\setlength{\tabcolsep}{8pt}
-% \begin{longtable}{|p{5.8cm}|p{8.4cm}|}
-% \hline
-% Service Web & Description \\
-% \hline
-% \endfirsthead
-% \hline
-% Service Web & Description \\
-% \hline
-% \endhead
-% \endfoot
-% \hline
-% \endlastfoot
-% \texttt{GET /api/admin/stats} & Statistiques globales de la plateforme (ADMIN). \\ \hline
-% \texttt{GET /api/admin/cluster/nodes}, \texttt{/namespaces}, \texttt{/pods}, \texttt{/storage} & État des nœuds, espaces de noms, pods et volumes (ADMIN). \\ \hline
-% \texttt{GET /api/admin/cluster/knative/services}, \texttt{/kafka/brokers} & État des services Knative et des courtiers Kafka (ADMIN). \\ \hline
-% \texttt{GET /api/admin/cluster/alerts}, \texttt{/events} & Alertes actives et événements d'avertissement récents (ADMIN). \\ \hline
-% \texttt{GET /api/admin/cluster/system-components} & Santé des composants système (ADMIN). \\ \hline
-% \texttt{GET /api/admin/cluster/overview} & Vue d'ensemble consolidée du cluster (ADMIN). \\ \hline
-% \texttt{GET /api/metrics/cluster} & Métriques agrégées du cluster (ADMIN). \\ \hline
-% \end{longtable}}
 
 \subsection{Conception}
 

@@ -85,10 +85,11 @@ export const AuthProvider = ({ children }) => {
                 });
                 userData = {
                     ...tokenData,
-                    role:      profile.data.role      || tokenData.role,
-                    suspended: profile.data.suspended || false,
-                    ownerId:   profile.data.ownerId   || null,
-                    id:        profile.data.id,
+                    role:        profile.data.role        || tokenData.role,
+                    suspended:   profile.data.suspended   || false,
+                    ownerId:     profile.data.ownerId     || null,
+                    id:          profile.data.id,
+                    permissions: profile.data.permissions || [],
                 };
             } catch { /* fallback to token data */ }
 

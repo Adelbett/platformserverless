@@ -3,7 +3,10 @@ const { Kafka } = require('kafkajs');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
-app.use(express.json());
+// Knative's KafkaSource doesn't always set Content-Type: application/json
+// when forwarding the raw Kafka record — express.json() silently skips
+// parsing (leaving req.body = {}) unless the type matcher accepts anything.
+app.use(express.json({ type: () => true }));
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Headers', '*');
@@ -50,10 +53,11 @@ app.post('/', async (req, res) => {
 
     console.log('══════════════════════════════════════');
     console.log('[EVENT RECEIVED]', ceType, ceId);
+    console.log('[RAW BODY]', JSON.stringify(body));
 
     if (ceType !== 'order.created') {
         console.log(`[PAYMENT] Ignored event type: ${ceType}`);
-        return res.status(200).send('OK');
+        return res.status(204).end();
     }
 
     const order = body?.data || body;
@@ -87,7 +91,7 @@ app.post('/', async (req, res) => {
         console.log(`[Kafka] Published ${cloudEvent.type} for order ${payment.orderId}`);
     }
 
-    res.status(200).send('OK');
+    res.status(204).end();
 });
 
 app.get('/', (_, res) => {

@@ -21,17 +21,17 @@ const NAV_SECTIONS = [
         items: [
             { path: '/dashboard',  label: 'Dashboard',    icon: LayoutDashboard, clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
             { path: '/apps',       label: 'Applications', icon: Box,                               allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
-            { path: '/apps/new',   label: 'Deploy',       icon: Rocket,          clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
-            { path: '/monitoring', label: 'Monitoring',   icon: Activity,        clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
-            { path: '/logs',       label: 'Logs',         icon: Terminal,        clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
+            { path: '/apps/new',   label: 'Deploy',       icon: Rocket,          clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'], permission: 'DEPLOY_APP' },
+            { path: '/monitoring', label: 'Monitoring',   icon: Activity,        clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'], permission: 'VIEW_MONITORING' },
+            { path: '/logs',       label: 'Logs',         icon: Terminal,        clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'], permission: 'VIEW_LOGS' },
         ],
     },
     {
         label: 'Configure',
         items: [
-            { path: '/kafka',    label: 'Kafka Topics', icon: Zap,        clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
-            { path: '/eventing', label: 'Eventing',     icon: Globe,      clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
-            { path: '/billing',  label: 'Billing',      icon: CreditCard, clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
+            { path: '/kafka',    label: 'Kafka Topics', icon: Zap,        clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'], permission: 'MANAGE_KAFKA' },
+            { path: '/eventing', label: 'Eventing',     icon: Globe,      clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'], permission: 'MANAGE_EVENTING' },
+            { path: '/billing',  label: 'Billing',      icon: CreditCard, clientOnly: true, allowedRoles: ['CLIENT_ADMIN','MEMBER'], permission: 'VIEW_BILLING' },
             { path: '/team',     label: 'Team',         icon: UserPlus,   clientOnly: true, allowedRoles: ['CLIENT_ADMIN'] },
             { path: '/settings', label: 'Settings',     icon: Settings,                    allowedRoles: ['CLIENT_ADMIN','MEMBER'] },
         ],
@@ -64,6 +64,11 @@ const NavItem = ({ item, collapsed, user }) => {
     if (item.adminOnly && user?.role !== 'ADMIN') return null;
     if (item.clientOnly && user?.role === 'ADMIN') return null;
     if (item.allowedRoles && !item.allowedRoles.includes(user?.role)) return null;
+    // Fine-grained permission check — mirrors PermissionService.has() on the
+    // backend: ADMIN/CLIENT_ADMIN are always authorized, only MEMBER is
+    // restricted to the permissions their CLIENT_ADMIN explicitly granted.
+    if (item.permission && user?.role === 'MEMBER'
+        && !(user?.permissions || []).includes(item.permission)) return null;
     const Icon = item.icon;
 
     return (

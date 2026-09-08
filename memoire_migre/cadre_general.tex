@@ -15,103 +15,29 @@ NextStep IT \cite{NextStepIT} est un intégrateur spécialisé dans les métiers
 
 La mission de NextStep IT est de faciliter la transformation numérique des entreprises en leur offrant des solutions technologiques avancées, fiables et personnalisées. La vision de l'entreprise est de devenir le partenaire incontournable des entreprises souhaitant optimiser leur infrastructure IT et leurs processus métiers.
 
-
-
-% \subsection{Fiche d'identité de NextStep IT}
-
-% Le tableau~\ref{tab:coordonnees} présente la fiche d'identité de NextStep IT.
-
-% \begin{table}[h!]
-% \centering
-% \begin{tabular}{|l|l|}
-% \hline
-% Nom de la société & NextStep IT \\
-% \hline
-% Année de création & 2012 \\
-% \hline
-% Secteur d'activité & Infrastructure IT, Cloud et nouvelles technologies \\
-% \hline
-% Siège social & Charguia, Tunisie \\
-% \hline
-% Domaines d'intervention & Fournisseur Internet, Intégration, Cloud, Services Managés, Support et Assistance, Conseil \\
-% \hline
-% Logo & \includegraphics[width=3cm]{image/nexsteplogo.png} \\
-% \hline
-% \end{tabular}
-% \caption{Fiche d'identité de NextStep IT}
-% \label{tab:coordonnees}
-% \end{table}
-
-
-\subsection{Fiche d'identité  de NextStep IT  }
-Le tableau 1.1 présente  la fiche d'identité de NextStep IT.
+\subsection{Fiche d'identité de NextStep IT}
+Le tableau~\ref{tab:NextStep} présente la fiche d'identité de NextStep IT.
 
 \begin{table}[h!]
 \centering
 \begin{tabular}{|l|l|}
 \hline
-Nom de la sociéte & NextStep IT \\
+Nom de la société & NextStep IT \\
 \hline
 Année de création & 2012 \\
 \hline
 Adresse & Rue 8612, Rue de l'énergie solaire, I 2035 \\
 \hline
-Téléphone & +216  70 258 200 \\
-
+Téléphone & +216 70 258 200 \\
 \hline
 Site Web & https://www.nextstep-it.com/ \\
 \hline
-Logo & \includegraphics[width=3cm]{image/nexsteplogo.png}
-
-\\
+Logo & \includegraphics[width=3cm]{image/nexsteplogo.png} \\
 \hline
 \end{tabular}
-\caption{Fiche d'identité NextStep   } 
+\caption{Fiche d'identité de NextStep IT}
 \label{tab:NextStep}
 \end{table}
-
-% \subsection{L'organigramme}
-
-% NextStep IT est structurée autour d'une direction générale supervisant les différents pôles opérationnels de l'entreprise (Cloud \& Infrastructure, Intégration \& Réseaux, Support \& Services Managés, Commercial, Conseil), chacun étant piloté par un responsable de pôle. Le stage s'est déroulé au sein du pôle Cloud, sous l'encadrement d'un ingénieur responsable des solutions d'infrastructure as a service.
-
-% \subsection{Domaines d'activité de NextStep IT}
-
-% NextStep IT accompagne ses clients à travers une offre complète et structurée autour de six grands pôles de services :
-
-% \begin{itemize}
-%     \item Fournisseur Internet :\\
-%     - Accès Internet haut débit sécurisé.\\
-%     - Services Internet personnalisés selon les usages métiers.\\
-%     - Solutions SD-WAN (réseau étendu piloté par logiciel, optimisé pour la performance et la résilience).
-
-%     \item Intégration :\\
-%     - Réseaux d'entreprise (réseaux locaux, Wifi, interconnexions, optimisation WAN, Data Center, QoS, câblage et supervision).\\
-%     - Solutions de mobilité et cybersécurité (sécurité périmétrique, VPN, WAF, IPS, antivirus, authentification forte, SIEM, PAM).\\
-%     - Data Center virtualisé, téléphonie IP, visioconférence.
-
-%     \item Cloud :\\
-%     - Housing, Infrastructure as a Service (IaaS).\\
-%     - Backup as a Service, Disaster Recovery.\\
-%     - Solutions de collaboration en ligne.
-
-%     \item Services Managés :\\
-%     - Prise en charge de l'infrastructure (ressources matérielles, réseaux, télécoms, applications).\\
-%     - Sécurité proactive, outils collaboratifs, haute disponibilité.\\
-%     - Supervision centralisée via NOC/SOC.
-
-%     \item Support et Assistance :\\
-%     - Assistance technique et maintenance.\\
-%     - Support technique (diagnostic et résolution d'incidents).\\
-%     - Infogérance complète.
-
-%     \item Conseil :\\
-%     - Audit de l'existant.\\
-%     - Études fonctionnelles et techniques, assistance à maîtrise d'ouvrage (AMOA).\\
-%     - Accompagnement stratégique et technologique.
-% \end{itemize}
-
-% C'est dans le pôle Cloud, et plus particulièrement dans une démarche de renforcement de l'offre Infrastructure as a Service, que s'inscrit notre projet de fin d'études : la conception et la réalisation d'une plateforme PaaS serverless bâtie sur Kubernetes, destinée à permettre aux clients de déployer et d'exploiter leurs applications conteneurisées sans avoir à gérer directement la complexité de l'orchestration sous-jacente.
-
 
 \subsection{Domaines d'activité de NextStep IT}
 
@@ -197,20 +123,16 @@ Comment concevoir une plateforme PaaS serverless multi-tenant, bâtie sur Kubern
 Plusieurs solutions existent aujourd'hui sur le marché pour répondre, partiellement ou totalement, à cette problématique.
 
 \subsubsection*{Heroku}
-Pionnier du PaaS, Heroku propose une expérience de déploiement très simplifiée (git push pour déployer), mais reste une plateforme propriétaire et fermée, offrant peu de contrôle sur l'infrastructure sous-jacente et dont les coûts croissent rapidement à l'échelle.
+Pionnier du PaaS, Heroku~\cite{Heroku} propose une expérience de déploiement très simplifiée (git push pour déployer), mais reste une plateforme propriétaire et fermée, offrant peu de contrôle sur l'infrastructure sous-jacente et dont les coûts croissent rapidement à l'échelle.
 
 \subsubsection*{Google Cloud Run}
 Représentative des offres serverless managées des fournisseurs de cloud public, au même titre qu'AWS Lambda ou Azure Container Apps. Cloud Run offre une excellente mise à l'échelle automatique, y compris le retour à zéro instance, mais impose un verrouillage fort vis-à-vis du fournisseur (vendor lock-in) et ne peut pas être hébergée sur une infrastructure privée ou on-premise, ce qui pose un problème pour un intégrateur comme NextStep IT souhaitant proposer une offre maîtrisée sur son propre cluster.
 
 \subsubsection*{OpenShift (Red Hat)}
-Plateforme PaaS complète bâtie sur Kubernetes, très robuste mais lourde à opérer et sous licence commerciale, avec un coût d'entrée élevé peu compatible avec une offre destinée à des PME.
+Plateforme PaaS complète bâtie sur Kubernetes, très robuste mais lourde à opérer et sous licence commerciale~\cite{OpenShift}, avec un coût d'entrée élevé peu compatible avec une offre destinée à des PME.
 
 \subsection*{Comparaison des solutions existantes}
 Le tableau~\ref{tab:comparaison_paas} confronte ces trois solutions aux critères issus de la problématique.
-
-
-
-\subsection*{Comparaison des solutions existantes}
 
 \renewcommand{\arraystretch}{1.3}
 \begin{longtable}{|p{5.2cm}|p{2.8cm}|p{2.8cm}|p{2.8cm}|}
@@ -275,82 +197,23 @@ La solution proposée consiste en une plateforme PaaS serverless multi-tenant ar
     \item Knative Serving pour l'exécution des applications des clients sous forme de services capables de monter en charge automatiquement en fonction du trafic, et de redescendre jusqu'à zéro instance en l'absence de sollicitation, réduisant ainsi la consommation de ressources et le coût pour le client.
     \item Apache Kafka, opéré par l'opérateur Strimzi sur Kubernetes, comme bus d'événements permettant aux applications des clients de communiquer de manière asynchrone.
     \item Knative Eventing, qui relie les messages Kafka aux services Knative via les ressources Broker, Trigger et KafkaSource, permettant de réveiller automatiquement une application mise à zéro instance à la réception d'un événement.
-    \item Un backend applicatif développé en Spring Boot, exposant une API REST sécurisée, orchestrant le cluster Kubernetes via le client Java Fabric8, et portant la logique métier (gestion des utilisateurs, des applications, de la facturation, des clés d'API, des journaux).
-    \item Deux portails web développés en React : un portail client permettant aux locataires de déployer et de superviser leurs applications, et une console d'administration réservée à l'équipe exploitant la plateforme.
-    \item Keycloak comme fournisseur d'identité, assurant l'authentification et la gestion des rôles (administrateur de la plateforme, administrateur de compte client, membre d'équipe) via le protocole OpenID Connect / OAuth2.
-    \item PostgreSQL comme système de persistance relationnelle pour les entités métier de la plateforme.
-    \item Une chaîne CI/CD interne, basée sur Jenkins et Kaniko, non pas un service proposé aux clients de la plateforme, mais l'outillage utilisé par l'équipe de développement elle-même pour construire, publier et déployer automatiquement les différents composants du projet (backend, portail client, console d'administration) au fil de leur évolution, sans nécessiter de démon Docker privilégié.
-    \item Une chaîne de supervision basée sur Prometheus et Grafana, complétée par des mécanismes internes de détection des redémarrages en boucle (crash loops) et d'alerte budgétaire.
+    \item Un backend applicatif développé en Spring Boot~\cite{SpringBootDoc}, exposant une API REST sécurisée, orchestrant le cluster Kubernetes via le client Java Fabric8, et portant la logique métier (gestion des utilisateurs, des applications, de la facturation, des clés d'API, des journaux).
+    \item Deux portails web développés en React~\cite{ReactDoc} : un portail client permettant aux locataires de déployer et de superviser leurs applications, et une console d'administration réservée à l'équipe exploitant la plateforme.
+    \item Keycloak~\cite{KeycloakDoc} comme fournisseur d'identité, assurant l'authentification et la gestion des rôles (administrateur de la plateforme, administrateur de compte client, membre d'équipe) via le protocole OpenID Connect / OAuth2.
+    \item PostgreSQL~\cite{PostgreSQLDoc} comme système de persistance relationnelle pour les entités métier de la plateforme.
+    \item Une chaîne CI/CD interne, basée sur Jenkins~\cite{JenkinsDoc} et Kaniko~\cite{KanikoDoc}, non pas un service proposé aux clients de la plateforme, mais l'outillage utilisé par l'équipe de développement elle-même pour construire, publier et déployer automatiquement les différents composants du projet (backend, portail client, console d'administration) au fil de leur évolution, sans nécessiter de démon Docker~\cite{DockerDoc} privilégié.
+    \item Une chaîne de supervision basée sur Prometheus~\cite{PrometheusDoc} et Grafana~\cite{GrafanaDoc}, complétée par des mécanismes internes de détection des redémarrages en boucle (crash loops) et d'alerte budgétaire.
 \end{itemize}
 
 Cette architecture est détaillée dans les chapitres suivants du présent mémoire.
 
-\section{Étude des méthodologies de développement}
+\section{Choix de la méthodologie de développement}
 
-Le choix d'une méthodologie de développement constitue une étape essentielle dans la réussite d'un projet logiciel. Une méthode adaptée permet d'améliorer l'organisation du travail, de faciliter la collaboration entre les différents acteurs et d'assurer une réalisation efficace des fonctionnalités attendues.
-
-% \subsection{Choix de la méthodologie}
-
-% On distingue traditionnellement deux grandes familles de méthodologies : les méthodologies prédictives (dites en cascade ou waterfall), qui reposent sur une planification exhaustive et séquentielle des phases du projet, avec peu de place pour les retours en arrière une fois une phase validée ; et les méthodologies agiles, qui privilégient un développement itératif et incrémental, une collaboration étroite avec les parties prenantes, et une capacité d'adaptation continue face aux changements de besoins. Le tableau~\ref{table:etude-comparative-methodes} présente une étude comparative des principales méthodes envisageables.
-
-% \begin{table}[H]
-% \centering
-% \renewcommand{\arraystretch}{1.2}
-% \begin{tabular}{|p{2.5cm}|p{6cm}|p{6cm}|}
-% \hline
-% Méthode & Forces & Faiblesses \\
-% \hline
-
-% RUP &
-% Bonne traçabilité.\newline
-% Architecture bien structurée.
-% &
-% Coût de mise en œuvre élevé.\newline
-% Complexité lors des premières phases.
-% \\
-% \hline
-
-% XP &
-% Développement progressif.\newline
-% Tests continus.\newline
-% Coût relativement réduit.
-% &
-% Forte implication de l'équipe.\newline
-% Difficile à appliquer sur de grands projets.
-% \\
-% \hline
-
-% 2TUP &
-% Adaptée à des projets de différentes tailles.\newline
-% Prise en compte des risques.\newline
-% Développement itératif.
-% &
-% Principalement centrée sur le développement.\newline
-% Peu de modèles documentaires.
-% \\
-% \hline
-
-% Scrum &
-% Forte implication des parties prenantes.\newline
-% Travail collaboratif.\newline
-% Adaptation rapide aux changements.\newline
-% Livraison incrémentale.
-% &
-% Gestion plus complexe avec de grandes équipes.\newline
-% Dépend fortement de l'implication des membres.
-% \\
-% \hline
-
-% \end{tabular}
-% \caption{Étude comparative des méthodologies de développement}
-% \label{table:etude-comparative-methodes}
-% \end{table}
-
-% Compte tenu de la nature exploratoire de ce projet (qui combine plusieurs technologies encore peu matures et en évolution rapide telles que Knative et Strimzi, et pour lequel certaines contraintes techniques (comportement réel du cluster, limites des outils de supervision, etc.) ne pouvaient être pleinement anticipées en amont) une approche agile a été privilégiée afin de permettre des ajustements réguliers du périmètre et des priorités tout au long du développement.
+Le choix d'une méthodologie de développement constitue une étape essentielle dans la réussite d'un projet logiciel. Une méthode adaptée permet d'améliorer l'organisation du travail, de faciliter la collaboration entre les différents acteurs et d'assurer une réalisation efficace des fonctionnalités attendues. Le projet combine plusieurs technologies encore peu matures et en évolution rapide (Knative, Strimzi), et certaines contraintes techniques — comportement réel du cluster, limites des outils de supervision — ne pouvaient être pleinement anticipées en amont : une approche agile a donc été privilégiée afin de permettre des ajustements réguliers du périmètre et des priorités tout au long du développement.
 
 \subsection{Méthodologie adoptée}
 
-À l'issue de cette étude comparative, nous avons retenu la méthodologie agile Scrum, qui répond le mieux aux besoins de notre projet. Scrum structure le développement en itérations courtes et fixes appelées sprints, à l'issue desquelles un incrément de produit potentiellement livrable est produit. Ce choix se justifie par plusieurs raisons :
+Nous avons retenu la méthodologie agile Scrum, qui répond le mieux aux besoins de notre projet. Scrum structure le développement en itérations courtes et fixes appelées sprints, à l'issue desquelles un incrément de produit potentiellement livrable est produit. Ce choix se justifie par plusieurs raisons :
 
 \begin{itemize}
     \item Scrum impose une définition claire et priorisée des besoins sous forme de Product Backlog, ce qui est particulièrement utile dans un projet dont le périmètre fonctionnel est large (infrastructure, backend, frontend, sécurité, supervision, CI/CD).

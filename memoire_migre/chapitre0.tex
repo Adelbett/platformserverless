@@ -19,6 +19,7 @@ L'analyse de la documentation fonctionnelle de la plateforme permet d'identifier
 \end{itemize}
 
 \subsection{Spécification des besoins}
+\label{sec:besoins-fonctionnels}
 
 \medskip
 \textbf{Besoins fonctionnels}
@@ -62,7 +63,7 @@ Les besoins fonctionnels sont organisés ci-dessous selon les grands blocs fonct
     \begin{itemize}[label=--]
         \item Calcul du coût à l'usage (CPU-heure, RAM-heure) par application et par tenant.
         \item Génération automatique de factures mensuelles (1\textsuperscript{er} du mois).
-        \item Paiement par carte bancaire (Stripe) — enregistrement de cartes, paiement de facture.
+        \item Paiement par carte bancaire (Stripe~\cite{StripeDoc}) — enregistrement de cartes, paiement de facture.
         \item Historique des transactions.
         \item Alerte J-3 avant échéance, passage automatique au statut OVERDUE en cas d'impayé.
         \item Suspension automatique du service en cas de facture impayée après échéance.
@@ -81,7 +82,6 @@ Les besoins fonctionnels sont organisés ci-dessous selon les grands blocs fonct
         \item Journal d'audit des actions administratives (qui a fait quoi, quand), exportable en CSV.
     \end{itemize}
 \end{itemize}
-\label{sec:besoins-fonctionnels}
 
 \medskip
 \textbf{Besoins non fonctionnels}
@@ -131,10 +131,8 @@ Les besoins fonctionnels sont organisés ci-dessous selon les grands blocs fonct
 \end{itemize}
 
 \subsection{Diagramme de cas d'utilisation général}
- Dans cette section, nous décrivons les exigences du système de manière formelle en utilisant le diagramme de cas d’utilisation global.
-~\ref{fig:uc-global-admin}
+Dans cette section, nous décrivons les exigences du système de manière formelle à l'aide des deux diagrammes de cas d'utilisation ci-dessous (figures~\ref{fig:uc-global} et~\ref{fig:uc-global-admin}), qui couvrent respectivement les rôles CLIENT\_ADMIN/MEMBER et le rôle ADMIN.
 
-\captionsetup[figure]{name=FIGURE}
 \begin{figure}[H]
  \centering
     \includegraphics[width=13cm]{image/usescasememeberadmin.png}
@@ -149,51 +147,6 @@ Les besoins fonctionnels sont organisés ci-dessous selon les grands blocs fonct
     \label{fig:uc-global-admin}
 \end{figure}
 
-% Le tableau~\ref{tab:uc-global} récapitule les principaux cas d'utilisation du système, l'acteur concerné, ainsi que le sprint de réalisation correspondant, permettant au lecteur de faire le lien avec les chapitres de réalisation.
-
-% \renewcommand{\arraystretch}{1.4}
-% \begin{longtable}{|p{7cm}|p{4cm}|p{2cm}|}
-% \hline
-% Cas d'utilisation & Acteur(s) & Sprint \\
-% \hline
-% \endfirsthead
-% \hline
-% Cas d'utilisation & Acteur(s) & Sprint \\
-% \hline
-% \endhead
-% \hline
-% \multicolumn{3}{r}{Suite du tableau à la page suivante} \\
-% \endfoot
-% \endlastfoot
-
-% Se connecter à la plateforme & CLIENT\_ADMIN, MEMBER, ADMIN & Sprint 3 \\
-% \hline
-% Gérer les membres de l'équipe & CLIENT\_ADMIN & Sprint 3 \\
-% \hline
-% Déployer une application & CLIENT\_ADMIN, MEMBER & Sprint 4 \\
-% \hline
-% Mettre à jour / supprimer une application & CLIENT\_ADMIN, MEMBER & Sprint 4 \\
-% \hline
-% Consulter l'historique de révisions et effectuer un rollback & CLIENT\_ADMIN, MEMBER & Sprint 4 \\
-% \hline
-% Créer et gérer un sujet Kafka & CLIENT\_ADMIN, MEMBER & Sprint 5 \\
-% \hline
-% Configurer un déclencheur d'événement (Trigger/KafkaSource) & CLIENT\_ADMIN, MEMBER & Sprint 5 \\
-% \hline
-% Consulter les journaux et les métriques d'une application & CLIENT\_ADMIN, MEMBER & Sprint 6 \\
-% \hline
-% Consulter sa facturation & CLIENT\_ADMIN & Sprint 7 \\
-% \hline
-% Superviser le cluster (nœuds, alertes, tenants) & ADMIN & Sprint 9 \\
-% \hline
-% Gérer les comptes clients et les quotas & ADMIN & Sprint 8 \\
-% \hline
-% Générer une clé d'API pour un pipeline CI/CD & CLIENT\_ADMIN & Sprint 3 \\
-% \hline
-% \caption{Principaux cas d'utilisation de la plateforme et sprint de réalisation associé}
-% \label{tab:uc-global}
-% \end{longtable}
-
 \section{Analyse Globale}
 
 Cette section donne une vue d'ensemble cohérente de l'architecture logique et physique du système, des composants qui le constituent et de leurs interactions, ainsi que des processus métier les plus structurants, indépendamment du découpage en sprints qui structurera les chapitres suivants. Les diagrammes UML propres à une fonctionnalité particulière (par exemple le diagramme de séquence détaillé de la création d'un déclencheur Kafka) seront présentés dans le chapitre de réalisation correspondant, en cohérence avec la vue d'ensemble donnée ici.
@@ -202,7 +155,6 @@ Cette section donne une vue d'ensemble cohérente de l'architecture logique et p
 
 La figure~\ref{fig:classes-global} présente les principales entités métier du système et leurs relations : \texttt{User}, \texttt{App}, \texttt{DeploymentLog}, \texttt{BillingSnapshot}, \texttt{AppInvoice} et les clés d'API. La propriété des applications est gérée par \texttt{UserContextService}, qui rattache les ressources d'un \texttt{MEMBER} à son \texttt{CLIENT\_ADMIN}.
 
-\captionsetup[figure]{name=FIGURE}
 \begin{figure}[H]
  \centering
     \includegraphics[width=13.5cm]{image/class1.png}
@@ -217,145 +169,41 @@ La figure~\ref{fig:classes-global} présente les principales entités métier du
 L'architecture logique de la plateforme est organisée en trois couches, représentées à la figure ~\ref{fig:architecture-logique} :
 
 \begin{figure}[H]
-\begin{adjustwidth}{-1.0cm}{-1.0cm}
 \centering
-\begin{tikzpicture}[
-  x=1cm, y=1cm,
-  every node/.style={font=\normalsize},
-  pres/.style={draw=figBleu, line width=1pt, rounded corners, minimum width=7.0cm,
-               minimum height=1.5cm, align=center, fill=figBleuFond},
-  mod/.style={draw=figVert, line width=1pt, rounded corners, minimum width=3.6cm,
-              minimum height=1.4cm, align=center, fill=figVertFond, font=\small},
-  infra/.style={draw=figOrange, line width=1pt, rounded corners, minimum width=4.8cm,
-                minimum height=1.5cm, align=center, fill=figOrangeFond, font=\small},
-  note/.style={draw=figVert!70, line width=0.9pt, dashed, rounded corners,
-               minimum width=14.6cm, minimum height=0.9cm, align=center,
-               fill=white, font=\footnotesize},
-  zone/.style={rounded corners, inner sep=12pt, line width=1.2pt},
-  fl/.style={->, line width=1.4pt, black!65},
-  lbl/.style={font=\small},
-  num/.style={circle, draw, line width=1pt, fill=white, inner sep=3pt, font=\bfseries}
-]
-
-% ═══════════ COUCHE 1 — PRESENTATION ═══════════
-\node[pres] (portail) at (-3.9,0)
-     {\textbf{Portail Client} (React)\\[1pt]
-      \footnotesize Dashboard · Applications · Déployer\\
-      \footnotesize Kafka Topics · Monitoring · Facturation · Équipe};
-\node[pres] (console) at (3.9,0)
-     {\textbf{Console d'Administration} (React)\\[1pt]
-      \footnotesize Dashboard · Clients · Utilisateurs\\
-      \footnotesize Facturation · Audit · Cluster · Paramètres};
-
-\begin{scope}[on background layer]
-  \node[zone, draw=figBleu, fill=figBleu!4, fit=(portail)(console)] (z1) {};
-\end{scope}
-\node[font=\small\bfseries, text=figBleu, anchor=west, fill=white, inner sep=3pt]
-      at ([xshift=8pt]z1.north west) {COUCHE 1 — PRÉSENTATION};
-\node[num, text=figBleu] at ([xshift=-13pt]z1.west) {1};
-
-% ═══════════ COUCHE 2 — SERVICE ═══════════
-\node[mod] (m1) at (-5.7,-4.3) {\textbf{Applications}\\\textbf{\& Déploiement}};
-\node[mod] (m2) at (-1.9,-4.3) {\textbf{Sécurité}\\\textbf{\& Utilisateurs}};
-\node[mod] (m3) at ( 1.9,-4.3) {\textbf{Kafka}\\\textbf{\& Eventing}};
-\node[mod] (m4) at ( 5.7,-4.3) {\textbf{Facturation}\\\textbf{\& Paiement}};
-
-\node[mod] (m5) at (-3.8,-6.2) {\textbf{Quotas}\\\textbf{\& Administration}};
-\node[mod] (m6) at ( 0.0,-6.2) {\textbf{Logs}\\\textbf{\& Monitoring}};
-\node[mod] (m7) at ( 3.8,-6.2) {\textbf{Support}\\\footnotesize configuration, erreurs};
-
-\node[note] (fab) at (0,-7.9)
-     {Client \textbf{Fabric8} : bibliothèque Java exécutée dans le processus du backend,
-      et non une couche distincte};
-
-\begin{scope}[on background layer]
-  \node[zone, draw=figVert, fill=figVert!4, fit=(m1)(m4)(m5)(m7)(fab)] (z2) {};
-\end{scope}
-\node[font=\small\bfseries, text=figVert, anchor=west, fill=white, inner sep=3pt]
-      at ([xshift=8pt]z2.north west) {COUCHE 2 — SERVICE : Backend API (Spring Boot)};
-\node[num, text=figVert] at ([xshift=-13pt]z2.west) {2};
-
-% ═══════════ COUCHE 3 — INFRASTRUCTURE ═══════════
-\node[infra] (i1) at (-5.1,-11.5) {\textbf{Serving \& Eventing}\\[1pt]
-      \footnotesize Knative Serving, Knative Eventing};
-\node[infra] (i2) at ( 0.0,-11.5) {\textbf{Messagerie}\\[1pt]
-      \footnotesize Kafka opéré par Strimzi};
-\node[infra] (i3) at ( 5.1,-11.5) {\textbf{Sécurité \& Réseau}\\[1pt]
-      \footnotesize Keycloak, Cilium (CNI), Kourier};
-
-\node[infra] (i4) at (-2.6,-13.5) {\textbf{Stockage \& Données}\\[1pt]
-      \footnotesize PostgreSQL, volumes persistants};
-\node[infra] (i5) at ( 2.6,-13.5) {\textbf{Observabilité}\\[1pt]
-      \footnotesize Prometheus, Grafana, Alertmanager};
-
-\begin{scope}[on background layer]
-  \node[zone, draw=figOrange, fill=figOrange!4, fit=(i1)(i3)(i4)(i5)] (z3) {};
-\end{scope}
-\node[font=\small\bfseries, text=figOrange, anchor=west, fill=white, inner sep=3pt]
-      at ([xshift=8pt]z3.north west) {COUCHE 3 — INFRASTRUCTURE : cluster Kubernetes};
-\node[num, text=figOrange] at ([xshift=-13pt]z3.west) {3};
-
-% ═══════════ FLUX PRINCIPAL ═══════════
-\draw[fl] (z1.south) -- (z2.north);
-\node[lbl, fill=white, inner sep=4pt] at (0,-2.15)
-     {HTTPS / REST / SSE — jeton JWT (Keycloak)};
-
-\draw[fl] (z2.south) -- (z3.north);
-\node[lbl, fill=white, inner sep=4pt] at (0,-9.75)
-     {API Kubernetes — ServiceAccount et RBAC, via Fabric8};
-
-% ═══════════ PRINCIPE ARCHITECTURAL ═══════════
-\node[draw=figVert, line width=1.2pt, rounded corners, fill=figVertFond!50,
-      align=center, font=\footnotesize, text width=14.2cm, inner sep=7pt] at (0,-16.2)
-     {\textbf{Principe architectural} — le backend est l'unique point d'entrée vers le cluster.
-      Aucune connexion directe n'est autorisée entre la couche de présentation ou un système
-      externe et l'API Kubernetes.};
-
-\end{tikzpicture}
-\caption{Architecture logique de la plateforme}
-\label{fig:architecture-logique}
-\end{adjustwidth}
+    \includegraphics[width=13.5cm]{image/architecture_logique.png}
+    \caption{Architecture logique de la plateforme}
+    \label{fig:architecture-logique}
 \end{figure}
 
 
 \begin{itemize}
-    \item Couche présentation : deux applications monopages (SPA) React — le portail client (déploiement et supervision des applications, facturation, gestion d'équipe) et la console d'administration (supervision du cluster, gestion des comptes clients, facturation globale, audit) — toutes deux servies statiquement via Nginx.
-    \item Couche service : une API REST unique en Spring Boot (module \texttt{backend-api}), organisée par domaine métier (applications, facturation, utilisateurs, Kafka, Eventing, clés d'API, journaux, administration), qui centralise la logique métier et constitue l'unique point d'entrée vers le cluster Kubernetes. Elle s'appuie en interne sur le client Kubernetes Java Fabric8 — une bibliothèque exécutée dans le même processus, non une couche distincte — pour créer, lire, modifier et surveiller les ressources Kubernetes natives et les CRD de Knative Serving, Knative Eventing et Strimzi.
-    \item Couche infrastructure : le cluster Kubernetes et les opérateurs qui y sont déployés (Knative Serving, Knative Eventing, Strimzi/Kafka), ainsi que les briques transverses Keycloak (identité), PostgreSQL (persistance), Prometheus/Grafana (supervision), Jenkins/Kaniko (intégration et déploiement continus).
+    \item \textbf{Présentation} : deux applications React distinctes, servies via Nginx. Le portail client couvre le déploiement et le suivi des applications, la facturation et la gestion d'équipe ; la console d'administration donne à l'équipe NextStep IT une vue sur l'ensemble des clients et du cluster.
+    \item \textbf{Service} : une seule API REST en Spring Boot, découpée par domaine métier (applications, sécurité, Kafka, facturation, administration...). C'est elle qui concentre toute la logique et qui parle au cluster, via Fabric8 — une bibliothèque Java exécutée dans son propre processus, pas un service séparé.
+    \item \textbf{Infrastructure} : le cluster Kubernetes et ses opérateurs (Knative pour l'exécution serverless, Strimzi pour Kafka), la couche réseau (Cilium en CNI, Kourier en passerelle d'entrée), et les briques transverses Keycloak, PostgreSQL, Prometheus/Grafana.
 \end{itemize}
 
-Un principe central de cette architecture : le backend Spring Boot est l'unique point d'entrée autorisé vers le cluster — ni les portails React, ni les clients externes (pipelines CI/CD via clé d'API) n'interagissent directement avec l'API Kubernetes, garantissant que toute action passe par les contrôles d'authentification, d'autorisation et d'isolation multi-tenant de la couche service.
-
-% \captionsetup[figure]{name=Figure}
-% \begin{figure}[H]
-%     \centering
-%     \includegraphics[width=1.02\textwidth]{image/logique.png}
-%     \caption{Architecture logique de la plateforme}
-%     \label{fig:archi-logique}
-% \end{figure}
-
-Un principe de conception central de cette architecture est que le backend Spring Boot est l'unique point d'entrée autorisé vers le cluster : ni les portails React, ni les clients externes (pipelines CI/CD via clé d'API) n'interagissent directement avec l'API Kubernetes. Ce choix garantit que toute action sur le cluster passe par les contrôles d'authentification, d'autorisation et d'appartenance (isolation multi-tenant) implémentés dans la couche service.
+Seul le backend parle à l'API Kubernetes : ni les portails ni un système externe (un pipeline CI/CD, par exemple) n'y accèdent directement. Toute action passe donc par cette couche de service, qui applique l'authentification et l'isolation entre tenants avant d'agir sur le cluster.
 
 \subsubsection{Architecture physique de la plateforme}
 
-La figure~\ref{fig:archi-physique} présente l'architecture physique (diagramme de déploiement) de la plateforme telle qu'exploitée sur le cluster Kubernetes décrit en section~\ref{sec:env-materiel}.
+Au-delà de son organisation logique, il est utile de voir comment la plateforme se répartit concrètement sur le cluster une fois en fonctionnement. La figure~\ref{fig:archi-physique} reprend, namespace par namespace, ce qui a pu être observé directement sur le cluster décrit en section~\ref{sec:env-materiel} — les pods réellement en cours d'exécution, et non une simple projection théorique du déploiement.
 
-\begin{figure}[!ht]
+\begin{figure}[H]
 \centering
-\includegraphics[width=16cm]{image/physiquearchitecture.png}
-\caption{Diagramme de déploiement de la plateforme}
-\label{fig:archi-physique}
+    \includegraphics[width=13.5cm]{image/architecture_physique.png}
+    \caption{Architecture physique de l'infrastructure Kubernetes}
+    \label{fig:archi-physique}
 \end{figure}
 
-Les éléments principaux de ce déploiement sont :
+Le cluster s'appuie sur trois nœuds Ubuntu. \texttt{vm01} porte le plan de contrôle Kubernetes (\texttt{kube-apiserver}, \texttt{etcd}, \texttt{kube-scheduler}, \texttt{kube-controller-manager}), tandis que \texttt{vm02} et \texttt{vm03} font tourner l'ensemble des pods, ceux de la plateforme comme ceux des applications clientes.
 
-\begin{itemize}
-    \item Le réseau et l'accès externe reposent sur trois briques déployées sur l'ensemble des nœuds : Cilium (CNI, application des \texttt{NetworkPolicy}), MetalLB (attribution d'adresses IP externes de type LoadBalancer) et Kourier (passerelle d'entrée HTTP pour les services Knative).
-    \item Le cluster est organisé en plusieurs espaces de noms : \texttt{platform} (backend, portails React, PostgreSQL, Keycloak, supervision Prometheus/Grafana/Alertmanager), \texttt{kafka} (cluster Kafka opéré par Strimzi), \texttt{knative-serving}/\texttt{kourier-system} (plan de contrôle Knative), et un espace de noms \texttt{user-<client>} créé dynamiquement pour chaque tenant.
-    \item Chaque tenant dispose de son propre espace de noms, isolé des autres et de la plateforme par une ressource \texttt{NetworkPolicy} créée automatiquement à sa première utilisation.
-    \item Les applications des clients sont déployées comme des ressources \texttt{Service} de Knative Serving dans leur espace de noms respectif, instanciées en zéro à N révisions actives (Revision) selon la charge.
-    \item Tous les pods, quel que soit leur espace de noms, s'exécutent sur les nœuds de travail vm02 ou vm03 ; vm01 assure le plan de contrôle du cluster.
-\end{itemize}
+En façade, trois composants réseau se partagent des rôles bien distincts. MetalLB attribue une adresse IP de type \texttt{LoadBalancer} à chaque \texttt{Service} Kubernetes qui en a besoin ; Kourier se contente de router le trafic HTTP vers les applications Knative des tenants ; Cilium, lui, assure la connectivité des pods en tant que CNI du cluster et applique les \texttt{NetworkPolicy}. Le backend et les portails, exposés directement en \texttt{Service} \texttt{LoadBalancer}, reçoivent donc leur IP de MetalLB sans jamais transiter par Kourier.
+
+Le namespace \texttt{platform} regroupe les deux composants centraux de la plateforme : PostgreSQL, avec son volume persistant, et le backend Spring Boot. Ce dernier tourne en \texttt{Deployment} Kubernetes classique plutôt qu'en service Knative, car il doit rester disponible en permanence et ne se prête pas à une mise à l'échelle à zéro.
+
+Vient ensuite le middleware Cloud Native. Le broker Kafka, opéré par Strimzi, est une instance unique du cluster, mutualisée entre tous les tenants. Il en va de même pour le plan de contrôle de Knative Eventing (le contrôleur Eventing et le dispatcher de sources Kafka), qui tourne une seule fois pour tout le cluster plutôt que d'être dupliqué par client — à la différence des ressources Broker et Trigger elles-mêmes, qui sont instanciées séparément dans le namespace de chaque tenant. Cette mutualisation du plan de contrôle a une conséquence concrète : lorsque le dispatcher de sources Kafka a connu un incident, la livraison d'événements s'est interrompue pour tous les clients à la fois, pas seulement pour l'un d'eux.
+
+Enfin, chaque client dispose de son propre namespace \texttt{user-<client>}, créé automatiquement lors de son premier déploiement et isolé par une \texttt{NetworkPolicy} générée à la volée. C'est là que vivent ses applications, sous forme de ressources Knative Service donnant naissance à des Revisions puis à des pods applicatifs.
 
 \section{Pilotage du projet avec SCRUM}
 \label{sec:scrum}
@@ -554,23 +402,6 @@ Worker 2 & 4 vCPU, 8 Go RAM, 50 Go disque & Ubuntu 24 & Nœud de travail \\
 \caption{Caractéristiques des machines virtuelles du cluster Kubernetes}
 \label{tab:vms-cluster}
 \end{table}
-% \begin{table}[H]
-% \centering
-% \renewcommand{\arraystretch}{1.3}
-% \begin{tabular}{|l|l|l|l|}
-% \hline
-% Nom de la VM & Ressources & Système & Rôle \\
-% \hline
-% Master   & 4 vCPU, 8 Go RAM, 50 Go disque & Ubuntu 24 & Plan de contrôle (control-plane) \\
-% \hline
-% Worker 1 & 4 vCPU, 8 Go RAM, 50 Go disque & Ubuntu 24 & Nœud de travail \\
-% \hline
-% Worker 2 & 4 vCPU, 8 Go RAM, 50 Go disque & Ubuntu 24 & Nœud de travail \\
-% \hline
-% \end{tabular}
-% \caption{Caractéristiques des machines virtuelles du cluster Kubernetes}
-% \label{tab:vms-cluster}
-% \end{table}
 
 Le cluster utilise Cilium comme interface réseau de conteneurs (CNI), MetalLB pour l'attribution d'adresses IP aux services de type LoadBalancer dans un environnement dépourvu de répartiteur de charge natif, et Kourier comme passerelle d'entrée (ingress gateway) pour Knative Serving.
 
@@ -647,23 +478,6 @@ Keycloak (OpenID Connect) & Bibliothèque d'intégration utilisée côté backen
 \hline
 \end{longtable}
 \endgroup
-% \begin{tabular}{|m{3cm}|m{10cm}|}
-% \hline
-% \multicolumn{1}{|c|}{Framework} & \multicolumn{1}{c|}{Description} \\
-% \hline
-% Spring Boot & Framework backend utilisé pour l'exposition de l'API REST, l'injection de dépendances, la sécurité (Spring Security) et l'accès aux données (Spring Data JPA). \\
-% \hline
-% Fabric8 Kubernetes Client & Bibliothèque Java utilisée par le backend pour orchestrer les ressources Kubernetes natives et les ressources personnalisées (CRD) de Knative et Strimzi. \\
-% \hline
-% React & Bibliothèque utilisée pour le développement des interfaces graphiques du portail client et de la console d'administration. \\
-% \hline
-% PostgreSQL / JPA-Hibernate & Système de gestion de base de données relationnelle et couche de mapping objet-relationnel utilisés pour la persistance des entités métier. \\
-% \hline
-% Keycloak (OpenID Connect) & Bibliothèque d'intégration utilisée côté backend et frontend pour l'authentification et la validation des jetons JWT. \\
-% \hline
-% \end{tabular}
-\captionof{table}{Frameworks et bibliothèques utilisés}
-\label{tab:frameworks}
 \end{center}
 
 \vspace{1em}
@@ -702,7 +516,7 @@ GitHub & Plateforme d'hébergement du code source et de gestion de versions, uti
 \hline
 Postman & Outil de test et de documentation des API REST, utilisé pour valider manuellement le comportement des différents points d'accès exposés par le backend avant leur intégration dans les interfaces graphiques. \\
 \hline
-PlantUML & Outil de modélisation UML en tant que code, utilisé pour la production des diagrammes de cas d'utilisation, de classes, de composants, de déploiement et de séquence présentés dans ce mémoire, à partir de scripts textuels versionnés avec le code source. \\
+PlantUML~\cite{PlantUMLDoc} & Outil de modélisation UML en tant que code, utilisé pour la production des diagrammes de cas d'utilisation, de classes, de composants, de déploiement et de séquence présentés dans ce mémoire, à partir de scripts textuels versionnés avec le code source. \\
 \hline
 \end{longtable}
 \endgroup
@@ -714,29 +528,6 @@ PlantUML & Outil de modélisation UML en tant que code, utilisé pour la product
 La mise en production de la plateforme repose sur une chaîne DevOps automatisée garantissant la fiabilité et la répétabilité des déploiements. Le tableau~\ref{tab:outils-devops} présente les outils utilisés pour la conteneurisation, l'intégration continue et l'exploitation du cluster.
 
 \renewcommand{\arraystretch}{1.3}
-% \begin{center}
-% \begin{tabular}{|m{3cm}|m{10cm}|}
-% \hline
-% \multicolumn{1}{|c|}{Outil} & \multicolumn{1}{c|}{Description} \\
-% \hline
-% Visual Studio Code & Environnement de développement intégré léger et extensible, utilisé pour le développement du backend Spring Boot, des deux applications frontend React, ainsi que pour la rédaction des manifestes Kubernetes et des scripts de déploiement. \\
-% \hline
-% GitHub & Plateforme d'hébergement du code source et de gestion de versions, utilisée pour le suivi des évolutions du projet et le déclenchement des pipelines d'intégration continue. \\
-% \hline
-% Postman & Outil de test et de documentation des API REST, utilisé pour valider manuellement le comportement des différents points d'accès exposés par le backend avant leur intégration dans les interfaces graphiques. \\
-% \hline
-% Docker & Utilisé pour la construction et l'exécution locale des images de conteneurs avant leur publication sur le registre Docker Hub par la chaîne CI/CD. \\
-% \hline
-% Jenkins et Kaniko & Utilisés pour l'automatisation de la construction, de la publication et du déploiement continu des composants de la plateforme, Kaniko permettant de construire les images sans démon Docker privilégié à l'intérieur du cluster. \\
-% \hline
-% kubectl & Interface en ligne de commande de Kubernetes, utilisée quotidiennement pour l'inspection de l'état du cluster, le déploiement manuel de ressources lors des phases de mise au point, et le diagnostic des incidents. \\
-% \hline
-% PlantUML & Outil de modélisation UML en tant que code, utilisé pour la production des diagrammes de cas d'utilisation, de classes, de composants, de déploiement et de séquence présentés dans ce mémoire, à partir de scripts textuels versionnés avec le code source. \\
-% \hline
-% \end{tabular}
-% \captionof{table}{Outils DevOps et de déploiement utilisés}
-% \label{tab:outils-devops}
-% \end{center}
 
 \begingroup
 \centering
