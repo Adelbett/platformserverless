@@ -37,7 +37,7 @@ public class MetricsController {
     }
 
     @GetMapping(value = "/apps/{id}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @Operation(summary = "SSE stream of per-app metrics, pushed every 10 seconds")
+    @Operation(summary = "SSE stream of per-app metrics, pushed every 15 seconds (matches Prometheus scrape_interval)")
     public SseEmitter streamAppMetrics(@PathVariable String id) {
         SseEmitter emitter = new SseEmitter(0L);
         Executors.newSingleThreadExecutor().execute(() -> {
@@ -45,7 +45,7 @@ public class MetricsController {
                 while (true) {
                     Map<String, Object> metrics = metricsService.getAppMetrics(id);
                     emitter.send(SseEmitter.event().data(metrics));
-                    Thread.sleep(5_000);
+                    Thread.sleep(15_000);
                 }
             } catch (IOException e) {
                 emitter.complete();
@@ -60,7 +60,7 @@ public class MetricsController {
     }
 
     @GetMapping(value = "/cluster/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @Operation(summary = "SSE stream of cluster-wide metrics, pushed every 10 seconds")
+    @Operation(summary = "SSE stream of cluster-wide metrics, pushed every 15 seconds (matches Prometheus scrape_interval)")
     public SseEmitter streamClusterMetrics() {
         SseEmitter emitter = new SseEmitter(0L);
         Executors.newSingleThreadExecutor().execute(() -> {
@@ -68,7 +68,7 @@ public class MetricsController {
                 while (true) {
                     Map<String, Object> metrics = metricsService.getClusterMetrics();
                     emitter.send(SseEmitter.event().data(metrics));
-                    Thread.sleep(5_000);
+                    Thread.sleep(15_000);
                 }
             } catch (IOException e) {
                 emitter.complete();

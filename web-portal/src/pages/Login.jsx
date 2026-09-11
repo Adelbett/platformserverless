@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Cloud, Eye, EyeOff, Gauge } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import Logo from '../components/Logo';
 import './Auth.css';
 
 const Login = () => {
@@ -38,9 +39,7 @@ const Login = () => {
 
             <div className="auth-form-panel">
                 <div className="branding-top">
-                    <div className="brand-mark">
-                        <Cloud size={20} fill="currentColor" strokeWidth={1.5} />
-                    </div>
+                    <Logo size="small" />
                     <span className="brand-name">NEXTSTEP</span>
                 </div>
 
