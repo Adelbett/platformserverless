@@ -20,6 +20,15 @@ api.interceptors.response.use(
             localStorage.removeItem('user')
             window.location.href = '/login'
         }
+        if (err.response?.status === 403 && err.response?.data?.error === 'ACCOUNT_SUSPENDED') {
+            try {
+                const cached = JSON.parse(localStorage.getItem('user'))
+                if (cached && !cached.suspended) {
+                    localStorage.setItem('user', JSON.stringify({ ...cached, suspended: true }))
+                    window.location.reload()
+                }
+            } catch { /* ignore */ }
+        }
         return Promise.reject(err)
     }
 )
